@@ -5,7 +5,7 @@
   "scope": "Local control first; optional explicitly enabled local-LAN extension. Planning complete; new middleware implementation not started.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
   "targetRepository": "E:/developments/projects/Snowball_Middleware",
-  "resumeTaskId": "MW.02.01.01.01",
+  "resumeTaskId": "MW.02.01.01.02",
   "requirements": [
     {
       "id": "R-LOCAL",
@@ -708,7 +708,7 @@
       "kind": "task",
       "title": "Host/Controller/Instance/Workspace identity와 context 분리",
       "requirements": [],
-      "status": "ready",
+      "status": "done",
       "dependsOn": [
         "MW.01.02.01.01"
       ],
@@ -732,13 +732,26 @@
         "D17"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "stable hostId, 복합 Session key, Workspace와 Project 모델을 정의한다.",
+        "owner": "muse-spark/2026-09-17",
+        "baseCommit": "75f98dc475cb6e3ed9123a614ed784bd2be5c29f",
+        "changedFiles": [
+          "packages/core/package.json",
+          "packages/core/tsconfig.json",
+          "packages/core/README.md",
+          "packages/core/src/identity.ts",
+          "packages/core/src/context.ts",
+          "packages/core/src/index.ts",
+          "tests/core-identity.test.mjs",
+          "docs/middleware/evidence/MW.02.01.01.01/verification.md"
+        ],
+        "completedSteps": [
+          1,
+          2,
+          3
+        ],
+        "nextAction": "Continue highest-priority eligible task MW.02.01.01.02.",
         "blockers": [],
-        "updatedAt": null
+        "updatedAt": "2026-09-17"
       },
       "priority": {
         "designDemand": 5,
@@ -752,8 +765,16 @@
       "kind": "acceptance",
       "title": "같은 nativeSessionId가 다른 instance/host에서 충돌하지 않는다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17",
+          "environment": "Windows x64 / Node 20.19.6 / TypeScript 5.9.3",
+          "procedure": "npm run build; npm test (16/16 pass); npm run test:reference (44/44 pass)",
+          "result": "Same native id under another host or instance formats to a different canonical session key; separator round-trip and foreign-host rejection covered",
+          "reference": "docs/middleware/evidence/MW.02.01.01.01/verification.md; tests/core-identity.test.mjs (uncommitted)"
+        }
+      ]
     },
     {
       "id": "MW.02.01.01.01.A2",
@@ -762,8 +783,16 @@
       "kind": "acceptance",
       "title": "두 controller의 scope 변경과 pending draft/approval 목적지가 독립적으로 유지된다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17",
+          "environment": "Windows x64 / Node 20.19.6 / TypeScript 5.9.3",
+          "procedure": "npm run build; npm test (16/16 pass); npm run test:reference (44/44 pass)",
+          "result": "Two controllers keep independent scope/draft/approval; scope switch never retargets bound destinations; one approval revision applies once with peer-observed resolve",
+          "reference": "docs/middleware/evidence/MW.02.01.01.01/verification.md; tests/core-identity.test.mjs (uncommitted)"
+        }
+      ]
     },
     {
       "id": "MW.02.01.01.02",

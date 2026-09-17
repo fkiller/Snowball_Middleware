@@ -6,7 +6,7 @@ Depth: L0 product → L1 outcome → L2 journey → L3 work package → L4 task 
 
 All implementation checks are pending unless their evidence says otherwise.
 
-- **MW** 하드웨어 독립 로컬 harness 제어 — 3/28 tasks done
+- **MW** 하드웨어 독립 로컬 harness 제어 — 4/28 tasks done
   - **MW.01** 분리 저장소와 계약 — 3/3 tasks done
     - **MW.01.01** 기존 작업을 보존하며 추출 — 2/2 tasks done
       - **MW.01.01.01** 소스 export와 재현 기반 — 2/2 tasks done
@@ -21,12 +21,12 @@ All implementation checks are pending unless their evidence says otherwise.
         - **MW.01.02.01.01** Versioned plugin contract와 process lifecycle — done
           - **MW.01.02.01.01.A1** 잘못된 manifest/version/hanging/crashing plugin이 거부·격리되고 core가 생존한다. — pass
           - **MW.01.02.01.01.A2** MK20와 provider code 없이 SDK/core build 및 virtual conformance가 통과한다. — pass
-  - **MW.02** 로컬 제어 Core — 0/3 tasks done
-    - **MW.02.01** 대상을 선택하고 명령 수행 — 0/2 tasks done
-      - **MW.02.01.01** identity와 journal — 0/2 tasks done
-        - **MW.02.01.01.01** Host/Controller/Instance/Workspace identity와 context 분리 — ready
-          - **MW.02.01.01.01.A1** 같은 nativeSessionId가 다른 instance/host에서 충돌하지 않는다. — pending
-          - **MW.02.01.01.01.A2** 두 controller의 scope 변경과 pending draft/approval 목적지가 독립적으로 유지된다. — pending
+  - **MW.02** 로컬 제어 Core — 1/3 tasks done
+    - **MW.02.01** 대상을 선택하고 명령 수행 — 1/2 tasks done
+      - **MW.02.01.01** identity와 journal — 1/2 tasks done
+        - **MW.02.01.01.01** Host/Controller/Instance/Workspace identity와 context 분리 — done
+          - **MW.02.01.01.01.A1** 같은 nativeSessionId가 다른 instance/host에서 충돌하지 않는다. — pass
+          - **MW.02.01.01.01.A2** 두 controller의 scope 변경과 pending draft/approval 목적지가 독립적으로 유지된다. — pass
         - **MW.02.01.01.02** Durable command/decision 처리와 복구 — todo
           - **MW.02.01.01.02.A1** 전송 직전/직후 crash와 reconnect가 중복 send를 만들지 않고 불확실하면 unknown을 유지한다. — pending
           - **MW.02.01.01.02.A2** 두 controller가 동일 decision을 답하면 한 번만 적용되고 stale 요청은 실패한다. — pending
