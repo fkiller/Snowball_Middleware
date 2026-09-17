@@ -6,7 +6,7 @@ Handoff state: READY — MANDATORY QUOTA HANDOFF. Final actual app check reports
 Local control first; hardware is optional. The user explicitly requests highest design-demand/difficulty work first while respecting dependencies. PLAN.json priority fields and validator --next implement that order. No mandatory cloud control plane; local-LAN is opt-in.
 
 ## Current repository and completed tasks
-Authoritative repository: E:/developments/projects/Snowball_Middleware. Branch codex/local-control-core. The initial foundation commit is the current HEAD after this handoff is committed; use git log -1 to obtain its exact hash. Source prototype remains separately at ../Snowball_Control, source HEAD c4513bb plus preserved dirty/untracked work.
+Authoritative repository: E:/developments/projects/Snowball_Middleware. Branch codex/local-control-core. Latest implementation commit: 93a56e9 (extract local middleware and establish isolated plugin protocol). A subsequent documentation-only handoff commit may be HEAD; use git log -2. Source prototype remains separately at ../Snowball_Control, source HEAD c4513bb plus preserved dirty/untracked work.
 
 Completed: MW.01.01.01.01 inventory (346 hashes); MW.01.01.01.02 separate repo/scaffold/reference suite; MW.01.02.01.01 SDK and isolated plugin-host foundation. PLAN.json: 3/28 tasks done, 6/56 checks passed. Source plan is a redirect, not a second ledger.
 
