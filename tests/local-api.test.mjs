@@ -1,0 +1,183 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import http from 'node:http';
+import { once } from 'node:events';
+import { CommandJournal, formatSessionKey } from '../packages/core/dist/index.js';
+import { LocalApi, WorkspaceFiles } from '../packages/api/dist/index.js';
+import { LocalClient } from '../packages/client-sdk/dist/index.js';
+
+const hostId = `host_${'a'.repeat(32)}`;
+const sessionKey = formatSessionKey({ hostId, harness: { pluginId: 'snowball.test', instanceId: 'local' }, nativeSessionId: 's1' });
+const ownerId = 'owner-1';
+const workspaceId = `ws_${'c'.repeat(16)}`;
+async function setup(t, options = {}) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'snowball-api-'));
+  const root = path.join(directory, 'workspace'); fs.mkdirSync(root); fs.writeFileSync(path.join(root, 'hello.txt'), 'local text');
+  fs.writeFileSync(path.join(directory, 'outside.txt'), 'must not read');
+  fs.writeFileSync(path.join(root, 'binary'), Buffer.from([0, 1, 2]));
+  fs.writeFileSync(path.join(root, 'large'), Buffer.alloc(256 * 1024 + 1, 65));
+  const journal = new CommandJournal({ hostId, directory: path.join(directory, 'state') }); journal.registerSession(sessionKey, ownerId);
+  const workspaces = await WorkspaceFiles.create([{ workspaceId, root }]);
+  const api = new LocalApi({ journal, workspaces, ...options }); await api.start();
+  t.after(async () => { await api.close(); journal.close(); fs.rmSync(directory, { recursive: true, force: true }); });
+  return { directory, root, journal, api, workspaces };
+}
+async function request(api, route, { method = 'GET', body, headers = {}, auth } = {}) {
+  const response = await fetch(api.origin + route, { method, headers: { Origin: api.origin, ...(auth ? { Authorization: `Bearer ${auth.token}`, 'X-Snowball-CSRF': auth.csrfToken } : {}), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+  return { status: response.status, headers: response.headers, body: await response.json() };
+}
+async function login(api) { const grant = api.issueBootstrap(); const res = await request(api, '/v1/bootstrap', { method: 'POST', body: { code: grant.code } }); assert.equal(res.status, 201); return res.body; }
+const input = (journal, commandId, extra = {}) => ({ commandId, sessionKey, ownerId, expectedRevision: journal.session(sessionKey).revision, operation: 'sessions.send', payload: { text: 'private-payload' }, ...extra });
+const matches = (status, code) => error => error.status === status && (!code || error.code === code);
+
+test('loopback listener denies foreign Host/Origin, missing authentication and query credentials', async t => {
+  const { api } = await setup(t); assert.equal(api.server.address().address, '127.0.0.1');
+  assert.equal((await request(api, '/v1/snapshot')).status, 401);
+  const auth = await login(api);
+  for (const headers of [{ Host: 'localhost' }, { Origin: 'https://evil.example' }, { Origin: 'null' }, { 'Sec-Fetch-Site': 'cross-site' }, { 'Sec-Fetch-Site': 'same-site' }]) {
+    // Native HTTP deliberately preserves hostile headers that fetch may normalize away.
+    const status = await new Promise((resolve, reject) => {
+      http.get(api.origin + '/v1/snapshot', { headers: { Origin: api.origin, Authorization: `Bearer ${auth.token}`, ...headers } }, res => { res.resume(); res.on('end', () => resolve(res.statusCode)); }).on('error', reject);
+    });
+    assert.equal(status, 403, JSON.stringify(headers));
+  }
+  const valid = await request(api, '/v1/snapshot', { auth }); assert.equal(valid.status, 200);
+  assert.equal(valid.headers.get('access-control-allow-origin'), null); assert.equal(valid.headers.get('cache-control'), 'no-store');
+  const query = await request(api, `/v1/snapshot?token=${auth.token}`, { auth });
+  assert.equal(query.status, 400); assert.equal(JSON.stringify(query.body).includes(auth.token), false);
+  assert.equal((await request(api, '/v1/snapshot', { auth, method: 'OPTIONS' })).status, 405);
+});
+
+test('one-use bootstrap, expiry, CSRF and logout revoke control without leaking credentials', async t => {
+  let now = 100; const { api, journal } = await setup(t, { now: () => now, sessionTtlMs: 1000 });
+  const grant = api.issueBootstrap();
+  const auth = (await request(api, '/v1/bootstrap', { method: 'POST', body: { code: grant.code } })).body;
+  assert.equal((await request(api, '/v1/bootstrap', { method: 'POST', body: { code: grant.code } })).status, 401);
+  assert.equal((await request(api, '/v1/commands', { auth, method: 'POST', body: input(journal, 'c1'), headers: { 'X-Snowball-CSRF': 'wrong' } })).status, 403);
+  const noOrigin = await fetch(api.origin + '/v1/commands', { method: 'POST', headers: { Authorization: `Bearer ${auth.token}`, 'X-Snowball-CSRF': auth.csrfToken, 'Content-Type': 'application/json' }, body: JSON.stringify(input(journal, 'c1')) });
+  assert.equal(noOrigin.status, 403); await noOrigin.arrayBuffer();
+  assert.equal(journal.listCommands().length, 0);
+  assert.equal((await request(api, '/v1/logout', { auth, method: 'POST' })).status, 200);
+  assert.equal((await request(api, '/v1/snapshot', { auth })).status, 401);
+  const next = await login(api); now = 1100;
+  assert.equal((await request(api, '/v1/snapshot', { auth: next })).status, 401);
+  const expiring = api.issueBootstrap(); now += 60_000;
+  const denied = await request(api, '/v1/bootstrap', { method: 'POST', body: { code: expiring.code } });
+  assert.equal(denied.status, 401); assert.deepEqual(denied.body, { error: 'unauthorized' });
+});
+
+test('SDK admits durable commands with authenticated actor, exact retries and stale conflicts; never dispatches', async t => {
+  const { api, journal } = await setup(t); const client = new LocalClient(api.origin);
+  const { controllerId } = await client.bootstrap(api.issueBootstrap().code);
+  const command = input(journal, 'c1'); const accepted = await client.submit(command);
+  assert.equal(accepted.command.status, 'queued'); assert.equal(accepted.command.input.actorId, controllerId);
+  assert.equal((await client.submit(command)).replayed, true);
+  await assert.rejects(client.submit({ ...command, payload: {} }), matches(409, 'idempotency_conflict'));
+  await assert.rejects(client.submit({ ...command, commandId: 'c2' }), matches(409, 'stale_revision'));
+  await assert.rejects(client.submit({ ...input(journal, 'c3'), actorId: controllerId }), matches(400, 'actor_is_authenticated'));
+  const other = new LocalClient(api.origin); await other.bootstrap(api.issueBootstrap().code);
+  await assert.rejects(other.submit(command), matches(403, 'command_owner_denied'));
+  const snapshot = await client.snapshot(); assert.equal(snapshot.commands.length, 1);
+  assert.equal(JSON.stringify(snapshot).includes('private-payload'), false);
+  assert.equal((await client.command('c1')).input.payload.text, 'private-payload');
+  assert.equal(journal.command('c1').status, 'queued');
+  await client.logout(); await assert.rejects(client.snapshot(), matches(401));
+});
+
+test('body completion rechecks revocation before admitting a command', async t => {
+  const { api, journal } = await setup(t); const auth = await login(api);
+  const body = JSON.stringify(input(journal, 'c1'));
+  const req = http.request(api.origin + '/v1/commands', { method: 'POST', headers: { Origin: api.origin, Authorization: `Bearer ${auth.token}`, 'X-Snowball-CSRF': auth.csrfToken, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } });
+  const response = once(req, 'response'); req.write(body.slice(0, -1));
+  await new Promise(r => setTimeout(r, 20)); api.revokeController(auth.controllerId); req.end(body.slice(-1));
+  const [res] = await response; res.resume(); await once(res, 'end');
+  assert.equal(res.statusCode, 401); assert.equal(journal.listCommands().length, 0);
+});
+
+test('SSE replays retained invalidations; gaps and new epoch demand a consistent snapshot', async t => {
+  const { api, journal } = await setup(t, { eventCapacity: 2 }); const client = new LocalClient(api.origin);
+  await client.bootstrap(api.issueBootstrap().code); const before = await client.snapshot();
+  await client.submit(input(journal, 'c1'));
+  let stream = client.events(before.cursor, AbortSignal.timeout(2000));
+  const replay = await stream.next(); assert.equal(replay.value.type, 'changed');
+  assert.equal(replay.value.cursor, (await client.snapshot()).cursor); await stream.return();
+  await client.submit(input(journal, 'c2')); await client.submit(input(journal, 'c3'));
+  for (const cursor of [before.cursor, `${'0'.repeat(32)}:0`, `${api.cursor.split(':')[0]}:99999`]) {
+    stream = client.events(cursor, AbortSignal.timeout(2000)); const result = await stream.next();
+    assert.equal(result.value.type, 'resync'); await stream.return();
+    const current = await client.snapshot(); assert.equal(current.commands.length, 3); assert.equal(current.cursor, api.cursor);
+  }
+  const snapshot = await client.snapshot(); stream = client.events(snapshot.cursor, AbortSignal.timeout(2000));
+  const next = stream.next(); await new Promise(r => setTimeout(r, 30)); await client.submit(input(journal, 'c4'));
+  assert.equal((await next).value.type, 'changed'); await stream.return();
+});
+
+test('stream sessions are revoked and connection limits reject excess observers', async t => {
+  const { api } = await setup(t); const auth = await login(api);
+  const headers = { Origin: api.origin, Authorization: `Bearer ${auth.token}` };
+  const first = await fetch(api.origin + '/v1/events', { headers }); const second = await fetch(api.origin + '/v1/events', { headers });
+  const excess = await fetch(api.origin + '/v1/events', { headers }); assert.equal(excess.status, 429); await excess.arrayBuffer();
+  api.revokeController(auth.controllerId);
+  assert.match(await first.text(), /event: resync/); assert.match(await second.text(), /event: resync/);
+});
+
+test('registered workspace reads reject outside roots, traversal, ADS, symlinks, binary and oversized files', async t => {
+  const { api, root, directory } = await setup(t); const client = new LocalClient(api.origin); await client.bootstrap(api.issueBootstrap().code);
+  assert.deepEqual(await client.readFile(workspaceId, 'hello.txt'), { text: 'local text' });
+  for (const relative of ['../outside.txt', 'sub/../../outside.txt', '/outside.txt', 'C:/outside.txt', 'hello.txt:secret', '\\outside.txt', 'binary', 'large']) {
+    await assert.rejects(client.readFile(workspaceId, relative), matches(404, 'file_unavailable'));
+  }
+  await assert.rejects(client.readFile(`ws_${'d'.repeat(16)}`, 'hello.txt'), matches(404));
+  // Windows directory junctions can be created without Developer Mode/admin privileges.
+  const outside = path.join(directory, 'outside'); fs.mkdirSync(outside); fs.writeFileSync(path.join(outside, 'secret.txt'), 'outside');
+  fs.symlinkSync(outside, path.join(root, 'link'), process.platform === 'win32' ? 'junction' : 'dir');
+  await assert.rejects(client.readFile(workspaceId, 'link/secret.txt'), matches(404));
+});
+
+test('SDK credentials only use headers/body, event fetch has no URL token and mutation network failures are not retried', async () => {
+  const calls = []; let failNext = false;
+  const client = new LocalClient('http://127.0.0.1:12345', async (url, options) => {
+    calls.push({ url, options });
+    if (failNext) throw new Error('lost connection');
+    return new Response(JSON.stringify({ token: 'token-secret', csrfToken: 'csrf-secret', controllerId: 'controller', expiresAt: 99999 }), { status: 201 });
+  });
+  await client.bootstrap('bootstrap-secret'); failNext = true;
+  await assert.rejects(client.submit({ commandId: 'c1' }), /lost connection/); assert.equal(calls.length, 2);
+  assert.ok(calls.every(c => !c.url.includes('secret')));
+  assert.equal(calls[1].options.headers.Authorization, 'Bearer token-secret');
+  assert.equal(calls[1].options.headers['X-Snowball-CSRF'], 'csrf-secret');
+  assert.equal(calls[1].options.redirect, 'error');
+  assert.throws(() => new LocalClient('http://localhost:12345'));
+  assert.throws(() => new LocalClient('http://127.0.0.1:12345/path'));
+});
+
+test('malformed, compressed and oversized bodies cannot admit work', async t => {
+  const { api, journal } = await setup(t); const auth = await login(api);
+  const headers = { Origin: api.origin, Authorization: `Bearer ${auth.token}`, 'X-Snowball-CSRF': auth.csrfToken, 'Content-Type': 'application/json' };
+  for (const [body, extra, expected] of [['{', {}, 400], ['[]', {}, 400], ['{}', { 'Content-Encoding': 'gzip' }, 415]]) {
+    const response = await fetch(api.origin + '/v1/commands', { method: 'POST', headers: { ...headers, ...extra }, body });
+    assert.equal(response.status, expected); await response.arrayBuffer();
+  }
+  try {
+    const response = await fetch(api.origin + '/v1/commands', { method: 'POST', headers, body: JSON.stringify(input(journal, 'oversize', { payload: 'x'.repeat(129 * 1024) })) });
+    assert.equal(response.status, 413); await response.arrayBuffer();
+  } catch (error) { assert.equal(error instanceof TypeError, true, 'An oversized socket may be closed before a response'); }
+  assert.equal(journal.listCommands().length, 0);
+});
+
+test('published OpenAPI routes and SDK operations describe the implemented v1 surface', () => {
+  const spec = JSON.parse(fs.readFileSync(new URL('../packages/api/openapi.v1.json', import.meta.url)));
+  assert.equal(spec.openapi, '3.1.0');
+  assert.equal(Object.keys(spec.paths).length, 8);
+  assert.deepEqual(spec.paths['/v1/bootstrap'].post.security, []);
+  assert.ok(spec.paths['/v1/commands'].post.responses['202']);
+  assert.equal(spec.components.schemas.CommandInput.properties.actorId, undefined);
+  const visit = value => {
+    if (!value || typeof value !== 'object') return;
+    if (value.$ref) assert.ok(value.$ref.split('/').slice(1).reduce((node, key) => node?.[key], spec), value.$ref);
+    for (const child of Object.values(value)) visit(child);
+  }; visit(spec);
+});

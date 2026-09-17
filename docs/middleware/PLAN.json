@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "planRevision": 4,
+  "planRevision": 5,
   "updatedAt": "2026-09-17",
-  "scope": "Local control first. Plugin, identity and durable command foundation implemented; authenticated loopback API next.",
+  "scope": "Local control first. Core journal and authenticated API verified; device registry next.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
   "targetRepository": "E:/developments/projects/Snowball_Middleware",
-  "resumeTaskId": "MW.02.02.01.01",
+  "resumeTaskId": "MW.04.01.01.01",
   "requirements": [
     {
       "id": "R-LOCAL",
@@ -895,7 +895,7 @@
       "kind": "task",
       "title": "인증된 localhost API와 event stream",
       "requirements": [],
-      "status": "todo",
+      "status": "done",
       "dependsOn": [
         "MW.02.01.01.02"
       ],
@@ -918,13 +918,26 @@
         "J06"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "loopback-only listener, Host/Origin/CSRF/session bootstrap을 구현한다.",
+        "owner": "Codex / 2026-09-17 continuation",
+        "baseCommit": "f17a769",
+        "changedFiles": [
+          "docs/ADR-003-LOCAL-API.md",
+          "packages/api",
+          "packages/client-sdk",
+          "packages/core/src/commands.ts",
+          "scripts/build.mjs",
+          "package-lock.json",
+          "tests/local-api.test.mjs",
+          "tests/plugin-host.test.mjs"
+        ],
+        "completedSteps": [
+          "loopback-only listener, Host/Origin/CSRF/session bootstrap을 구현한다.",
+          "명령/목록/상태/SSE cursor와 snapshot recovery를 구현한다.",
+          "payload/time/queue limits와 registered Workspace 파일 접근 경계를 적용한다."
+        ],
+        "nextAction": "Proceed to MW.04.01.01.01 device registry, the highest-priority dependency-ready task.",
         "blockers": [],
-        "updatedAt": null
+        "updatedAt": "2026-09-17T23:53:33.785Z"
       },
       "priority": {
         "designDemand": 5,
@@ -938,8 +951,16 @@
       "kind": "acceptance",
       "title": "허용되지 않은 origin/host/인증과 stale revision 요청이 차단되고 token이 로그/URL에 남지 않는다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17",
+          "environment": "Windows x64 / Node 20.19.6",
+          "procedure": "npm test (real loopback HTTP/SSE and client SDK)",
+          "result": "42/42 tests pass; auth/origin/CSRF/revocation, stale commands, bounded workspace reads and event recovery verified.",
+          "reference": "docs/middleware/evidence/MW.02.02.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.02.02.01.01.A2",
@@ -948,8 +969,16 @@
       "kind": "acceptance",
       "title": "event gap/reconnect에서 snapshot이 일관되고 LAN 비활성 시 외부 interface listener가 없다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17",
+          "environment": "Windows x64 / Node 20.19.6",
+          "procedure": "npm test (real loopback HTTP/SSE and client SDK)",
+          "result": "42/42 tests pass; auth/origin/CSRF/revocation, stale commands, bounded workspace reads and event recovery verified.",
+          "reference": "docs/middleware/evidence/MW.02.02.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.03.01.01.01",

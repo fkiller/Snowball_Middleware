@@ -58,10 +58,12 @@ test('unapproved digest and altered artifact never start', async t => {
 });
 
 test('request timeout retains unknown and late reply does not corrupt next request', async t => {
-  const { host } = await fixture(t, `setTimeout(()=>send({jsonrpc:'2.0',id:r.id,result:r.params}),r.params.delay);`, { timeoutMs: 150 });
+  // Allow process startup under parallel filesystem/HTTP tests. The late first reply
+  // arrives while the second request is pending, rather than after this test exits.
+  const { host } = await fixture(t, `setTimeout(()=>send({jsonrpc:'2.0',id:r.id,result:r.params}),r.params.delay);`, { timeoutMs: 1000 });
   await host.start();
-  await assert.rejects(host.request('devices.list', { delay: 250 }), e => e.code === 'timeout' && e.delivery === 'unknown');
-  assert.deepEqual(await host.request('devices.list', { delay: 0 }), { delay: 0 });
+  await assert.rejects(host.request('devices.list', { delay: 1250 }), e => e.code === 'timeout' && e.delivery === 'unknown');
+  assert.deepEqual(await host.request('devices.list', { delay: 500 }), { delay: 500 });
 });
 
 test('cancel before/after dispatch has distinct certainty; outstanding limit enforced', async t => {

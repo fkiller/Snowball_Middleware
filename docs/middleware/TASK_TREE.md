@@ -6,7 +6,7 @@ Depth: L0 product → L1 outcome → L2 journey → L3 work package → L4 task 
 
 All implementation checks are pending unless their evidence says otherwise.
 
-- **MW** 하드웨어 독립 로컬 harness 제어 — 5/28 tasks done
+- **MW** 하드웨어 독립 로컬 harness 제어 — 6/28 tasks done
   - **MW.01** 분리 저장소와 계약 — 3/3 tasks done
     - **MW.01.01** 기존 작업을 보존하며 추출 — 2/2 tasks done
       - **MW.01.01.01** 소스 export와 재현 기반 — 2/2 tasks done
@@ -21,7 +21,7 @@ All implementation checks are pending unless their evidence says otherwise.
         - **MW.01.02.01.01** Versioned plugin contract와 process lifecycle — done
           - **MW.01.02.01.01.A1** 잘못된 manifest/version/hanging/crashing plugin이 거부·격리되고 core가 생존한다. — pass
           - **MW.01.02.01.01.A2** MK20와 provider code 없이 SDK/core build 및 virtual conformance가 통과한다. — pass
-  - **MW.02** 로컬 제어 Core — 2/3 tasks done
+  - **MW.02** 로컬 제어 Core — 3/3 tasks done
     - **MW.02.01** 대상을 선택하고 명령 수행 — 2/2 tasks done
       - **MW.02.01.01** identity와 journal — 2/2 tasks done
         - **MW.02.01.01.01** Host/Controller/Instance/Workspace identity와 context 분리 — done
@@ -30,11 +30,11 @@ All implementation checks are pending unless their evidence says otherwise.
         - **MW.02.01.01.02** Durable command/decision 처리와 복구 — done
           - **MW.02.01.01.02.A1** 전송 직전/직후 crash와 reconnect가 중복 send를 만들지 않고 불확실하면 unknown을 유지한다. — pass
           - **MW.02.01.01.02.A2** 두 controller가 동일 decision을 답하면 한 번만 적용되고 stale 요청은 실패한다. — pass
-    - **MW.02.02** 로컬 client 연결 — 0/1 tasks done
-      - **MW.02.02.01** API와 인증 — 0/1 tasks done
-        - **MW.02.02.01.01** 인증된 localhost API와 event stream — todo
-          - **MW.02.02.01.01.A1** 허용되지 않은 origin/host/인증과 stale revision 요청이 차단되고 token이 로그/URL에 남지 않는다. — pending
-          - **MW.02.02.01.01.A2** event gap/reconnect에서 snapshot이 일관되고 LAN 비활성 시 외부 interface listener가 없다. — pending
+    - **MW.02.02** 로컬 client 연결 — 1/1 tasks done
+      - **MW.02.02.01** API와 인증 — 1/1 tasks done
+        - **MW.02.02.01.01** 인증된 localhost API와 event stream — done
+          - **MW.02.02.01.01.A1** 허용되지 않은 origin/host/인증과 stale revision 요청이 차단되고 token이 로그/URL에 남지 않는다. — pass
+          - **MW.02.02.01.01.A2** event gap/reconnect에서 snapshot이 일관되고 LAN 비활성 시 외부 interface listener가 없다. — pass
   - **MW.03** Harness discovery — 0/5 tasks done
     - **MW.03.01** 최초 발견과 검증 — 0/2 tasks done
       - **MW.03.01.01** 후보와 상태 모델 — 0/2 tasks done

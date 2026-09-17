@@ -38,6 +38,7 @@ export class CommandJournal {
   private order = 0;
   private closed = false;
   private poisoned = false;
+  private readonly listeners = new Set<() => void>();
 
   constructor(options: JournalOptions) {
     this.hostId = parseHostId(options.hostId);
@@ -118,6 +119,7 @@ export class CommandJournal {
     const tx = this.validate({ schema: 1, hostId: this.hostId, sessions: [], commands: [], decisions: [], ...changes });
     try { this.log.append(tx); } catch (error) { this.poisoned = true; throw error; }
     this.apply(tx); // Published only AFTER durable write succeeds.
+    for (const listener of this.listeners) { try { listener(); } catch { /* An observer cannot undo a durable commit. */ } }
   }
   private changeCommand(c: CommandRecord, status: CommandRecord['status'], reason?: string): CommandRecord {
     return { ...copy(c), status, revision: c.revision + 1, updatedAt: this.time(), ...(reason ? { reason } : {}) };
@@ -143,6 +145,10 @@ export class CommandJournal {
   decision(decisionId: string): DecisionRecord | undefined { const d = this.decisions.get(decisionId); return d ? copy(d) : undefined; }
   listCommands(): CommandRecord[] { return [...this.commands.values()].map(copy); }
   listDecisions(): DecisionRecord[] { return [...this.decisions.values()].map(copy); }
+  listSessions(): SessionRecord[] { return [...this.sessions.values()].map(copy); }
+  subscribe(listener: () => void): () => void {
+    this.checkOpen(); this.listeners.add(listener); return () => { this.listeners.delete(listener); };
+  }
 
   /** Trusted adapter observation; not a client selection or discovery result. */
   registerSession(sessionKey: string, ownerId: string): SessionRecord {
@@ -286,5 +292,5 @@ export class CommandJournal {
     if (claimed?.status === 'queued') commands.push(this.changeCommand(claimed, 'cancelled', 'decision_resolved_externally'));
     this.commit({ decisions: [next], commands }); return copy(next);
   }
-  close(): void { if (!this.closed) { this.closed = true; this.log.close(); } }
+  close(): void { if (!this.closed) { this.closed = true; this.listeners.clear(); this.log.close(); } }
 }

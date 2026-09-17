@@ -1,0 +1,841 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Snowball local middleware API",
+    "version": "1.0.0",
+    "description": "Local control only. Exact numeric loopback Host required. Origin required for POST and validated whenever present. Body limit 128 KiB; snapshot limit 8 MiB. No CORS, cookies, external listener, auto dispatch or credential-bearing URLs."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:{port}",
+      "variables": {
+        "port": {
+          "default": "43123",
+          "description": "Use the actual port returned by the local runtime."
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "LocalSession": []
+    }
+  ],
+  "paths": {
+    "/v1/bootstrap": {
+      "post": {
+        "operationId": "bootstrap",
+        "description": "Consume a one-use grant minted by the trusted tray/CLI, valid for 60 seconds. No public grant-minting route.",
+        "responses": {
+          "201": {
+            "description": "Memory-only credentials. Do not log/store in URLs or browser storage.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credentials"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "security": [],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact listener origin, e.g. http://127.0.0.1:43123. No remote, null, or alias origin."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "code"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/snapshot": {
+      "get": {
+        "operationId": "snapshot",
+        "description": "Atomic current host summary and cursor. Omits command payloads and decision answer details.",
+        "responses": {
+          "200": {
+            "description": "Current state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/v1/commands": {
+      "post": {
+        "operationId": "submitCommand",
+        "description": "Admit to the durable queue. actorId comes from authentication. Identical ID+intent returns original. This route does not dispatch. No automatic retries.",
+        "responses": {
+          "200": {
+            "description": "Exact retry: retained record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Admission"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Admitted, not evidence of dispatch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Admission"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact listener origin, e.g. http://127.0.0.1:43123. No remote, null, or alias origin."
+          },
+          {
+            "name": "X-Snowball-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/commands/{commandId}": {
+      "get": {
+        "operationId": "command",
+        "description": "Authenticated host-supervision read.",
+        "responses": {
+          "200": {
+            "description": "Retained command",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommandRecord"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "commandId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/decisions/{decisionId}": {
+      "get": {
+        "operationId": "decision",
+        "description": "Exact owner/native request, current local revision and canonical allowed answers.",
+        "responses": {
+          "200": {
+            "description": "Decision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionRecord"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "decisionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/events": {
+      "get": {
+        "operationId": "events",
+        "description": "Authenticated fetch SSE. changed invalidates cached state. resync requires GET snapshot then reconnect from its cursor. Events are volatile across restart; no query credentials.",
+        "responses": {
+          "200": {
+            "description": "Bounded changed/resync events. Data is JSON containing cursor; resync also contains snapshot: /v1/snapshot.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Cursor"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/workspaces/{workspaceId}/file": {
+      "get": {
+        "operationId": "readFile",
+        "description": "Read at most 256 KiB of UTF-8 text beneath a trusted registered workspace. Rejects symlinks/traversal/ADS. No remote registration or arbitrary absolute paths.",
+        "responses": {
+          "200": {
+            "description": "Bounded text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "text"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/logout": {
+      "post": {
+        "operationId": "logout",
+        "description": "Revoke current controller session and close its streams.",
+        "responses": {
+          "200": {
+            "description": "Revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revoked": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "revoked"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact listener origin, e.g. http://127.0.0.1:43123. No remote, null, or alias origin."
+          },
+          {
+            "name": "X-Snowball-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "LocalSession": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "In-memory bootstrap session token"
+      }
+    },
+    "schemas": {
+      "Cursor": {
+        "type": "string",
+        "pattern": "^[a-f0-9]{32}:[0-9]+$"
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "Credentials": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "csrfToken": {
+            "type": "string"
+          },
+          "controllerId": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "token",
+          "csrfToken",
+          "controllerId",
+          "expiresAt"
+        ],
+        "additionalProperties": false
+      },
+      "CommandInput": {
+        "type": "object",
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+          },
+          "sessionKey": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation": {
+            "type": "string"
+          },
+          "payload": {
+            "description": "Plain JSON, at most 64 KiB canonical encoding, nesting at most 32."
+          },
+          "decision": {
+            "type": "object",
+            "properties": {
+              "decisionId": {
+                "type": "string"
+              },
+              "expectedRevision": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "decisionId",
+              "expectedRevision"
+            ],
+            "additionalProperties": false
+          },
+          "expiresAt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "commandId",
+          "sessionKey",
+          "ownerId",
+          "expectedRevision",
+          "operation",
+          "payload"
+        ],
+        "additionalProperties": false
+      },
+      "CommandRecord": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "object",
+            "properties": {
+              "commandId": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+              },
+              "sessionKey": {
+                "type": "string"
+              },
+              "ownerId": {
+                "type": "string"
+              },
+              "expectedRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "operation": {
+                "type": "string"
+              },
+              "payload": {
+                "description": "Plain JSON, at most 64 KiB canonical encoding, nesting at most 32."
+              },
+              "decision": {
+                "type": "object",
+                "properties": {
+                  "decisionId": {
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "decisionId",
+                  "expectedRevision"
+                ],
+                "additionalProperties": false
+              },
+              "expiresAt": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "actorId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "commandId",
+              "sessionKey",
+              "ownerId",
+              "expectedRevision",
+              "operation",
+              "payload",
+              "actorId"
+            ],
+            "additionalProperties": false
+          },
+          "fingerprint": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "dispatched",
+              "acknowledged",
+              "completed",
+              "failed",
+              "unknown",
+              "cancelled"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "order": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string"
+          },
+          "correlationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "input",
+          "fingerprint",
+          "status",
+          "revision",
+          "order",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "DecisionRecord": {
+        "type": "object",
+        "properties": {
+          "decisionId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string"
+          },
+          "nativeRequestId": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "nativeRevision": {
+            "type": "string"
+          },
+          "allowedAnswers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 64
+          },
+          "expiresAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "claimed",
+              "needs_review",
+              "unknown",
+              "resolved",
+              "expired"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "claimCommandId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "decisionId",
+          "sessionKey",
+          "ownerId",
+          "nativeRequestId",
+          "nativeRevision",
+          "allowedAnswers",
+          "status",
+          "revision",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "Admission": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/CommandRecord"
+          },
+          "replayed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "command",
+          "replayed"
+        ],
+        "additionalProperties": false
+      },
+      "Snapshot": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "$ref": "#/components/schemas/Cursor"
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionKey": {
+                  "type": "string"
+                },
+                "ownerId": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "sessionKey",
+                "ownerId",
+                "revision"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "commands": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "commandId": {
+                  "type": "string"
+                },
+                "actorId": {
+                  "type": "string"
+                },
+                "sessionKey": {
+                  "type": "string"
+                },
+                "ownerId": {
+                  "type": "string"
+                },
+                "operation": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "dispatched",
+                    "acknowledged",
+                    "completed",
+                    "failed",
+                    "unknown",
+                    "cancelled"
+                  ]
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "order": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "updatedAt": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "commandId",
+                "actorId",
+                "sessionKey",
+                "ownerId",
+                "operation",
+                "status",
+                "revision",
+                "order",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "decisionId": {
+                  "type": "string"
+                },
+                "sessionKey": {
+                  "type": "string"
+                },
+                "ownerId": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "claimed",
+                    "needs_review",
+                    "unknown",
+                    "resolved",
+                    "expired"
+                  ]
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "expiresAt": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "decisionId",
+                "sessionKey",
+                "ownerId",
+                "status",
+                "revision"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "workspaceId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "workspaceId"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "cursor",
+          "sessions",
+          "commands",
+          "decisions",
+          "workspaces"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Generic error code; no raw exception/path/credential. Authentication 401, origin/CSRF 403, stale intent 409, capacity 429, unavailable 503.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}
