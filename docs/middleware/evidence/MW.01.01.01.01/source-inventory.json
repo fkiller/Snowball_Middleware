@@ -1,0 +1,2793 @@
+{
+  "version": 1,
+  "sourceRoot": "E:\\developments\\projects\\Snowball_Control",
+  "sourceCommit": "c4513bb03e7d969c6773604bfdcdb651412e0f0f",
+  "generatedAt": "2026-09-17T18:23:48.799Z",
+  "license": "No root LICENSE/COPYING/NOTICE found. Internal development export only; public redistribution requires license/provenance review. Generated provider types retain their original headers.",
+  "exclusions": [
+    "host/node_modules",
+    "host/dist",
+    "host/.state",
+    "host/.venv*",
+    "host/probes",
+    "host/poc",
+    "recordings and temporary WAV fixtures",
+    "hardware firmware/toolchain/binaries",
+    "environment files and credentials"
+  ],
+  "tests": {
+    "portable": "All host/tests except integration.test.mjs and whisper-worker.test.mjs (44 tests at baseline). Local mock HTTP/mesh sockets are used.",
+    "optionalSpeech": "integration.test.mjs and whisper-worker.test.mjs require Python + faster-whisper + cached model, optionally an external prerecorded WAV. Not redistributed.",
+    "live": "No live provider command/hardware test included in default suite."
+  },
+  "files": [
+    {
+      "source": "host/package-lock.json",
+      "target": "reference/legacy-host/package-lock.json",
+      "sha256": "d6e0fc8b879e097d714e86e50a3b88d751131ac424694da533287946ac56cab3",
+      "bytes": 1454,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/package.json",
+      "target": "reference/legacy-host/package.json",
+      "sha256": "8001690b9cc6311af032aab9855e1ee367ff1bf786aaad02d7644c9a4642d350",
+      "bytes": 537,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/audio/draft.ts",
+      "target": "reference/legacy-host/src/audio/draft.ts",
+      "sha256": "c957018cec16e79bf1b89a0925071c65eebdfdfd3530313a1da0026c06786eed",
+      "bytes": 3659,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/audio/local-whisper.ts",
+      "target": "reference/legacy-host/src/audio/local-whisper.ts",
+      "sha256": "e6e5351c229de0615df668f0b0a9bcf44add037bfe1375d7c4c359edb91793f9",
+      "bytes": 9330,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/audio/native-worker.ts",
+      "target": "reference/legacy-host/src/audio/native-worker.ts",
+      "sha256": "c60af28b31c31d449ef563dd0768e5a599f99919b19927ce19796e59c7541750",
+      "bytes": 4478,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/audio/provider.ts",
+      "target": "reference/legacy-host/src/audio/provider.ts",
+      "sha256": "86d1cd1be4a7247ca17dc4d9da0ec4405d8872d5834124a6b76b8ceba878f7e2",
+      "bytes": 276,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/audio/speech.ts",
+      "target": "reference/legacy-host/src/audio/speech.ts",
+      "sha256": "d8eba89513feca6f8b077bfd410933c0c083aece7fe60eb1419eff99309b042b",
+      "bytes": 6712,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/audio/transport.ts",
+      "target": "reference/legacy-host/src/audio/transport.ts",
+      "sha256": "f895106dbf7d278f9e5cdacf21f30491f029606d15e5d465f81fc4b29ee8153a",
+      "bytes": 8960,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/audio/whisper_worker.py",
+      "target": "reference/legacy-host/src/audio/whisper_worker.py",
+      "sha256": "6e2c564829d6536cea33d7f56eb1a11836016875be2fc41f959d89df477e6469",
+      "bytes": 4532,
+      "tracked": false,
+      "role": "optional-speech-worker"
+    },
+    {
+      "source": "host/src/codex/adapter.ts",
+      "target": "reference/legacy-host/src/codex/adapter.ts",
+      "sha256": "3aa789813b092cadced2e6def2ba316418f7806dafa423a065ac90622917e036",
+      "bytes": 10344,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/codex/desktop.ts",
+      "target": "reference/legacy-host/src/codex/desktop.ts",
+      "sha256": "37fa80a532e0e47633011c205d3a77c1466a3928f0359601501ba76f70d1967d",
+      "bytes": 9698,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/codex/generated/AddConversationListenerParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/AddConversationListenerParams.ts",
+      "sha256": "65ae6b0469a2ad46399055c2002329e31d19e1e4d6d95d2549897f81d0fc05ed",
+      "bytes": 322,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AddConversationSubscriptionResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/AddConversationSubscriptionResponse.ts",
+      "sha256": "9670f0a5545927a191260bbef34d13bf96f9f7b91ebbf7e090a16efb19dad07c",
+      "bytes": 232,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AgentMessageContent.ts",
+      "target": "reference/legacy-host/src/codex/generated/AgentMessageContent.ts",
+      "sha256": "79d0daf06fcac4ac315104b423a4c25461e1aad637fb05cd7400a2c8bee00a4b",
+      "bytes": 222,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AgentMessageContentDeltaEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/AgentMessageContentDeltaEvent.ts",
+      "sha256": "03148227d3b56acaf8f4233d90e59b00931bc4892b89ff15be6e021bc255590c",
+      "bytes": 270,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AgentMessageDeltaEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/AgentMessageDeltaEvent.ts",
+      "sha256": "18edd7c5606b2fdcd637acc220ee53ee5232cfe0e2e7ab74cce9860a4b1e24fd",
+      "bytes": 210,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AgentMessageEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/AgentMessageEvent.ts",
+      "sha256": "16fc8313762d607d9aa6c7ef1ac22054507edc2a792ea6b1cd80977040a4b468",
+      "bytes": 207,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AgentMessageItem.ts",
+      "target": "reference/legacy-host/src/codex/generated/AgentMessageItem.ts",
+      "sha256": "1221e468cbc3dc73e79873f59b0c5729975bd4e7869e1e389f982587740ad2f3",
+      "bytes": 304,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AgentReasoningDeltaEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/AgentReasoningDeltaEvent.ts",
+      "sha256": "1b26db528db096dd144759eac7e98b65e0d298e530ca580753f53216a4cc74ac",
+      "bytes": 212,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AgentReasoningEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/AgentReasoningEvent.ts",
+      "sha256": "8aac9a79db250b383cf15932574b69771a34d11b2c02fe669f8379330038a002",
+      "bytes": 206,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AgentReasoningRawContentDeltaEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/AgentReasoningRawContentDeltaEvent.ts",
+      "sha256": "9ac7083caff47cfc59133062b0597672e11fc14ac6373b99a583860c904f0b6a",
+      "bytes": 222,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AgentReasoningRawContentEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/AgentReasoningRawContentEvent.ts",
+      "sha256": "78d8888f92273d278e06259ce2b987aba2bf5859bc98dc654ced5959a7b6e55d",
+      "bytes": 216,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AgentReasoningSectionBreakEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/AgentReasoningSectionBreakEvent.ts",
+      "sha256": "8109e370c73a35134f61862e4f19de2f31b5074ebc7c10429031583dd8fd7e32",
+      "bytes": 244,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/Annotations.ts",
+      "target": "reference/legacy-host/src/codex/generated/Annotations.ts",
+      "sha256": "331f5650f4b02a1a2fe4186497f1d9ad244f05a39b693a3e5ae7843da38aabd5",
+      "bytes": 409,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ApplyPatchApprovalParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/ApplyPatchApprovalParams.ts",
+      "sha256": "aac81cc73bfea53fefb6a36be2e8d5db5761c6e32a63c2a7365bbedaf9a99988",
+      "bytes": 814,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ApplyPatchApprovalRequestEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ApplyPatchApprovalRequestEvent.ts",
+      "sha256": "fb0bdbd5d5b291e8879bde59c97e12d3cf3da631acc545cf14d7336773554c5b",
+      "bytes": 783,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ApplyPatchApprovalResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/ApplyPatchApprovalResponse.ts",
+      "sha256": "31979f138e5a7f20378994fe19129769f3786b4c1f922ceebd9727a3c1027be5",
+      "bytes": 281,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ArchiveConversationParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/ArchiveConversationParams.ts",
+      "sha256": "33db7838ff559406b8c94e1c489067a17e98a5e14a8cdaa2e7bdf8b08d3d0e9c",
+      "bytes": 307,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ArchiveConversationResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/ArchiveConversationResponse.ts",
+      "sha256": "4de2d873f0d66544d94b8b512bd62f5e0c0f444dd0cb7f6238d8f3271df909e6",
+      "bytes": 218,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AskForApproval.ts",
+      "target": "reference/legacy-host/src/codex/generated/AskForApproval.ts",
+      "sha256": "dd1f5ad679956d0066285e42ecb9c1487824f4aa900210e9495666138222ae3a",
+      "bytes": 359,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AudioContent.ts",
+      "target": "reference/legacy-host/src/codex/generated/AudioContent.ts",
+      "sha256": "3f302b769a8d0e28a0d89fc97616b6edbf55d80673069bc2f806543731e7b726",
+      "bytes": 353,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AuthMode.ts",
+      "target": "reference/legacy-host/src/codex/generated/AuthMode.ts",
+      "sha256": "4c89cde8d5c2cb635d89be1c76eda0db0efa7934957847262610775fc4778202",
+      "bytes": 198,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/AuthStatusChangeNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/AuthStatusChangeNotification.ts",
+      "sha256": "b4c13c2672d6f16ec0f372a703fac219dbe753afee76a4875b7f0d267a5eaa1b",
+      "bytes": 350,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/BackgroundEventEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/BackgroundEventEvent.ts",
+      "sha256": "095a9e37c033cc1a63bcabdcf060be0e535106653bb92c545b578ca523519136",
+      "bytes": 210,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/BlobResourceContents.ts",
+      "target": "reference/legacy-host/src/codex/generated/BlobResourceContents.ts",
+      "sha256": "b23aee58056a708f10e418464be9a4fc83c0f09359aeea8bf6734443ef99ae3b",
+      "bytes": 239,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/CallToolResult.ts",
+      "target": "reference/legacy-host/src/codex/generated/CallToolResult.ts",
+      "sha256": "2cf1646f229405068dc70b961eccf323722e853a1ea4886973cabc504dd1baf7",
+      "bytes": 425,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/CancelLoginChatGptParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/CancelLoginChatGptParams.ts",
+      "sha256": "a6e28632ae0dcf3474cca8eb3cd18bc8ec247193f12f55410866dc98ef3e42d1",
+      "bytes": 214,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/CancelLoginChatGptResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/CancelLoginChatGptResponse.ts",
+      "sha256": "435a7b54bf240d3d019f9011c389ec069f7d67638918e2b3d10014bfd2e1a78f",
+      "bytes": 217,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ClientInfo.ts",
+      "target": "reference/legacy-host/src/codex/generated/ClientInfo.ts",
+      "sha256": "c3f38c70ffff810867af87a536d915dadea9e4b547343611c4e14731bcb7c648",
+      "bytes": 236,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ClientNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/ClientNotification.ts",
+      "sha256": "96692c191ff9ac32c2688b46a0a04f23d15646937adc352f2adcc8211c6d17a0",
+      "bytes": 215,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ClientRequest.ts",
+      "target": "reference/legacy-host/src/codex/generated/ClientRequest.ts",
+      "sha256": "0d185175db7b6b592484e303cf7d5c1021be581ba9c819d4f27a16fa46dc3f08",
+      "bytes": 6379,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/CodexErrorInfo.ts",
+      "target": "reference/legacy-host/src/codex/generated/CodexErrorInfo.ts",
+      "sha256": "2ac94bab404be22ee5da21ae84a7451d3c46198cec7907edd5fe20bc70f590af",
+      "bytes": 676,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ContentBlock.ts",
+      "target": "reference/legacy-host/src/codex/generated/ContentBlock.ts",
+      "sha256": "a39c0f9c36238e72b2864f7455b29622c456fc4f96ab73977e71b885f0d87185",
+      "bytes": 523,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ContentItem.ts",
+      "target": "reference/legacy-host/src/codex/generated/ContentItem.ts",
+      "sha256": "edaeb4bdd06c50a2fc47b709101ebeab2036fd95aeadc26eccdc243ac0f0c06f",
+      "bytes": 311,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ContextCompactedEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ContextCompactedEvent.ts",
+      "sha256": "bc6a60fb60030f622c82a886aadd317b2213c2ce470038bbe1c1117d6142ab52",
+      "bytes": 195,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ConversationGitInfo.ts",
+      "target": "reference/legacy-host/src/codex/generated/ConversationGitInfo.ts",
+      "sha256": "5916b6580cd3a589882e8d6449e8b80c049652a8b3e1bf6ead3c5a4b5f3238cd",
+      "bytes": 262,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ConversationId.ts",
+      "target": "reference/legacy-host/src/codex/generated/ConversationId.ts",
+      "sha256": "e0b9888508ef95541cff31115d423a8dcfb6646be2a2d0fd40190df45fb7b3a1",
+      "bytes": 190,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ConversationSummary.ts",
+      "target": "reference/legacy-host/src/codex/generated/ConversationSummary.ts",
+      "sha256": "a86048f5bcec12a93fdee291ae4121ef6ef55f97a6c34273581f9a2bf11e8d73",
+      "bytes": 573,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/CreditsSnapshot.ts",
+      "target": "reference/legacy-host/src/codex/generated/CreditsSnapshot.ts",
+      "sha256": "a8570b834fcd2e901ea5dc66e25dc960cc6cc8d3b32092e22dc76d6d624854d3",
+      "bytes": 254,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/CustomPrompt.ts",
+      "target": "reference/legacy-host/src/codex/generated/CustomPrompt.ts",
+      "sha256": "e12a85940ff944451683e3e2bd17c9d3b7e4d22cbc4d1d53034f65523c488cde",
+      "bytes": 288,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/DeprecationNoticeEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/DeprecationNoticeEvent.ts",
+      "sha256": "eda54538aa862b28451ce6c4df12e3e2fcd8d6d09ce5049055f261d00933b46d",
+      "bytes": 362,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ElicitationRequestEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ElicitationRequestEvent.ts",
+      "sha256": "43cfa7d7503157a1772ad6c1d75d7097fc3f8905f242c023ca95763f44cf2866",
+      "bytes": 295,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/EmbeddedResource.ts",
+      "target": "reference/legacy-host/src/codex/generated/EmbeddedResource.ts",
+      "sha256": "a8785c16dd9ce6012fa2006a285b22f79f4750bb43d92b1a4cf0e8e96460438b",
+      "bytes": 589,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/EmbeddedResourceResource.ts",
+      "target": "reference/legacy-host/src/codex/generated/EmbeddedResourceResource.ts",
+      "sha256": "4b8c0953b8ac0aecbbacb4a0815ffdd25ae6ca73d670eac96b752eeea96f0220",
+      "bytes": 373,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ErrorEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ErrorEvent.ts",
+      "sha256": "03ad0e37d759f1a44d4523b16f85477d616fc6798c08fff3e3579d6b54d59fa0",
+      "bytes": 297,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/EventMsg.ts",
+      "target": "reference/legacy-host/src/codex/generated/EventMsg.ts",
+      "sha256": "4f75bccffd5f50d26c2b9153a44166f8a0720801d964c982793149bedf478a4e",
+      "bytes": 6776,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ExecApprovalRequestEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ExecApprovalRequestEvent.ts",
+      "sha256": "5e8ea1c7be36c212d97766c46e09d87bb4b6d2e331f79714d2fdf4915074ceed",
+      "bytes": 931,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ExecCommandApprovalParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/ExecCommandApprovalParams.ts",
+      "sha256": "be1e2d25e4dc5f19ba484c3c42bef6213c5de57f1b155fefc29fdf99a96f506d",
+      "bytes": 586,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ExecCommandApprovalResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/ExecCommandApprovalResponse.ts",
+      "sha256": "3a0de1366e4bc0184774908f4d2506ad53a7e1ddfc7306a0de2bb3cdaa65ec96",
+      "bytes": 282,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ExecCommandBeginEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ExecCommandBeginEvent.ts",
+      "sha256": "cd06af5e2d91d405f03b31486c2ac7237cd53a7d3a7801acadfbdf5a3d04bc2d",
+      "bytes": 987,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ExecCommandEndEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ExecCommandEndEvent.ts",
+      "sha256": "6b14458c46de7cab42e15c0abea38ff0d1ce0e1b5cb37256f85b4ef86978197a",
+      "bytes": 1349,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ExecCommandOutputDeltaEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ExecCommandOutputDeltaEvent.ts",
+      "sha256": "eb9265675b2fc885a92f41cf719193ca59ec5b8860c93ac9b40551c2dc55eabf",
+      "bytes": 502,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ExecCommandSource.ts",
+      "target": "reference/legacy-host/src/codex/generated/ExecCommandSource.ts",
+      "sha256": "3a44e0b3b0034c5dc663486d13a6f8d15318316cc553039e7c79e43fc82e02f3",
+      "bytes": 263,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ExecOneOffCommandParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/ExecOneOffCommandParams.ts",
+      "sha256": "3008a65c6a47e937a104c9a0870ce1e672d436e2c0b257f09310555335a0b837",
+      "bytes": 357,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ExecOneOffCommandResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/ExecOneOffCommandResponse.ts",
+      "sha256": "f5b7f0b9576f8d74e532ce4026124596a31d637515677025a3946d04b0b9d241",
+      "bytes": 248,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ExecOutputStream.ts",
+      "target": "reference/legacy-host/src/codex/generated/ExecOutputStream.ts",
+      "sha256": "1208502e7e7fa7088d2eb38acbe43989b644ec52205597c549e9cb81570ccd5c",
+      "bytes": 205,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ExecPolicyAmendment.ts",
+      "target": "reference/legacy-host/src/codex/generated/ExecPolicyAmendment.ts",
+      "sha256": "6c03481f0980691f87b10281f1e926c969e567a76c51d426b3d1161cd4f7eb43",
+      "bytes": 493,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ExitedReviewModeEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ExitedReviewModeEvent.ts",
+      "sha256": "8c7741d08f88d9af90a7dc7982f1e62e586b8e145a3ceb6a4c0924decbe913f7",
+      "bytes": 297,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/FileChange.ts",
+      "target": "reference/legacy-host/src/codex/generated/FileChange.ts",
+      "sha256": "831feada4d69f7049a174ff7abdd49797b4a2a28ba2a2167f44f1aa17b6f3520",
+      "bytes": 328,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ForcedLoginMethod.ts",
+      "target": "reference/legacy-host/src/codex/generated/ForcedLoginMethod.ts",
+      "sha256": "d31940427b6bb684eddcf7111e836741da092bab2679a6735ca4dc38b031f030",
+      "bytes": 204,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/FunctionCallOutputContentItem.ts",
+      "target": "reference/legacy-host/src/codex/generated/FunctionCallOutputContentItem.ts",
+      "sha256": "a9bb38a76f6d9f5ecb22b76a8984a20ceff6dd0893cef178b82e10db3f00f671",
+      "bytes": 460,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/FunctionCallOutputPayload.ts",
+      "target": "reference/legacy-host/src/codex/generated/FunctionCallOutputPayload.ts",
+      "sha256": "63789e2ae1a801c103f8606385c1dbfd23c5e6e85894f3ceb94c42cc45081237",
+      "bytes": 792,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/FuzzyFileSearchParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/FuzzyFileSearchParams.ts",
+      "sha256": "e509e9144bb4c2673f6844548d2325cf3e2d5b2b88ae32f7399247177a1d1d9f",
+      "bytes": 265,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/FuzzyFileSearchResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/FuzzyFileSearchResponse.ts",
+      "sha256": "fca23b73c96d1a8210e83244d15d4a59768ed2e9de9c5aac9a6022fe50edf614",
+      "bytes": 303,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/FuzzyFileSearchResult.ts",
+      "target": "reference/legacy-host/src/codex/generated/FuzzyFileSearchResult.ts",
+      "sha256": "420a242e7b306da5a05088c75dbbc36cf133250d29a2f65ab31641f79d7d75fd",
+      "bytes": 343,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/GetAuthStatusParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/GetAuthStatusParams.ts",
+      "sha256": "5dc04ff59a05ceedab54c850899b09a9c81e68ea7934183325b39be6344bb40e",
+      "bytes": 252,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/GetAuthStatusResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/GetAuthStatusResponse.ts",
+      "sha256": "9aaaa5326b399883165edd426d2b340fe4d58e19d0481c860ca28813a365d853",
+      "bytes": 329,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/GetConversationSummaryParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/GetConversationSummaryParams.ts",
+      "sha256": "ceb8a6444f0f708df0730423efaee6b8c75bf4125e90aed80303bb16de35f153",
+      "bytes": 316,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/GetConversationSummaryResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/GetConversationSummaryResponse.ts",
+      "sha256": "39a163f2e24cc96584de6fd783acfba2676edb2863f87ba9e61285e13644841d",
+      "bytes": 299,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/GetHistoryEntryResponseEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/GetHistoryEntryResponseEvent.ts",
+      "sha256": "003450f524b971d10c2023756f33b3fc2d534435aa7f4ad4215915c2352b18ae",
+      "bytes": 388,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/GetUserAgentResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/GetUserAgentResponse.ts",
+      "sha256": "9f4bf9d8512ae5461bfc6977fe466922b231022aacacbcd9ede802f45d7e7d60",
+      "bytes": 212,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/GetUserSavedConfigResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/GetUserSavedConfigResponse.ts",
+      "sha256": "585b65b6bde5f7be3d807f47c1e0e00f87483a8d2100ac8d8b72d7bbc7187f8a",
+      "bytes": 282,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/GhostCommit.ts",
+      "target": "reference/legacy-host/src/codex/generated/GhostCommit.ts",
+      "sha256": "c81968f60a53d8a9eba64e3c98aef91a6887307258276667f3cbedd343a6deba",
+      "bytes": 376,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/GitDiffToRemoteParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/GitDiffToRemoteParams.ts",
+      "sha256": "4208318686772f2ce21ce98a0abfdcebce560194d946b8b017da1287140287d3",
+      "bytes": 207,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/GitDiffToRemoteResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/GitDiffToRemoteResponse.ts",
+      "sha256": "c8b4be6e7a9c522a2865e2df4d8b54e0f0f16172f97c3a6c412997056a6297ab",
+      "bytes": 263,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/GitSha.ts",
+      "target": "reference/legacy-host/src/codex/generated/GitSha.ts",
+      "sha256": "826b48e6b10984ac6b27ef6ca0becc1aa9d4709e0b693de93ecff750a57a54c8",
+      "bytes": 182,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/HistoryEntry.ts",
+      "target": "reference/legacy-host/src/codex/generated/HistoryEntry.ts",
+      "sha256": "62ace7701e1301d9d79601949916743c86be35d02fffa1458b58362ae36beddb",
+      "bytes": 236,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ImageContent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ImageContent.ts",
+      "sha256": "6a7f6c610e1ccd03c03490773d3a376de5a24f3fa117e3d66e8081d904faa579",
+      "bytes": 356,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/index.ts",
+      "target": "reference/legacy-host/src/codex/generated/index.ts",
+      "sha256": "ae152caada44266e618843621c10d068b4bb4b1a539f3fe548ba7a92aea44042",
+      "bytes": 12435,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/InitializeParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/InitializeParams.ts",
+      "sha256": "62bff32ae2a189288518a19452063db40ebadf759aa1fbaceef363878128b288",
+      "bytes": 261,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/InitializeResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/InitializeResponse.ts",
+      "sha256": "0876d20d3f5e8b9b3fdbdb5e54581b0513ada5ccf1eea43c09806483e1caa329",
+      "bytes": 210,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/InputItem.ts",
+      "target": "reference/legacy-host/src/codex/generated/InputItem.ts",
+      "sha256": "0931c0e31980096b7e47a70ded342c665a62401e2436770fb09adabbc7674c51",
+      "bytes": 332,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/InterruptConversationParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/InterruptConversationParams.ts",
+      "sha256": "78dd5e750efb8734f47793f7c2ba9218e2cf227c627ad80da7e3d116385fde37",
+      "bytes": 288,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/InterruptConversationResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/InterruptConversationResponse.ts",
+      "sha256": "b16dc03028b733e719848671c7835b4b962b4850b3407260930c1368d3a6718d",
+      "bytes": 290,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ItemCompletedEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ItemCompletedEvent.ts",
+      "sha256": "aa9c0725bf35975f681ea674188cf42c8ec73e04902dce8e7cb7f7ac3b6ac50c",
+      "bytes": 351,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ItemStartedEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ItemStartedEvent.ts",
+      "sha256": "78d2492d006615ac1decac5746b09392a291c227a519cc145f1f0af7554bb629",
+      "bytes": 349,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ListConversationsParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/ListConversationsParams.ts",
+      "sha256": "066f56c4eb761ef4d15855d1b95bb04532ec29af974e9fd5f7bb3203396833f2",
+      "bytes": 282,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ListConversationsResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/ListConversationsResponse.ts",
+      "sha256": "1415d9f797b967ec1604e553eb9a80b82187bfd43e595995d71746d472830ae0",
+      "bytes": 326,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ListCustomPromptsResponseEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ListCustomPromptsResponseEvent.ts",
+      "sha256": "d7c6e896477db9acda817936173a41ad28647f22a2fc7011316c6e4c95adcd5a",
+      "bytes": 349,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/LocalShellAction.ts",
+      "target": "reference/legacy-host/src/codex/generated/LocalShellAction.ts",
+      "sha256": "4cbe0baf839752c8aa69a3f93ce236236c7ffb9b3bcdcb6d1133a5493c5445cf",
+      "bytes": 295,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/LocalShellExecAction.ts",
+      "target": "reference/legacy-host/src/codex/generated/LocalShellExecAction.ts",
+      "sha256": "7f579ad71d9ac2ecfc94bea32e05d229b4d653eb0fb5491afc7a53ccaaaf8672",
+      "bytes": 341,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/LocalShellStatus.ts",
+      "target": "reference/legacy-host/src/codex/generated/LocalShellStatus.ts",
+      "sha256": "8b302c2b183668ed0f67a753befb4aaa2c998d316cc5ff7be4ca442cd5a4c741",
+      "bytes": 228,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/LoginApiKeyParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/LoginApiKeyParams.ts",
+      "sha256": "4634ee56a02ee7510425d3596cd2f23152ba7e007a605d61627c38b8ad040cae",
+      "bytes": 206,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/LoginApiKeyResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/LoginApiKeyResponse.ts",
+      "sha256": "2f64dbb8159b6e09c5c5d23e4603baf24bdd2f414f68a14d24e58fdcb02c03bd",
+      "bytes": 210,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/LoginChatGptCompleteNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/LoginChatGptCompleteNotification.ts",
+      "sha256": "c82cc56b59cdcac8323f0b25d9cc8d793ff61e30e7779451b869ce5879d8296a",
+      "bytes": 331,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/LoginChatGptResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/LoginChatGptResponse.ts",
+      "sha256": "c09aa6731e684dd2f0a6e00d0cf6aeb47309d6f02285d3522dcccc4ebfa1d78f",
+      "bytes": 227,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/LogoutChatGptResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/LogoutChatGptResponse.ts",
+      "sha256": "80c0e27bd6e21a58afe80b394a61367c3f54c0c074d1e673b9a9843fe7403235",
+      "bytes": 212,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/McpAuthStatus.ts",
+      "target": "reference/legacy-host/src/codex/generated/McpAuthStatus.ts",
+      "sha256": "7f6760817fcd2d47f21ed10b5ba988e0c57668c9b83e508e40184f152fa77f92",
+      "bytes": 242,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/McpInvocation.ts",
+      "target": "reference/legacy-host/src/codex/generated/McpInvocation.ts",
+      "sha256": "5fe112505c8e6b85b91e255669509ecceb4eca8072422da3ac833fcb1081e12d",
+      "bytes": 460,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/McpListToolsResponseEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/McpListToolsResponseEvent.ts",
+      "sha256": "046271ea7b3d3cfebf293d6ffa1abeed9ecdc837fa42ed590245de98168ef4dc",
+      "bytes": 833,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/McpStartupCompleteEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/McpStartupCompleteEvent.ts",
+      "sha256": "630336a5effce842b51348cb6b59b04aacc50064c82cedaaa703cf7b39b01545",
+      "bytes": 340,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/McpStartupFailure.ts",
+      "target": "reference/legacy-host/src/codex/generated/McpStartupFailure.ts",
+      "sha256": "15b7a3b959c1fafc8d637bb97be3636392a04658fb79000fff7c35f1ba6c69ab",
+      "bytes": 221,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/McpStartupStatus.ts",
+      "target": "reference/legacy-host/src/codex/generated/McpStartupStatus.ts",
+      "sha256": "46398a38d9a841204a1c5912ec2392864eed74d7a6ced089ef45b7052a0bffd9",
+      "bytes": 299,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/McpStartupUpdateEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/McpStartupUpdateEvent.ts",
+      "sha256": "814ee1854ae7a7ce7f98b1bff67e20d9b6a982c9da953bcaa1012d7ff035bffa",
+      "bytes": 371,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/McpToolCallBeginEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/McpToolCallBeginEvent.ts",
+      "sha256": "3830b36d1148286a2c6ced598d4dba551cdcf2035ef859de89ee96d48e1b175e",
+      "bytes": 368,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/McpToolCallEndEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/McpToolCallEndEvent.ts",
+      "sha256": "34afc3600c1529cb4d5fb9c60cfc7b5491c0de5283e63d4b70d785b529cf322e",
+      "bytes": 559,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/NewConversationParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/NewConversationParams.ts",
+      "sha256": "234747a778bec6c4091b9f3135190ae7e4decba949a8ba191067b9169a2f2b02",
+      "bytes": 709,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/NewConversationResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/NewConversationResponse.ts",
+      "sha256": "6383a427f1b87c904cc0b081991ee5e18f1bb25a820fccb2fc2f74ce8e8e1515",
+      "bytes": 419,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ParsedCommand.ts",
+      "target": "reference/legacy-host/src/codex/generated/ParsedCommand.ts",
+      "sha256": "fc62d4447664e3e386072eb7c0d1e1d3901a71e0ac439dde14d453ebd996f885",
+      "bytes": 672,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/PatchApplyBeginEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/PatchApplyBeginEvent.ts",
+      "sha256": "b4cebf55e288f1c7b209f0203b5461b6aeb3dc28458d36acd34294296169677d",
+      "bytes": 637,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/PatchApplyEndEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/PatchApplyEndEvent.ts",
+      "sha256": "47fef6649bab5d50af52dffdc0512b0204e1aa34f90de7f40e2fd2410f290ad8",
+      "bytes": 798,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/PlanItemArg.ts",
+      "target": "reference/legacy-host/src/codex/generated/PlanItemArg.ts",
+      "sha256": "c4db7004d70a626ae93b8e438f9ceb9f6ad7a83938bb46449ae6999908180c96",
+      "bytes": 266,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/PlanType.ts",
+      "target": "reference/legacy-host/src/codex/generated/PlanType.ts",
+      "sha256": "aeee73a6ef353d3770b8675cdb046f184a1cf08143fa742a3ca5079a055cd1e6",
+      "bytes": 258,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/Profile.ts",
+      "target": "reference/legacy-host/src/codex/generated/Profile.ts",
+      "sha256": "b140dc0de6149e3fd10632fe37fc266eee44bffbe9a10b81c8a9f41430c59a4a",
+      "bytes": 650,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/RateLimitSnapshot.ts",
+      "target": "reference/legacy-host/src/codex/generated/RateLimitSnapshot.ts",
+      "sha256": "36a18abd5a8d3a0cb5cfe8dbaa64a4dc28c410db64351eda64cbfa024896694f",
+      "bytes": 479,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/RateLimitWindow.ts",
+      "target": "reference/legacy-host/src/codex/generated/RateLimitWindow.ts",
+      "sha256": "3d04cd73080d2b4609dd1fe7041410f5c077aa9efe26ee8d1bd7492059d8eb7d",
+      "bytes": 458,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/RawResponseItemEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/RawResponseItemEvent.ts",
+      "sha256": "79d834881aa40f7a75af17a55617fb15f914fdbc322609c11972da71982c8b40",
+      "bytes": 265,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReasoningContentDeltaEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReasoningContentDeltaEvent.ts",
+      "sha256": "b3440f5c297e81c2f4818af20db4d29db3616a641578da3404fc366b8496377a",
+      "bytes": 290,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReasoningEffort.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReasoningEffort.ts",
+      "sha256": "43f25032fc61a754b26d4f985158304707f7f67e0777f737fd25c0e8f692a489",
+      "bytes": 352,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReasoningItem.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReasoningItem.ts",
+      "sha256": "bacd0121ac3d0b91d8713da55050eb77d5c0d2747bf8f25fecbc5b921c5b2aa1",
+      "bytes": 255,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReasoningItemContent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReasoningItemContent.ts",
+      "sha256": "7bb310c4c20b21d199304e7b64ba673c32288eec39a7390ca0f8a10c3f6aa301",
+      "bytes": 269,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReasoningItemReasoningSummary.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReasoningItemReasoningSummary.ts",
+      "sha256": "f5f7508ac48eecd43029e87714aa23db8d5f629e0626216aa0ed2239f1aac1ce",
+      "bytes": 240,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReasoningRawContentDeltaEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReasoningRawContentDeltaEvent.ts",
+      "sha256": "d3a55890738ba5c275af0f2a0aef27f1e829b0d5a0e4df3bd7bb2afd1b08cd82",
+      "bytes": 293,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReasoningSummary.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReasoningSummary.ts",
+      "sha256": "1d56c8b72bf6806438e612e1a14a567ceab91be91a4bcb0ca192f898fe0bf9bc",
+      "bytes": 469,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/RemoveConversationListenerParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/RemoveConversationListenerParams.ts",
+      "sha256": "b4dddd9070ee579f7c693af5e0318e913204ab0c652830586ed38bfce5f824f1",
+      "bytes": 229,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/RemoveConversationSubscriptionResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/RemoveConversationSubscriptionResponse.ts",
+      "sha256": "91cd479082c69c373a94bfb9639d6df8860819db346ed960d953ca3d83d09743",
+      "bytes": 229,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/RequestId.ts",
+      "target": "reference/legacy-host/src/codex/generated/RequestId.ts",
+      "sha256": "beeb38dfd0b050b171141bd66d51663786a50a81cbe904ba9b006289a101fd39",
+      "bytes": 194,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/Resource.ts",
+      "target": "reference/legacy-host/src/codex/generated/Resource.ts",
+      "sha256": "f6331e9e05506731a047ca837498abb15d0e02c774f268fab9e9d05347bd87c6",
+      "bytes": 424,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ResourceLink.ts",
+      "target": "reference/legacy-host/src/codex/generated/ResourceLink.ts",
+      "sha256": "150f31481cf3398bcbee43fa1f8a387253c8fa94346cc9b53294b6a014d08c67",
+      "bytes": 597,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ResourceTemplate.ts",
+      "target": "reference/legacy-host/src/codex/generated/ResourceTemplate.ts",
+      "sha256": "7ef7a63023339780bb5241ea754077a1df232805c91c1e8a86e7d6f7a6fe0bab",
+      "bytes": 431,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ResponseItem.ts",
+      "target": "reference/legacy-host/src/codex/generated/ResponseItem.ts",
+      "sha256": "50bf71dbd2273a96abc7135c6b9678a9e45604d24ef7af4a5078c60f48755986",
+      "bytes": 1621,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ResumeConversationParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/ResumeConversationParams.ts",
+      "sha256": "c757f5a1ba6d1efe8cf8f8e30b3a5c58dc119dd1147367098839baf60a5b547e",
+      "bytes": 513,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ResumeConversationResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/ResumeConversationResponse.ts",
+      "sha256": "16b291a874aa3fb4a7aad718aa6eca36ead629fe4e0051459b17b63f2e723498",
+      "bytes": 408,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReviewCodeLocation.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReviewCodeLocation.ts",
+      "sha256": "47b669e5387f06d287d8e7eb47a4d4b6233a8218e9ac8e2ac30298ba59da4d80",
+      "bytes": 367,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReviewDecision.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReviewDecision.ts",
+      "sha256": "ea5ceb26979ae0397be946a3d07c5416ab223ebf7681c624fa8a4ddc73c0dae1",
+      "bytes": 467,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReviewFinding.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReviewFinding.ts",
+      "sha256": "24585d39f23fc3e9a2d2853741fb7764c345a3ecb43b114b85a80549a2f5ca9c",
+      "bytes": 441,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReviewLineRange.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReviewLineRange.ts",
+      "sha256": "4e78c6773f66be8d832b8532bbd85ad7486609c6bebf0f705863709100edb063",
+      "bytes": 287,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReviewOutputEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReviewOutputEvent.ts",
+      "sha256": "aa43245e4156fc21613cb2a0b01481371f963735e6f5b03e58b06e5e3312734b",
+      "bytes": 440,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReviewRequest.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReviewRequest.ts",
+      "sha256": "e899ad360ad94175e016f68d957757a490408f1d770bbf5269df4cc27f73cfe0",
+      "bytes": 341,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ReviewTarget.ts",
+      "target": "reference/legacy-host/src/codex/generated/ReviewTarget.ts",
+      "sha256": "fd0578ec697150df7ab5d7967cc6b2c5e4b87375579b8af2fe0f156a1888251c",
+      "bytes": 437,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/Role.ts",
+      "target": "reference/legacy-host/src/codex/generated/Role.ts",
+      "sha256": "7905004b3fd5d22283fc22b71b8b6097c06e454e39fec47a21e69ca124d06450",
+      "bytes": 269,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SandboxMode.ts",
+      "target": "reference/legacy-host/src/codex/generated/SandboxMode.ts",
+      "sha256": "8a59381e04efa84f9001e5c24444ee26fccf8f9e10bcfb02d2f6a24e85898843",
+      "bytes": 235,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SandboxPolicy.ts",
+      "target": "reference/legacy-host/src/codex/generated/SandboxPolicy.ts",
+      "sha256": "9ad4d7b722492af675ef964366c4dad35830a3ce72d677cba65dab4f30ee2004",
+      "bytes": 949,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SandboxSettings.ts",
+      "target": "reference/legacy-host/src/codex/generated/SandboxSettings.ts",
+      "sha256": "763df28fe0360f69f7f5322c2a55cba66a902f2729731dcffb0790db058e6791",
+      "bytes": 319,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SendUserMessageParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/SendUserMessageParams.ts",
+      "sha256": "2467c19c4e4930a31fa40b9670ed18dd15508027d278ffd54e80f2c9c2f2a4d0",
+      "bytes": 353,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SendUserMessageResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/SendUserMessageResponse.ts",
+      "sha256": "3e5fbeff44c3d9874dcb5ab2ce98c6ad0a09f7dcea3e2af325b61e037603a767",
+      "bytes": 214,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SendUserTurnParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/SendUserTurnParams.ts",
+      "sha256": "ff26feebfed1cf308961adce96ab4c3f282e742b83f5fccd023a9eba2ff419b8",
+      "bytes": 727,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SendUserTurnResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/SendUserTurnResponse.ts",
+      "sha256": "d8115db01cbd8a8de1156a88cf5c8577c05a430d6b59325ce4b4dfe942d31ee1",
+      "bytes": 211,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/serde_json/JsonValue.ts",
+      "target": "reference/legacy-host/src/codex/generated/serde_json/JsonValue.ts",
+      "sha256": "8697aaaa4cbe8f91492fe36dc545cc53a26e53143371c22c08385969d4e3cc61",
+      "bytes": 264,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ServerNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/ServerNotification.ts",
+      "sha256": "a412dcbf41390592106c3de6f0eaa43ccd0897f55a8fafc57088e34baa6a8520",
+      "bytes": 4759,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ServerRequest.ts",
+      "target": "reference/legacy-host/src/codex/generated/ServerRequest.ts",
+      "sha256": "a482f4e8d6e2f3ae2929fa2c406235bc5e9fa4630e4c88c384488a3225d329af",
+      "bytes": 1049,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SessionConfiguredEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/SessionConfiguredEvent.ts",
+      "sha256": "16b834b3e96c34f504949e52678b73880abff50f2c3ebbfb5a6e0c421269997f",
+      "bytes": 1584,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SessionConfiguredNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/SessionConfiguredNotification.ts",
+      "sha256": "427b8ad1d54a025f48bf26c62c96d6e3b89f4ae058ef9d9f6d96c78fd1a1e902",
+      "bytes": 554,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SessionSource.ts",
+      "target": "reference/legacy-host/src/codex/generated/SessionSource.ts",
+      "sha256": "475dd71962e48e5eb880ced7def925602e13763439ed1a89b02eca3cdbca5c52",
+      "bytes": 317,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SetDefaultModelParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/SetDefaultModelParams.ts",
+      "sha256": "436ca822fba44cf9e9eb401a0e7a4a434a5a820435f06690cc490f5f91cd9ff7",
+      "bytes": 315,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SetDefaultModelResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/SetDefaultModelResponse.ts",
+      "sha256": "0f63ed4863f01ec34d9c468517eaa903e241d2df0c5f652a00eb85b18e99da5f",
+      "bytes": 214,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SkillErrorInfo.ts",
+      "target": "reference/legacy-host/src/codex/generated/SkillErrorInfo.ts",
+      "sha256": "0d59892e9b1d002a1d7065a49b3951c3d9a8b73bd1746a5b76c3018882296a54",
+      "bytes": 218,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SkillInfo.ts",
+      "target": "reference/legacy-host/src/codex/generated/SkillInfo.ts",
+      "sha256": "fda8360371a0f6ec30a7557c133e706e9c25f19ade63cf2610a52292c85bb80a",
+      "bytes": 231,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SkillLoadOutcomeInfo.ts",
+      "target": "reference/legacy-host/src/codex/generated/SkillLoadOutcomeInfo.ts",
+      "sha256": "d6bbc224fd46ae395814f9bc2794eb5314d8b670d4b7d40ddc859d5b0cd2c168",
+      "bytes": 352,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/StepStatus.ts",
+      "target": "reference/legacy-host/src/codex/generated/StepStatus.ts",
+      "sha256": "1dc98cd702d2e7bcde4535adaa4bc0b6f5c2a017c3676738fd99dcf945d65d4c",
+      "bytes": 219,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/StreamErrorEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/StreamErrorEvent.ts",
+      "sha256": "7cf82346e948db5b15e31ba2f92df971d608b8920a465847ab17ebe83c683bf7",
+      "bytes": 303,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/SubAgentSource.ts",
+      "target": "reference/legacy-host/src/codex/generated/SubAgentSource.ts",
+      "sha256": "cdfedaf3fd69d4a2788aecf0514973d286bca9ad0edcc0f59462cfc529ac01c4",
+      "bytes": 226,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/TaskCompleteEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/TaskCompleteEvent.ts",
+      "sha256": "4e7dae59f2895971294d0bfe4e20995112e0aecc20749eb911b00c695321c1a7",
+      "bytes": 225,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/TaskStartedEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/TaskStartedEvent.ts",
+      "sha256": "435ab585070b19af68fdf3e45c199ea743db1c009aa5b7a6613882922f55cf3a",
+      "bytes": 226,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/TerminalInteractionEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/TerminalInteractionEvent.ts",
+      "sha256": "5d2f6a3d301efa900ef548bc03ab11cb7c200fc150c75d1607c84f8d28dfbfb4",
+      "bytes": 430,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/TextContent.ts",
+      "target": "reference/legacy-host/src/codex/generated/TextContent.ts",
+      "sha256": "36c78ecf748317718e6c75a67d954cf899903d45cea9640341aa835cf05bee04",
+      "bytes": 333,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/TextResourceContents.ts",
+      "target": "reference/legacy-host/src/codex/generated/TextResourceContents.ts",
+      "sha256": "f56ab0d4ce6b579d956f2d9bfef14ef443d41e0d03a8e282ae7125897412b0af",
+      "bytes": 239,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/TokenCountEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/TokenCountEvent.ts",
+      "sha256": "913ead30bf5e2905c175759fc6368f6fdc4a83c0ee1971661d3f35d8f65d98a4",
+      "bytes": 374,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/TokenUsage.ts",
+      "target": "reference/legacy-host/src/codex/generated/TokenUsage.ts",
+      "sha256": "6f22a067d3fd6529864a237ffdf7ea8e7186b78b470240daae6650628d21d638",
+      "bytes": 312,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/TokenUsageInfo.ts",
+      "target": "reference/legacy-host/src/codex/generated/TokenUsageInfo.ts",
+      "sha256": "36959e81e3b43790b980a97ed6ae5ca846505a97b1781863c39d95c2150e5080",
+      "bytes": 333,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/Tool.ts",
+      "target": "reference/legacy-host/src/codex/generated/Tool.ts",
+      "sha256": "b5c24f9282af938a54099b24f82032632df42df345b0cdfc37cce420a1d22f1f",
+      "bytes": 553,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ToolAnnotations.ts",
+      "target": "reference/legacy-host/src/codex/generated/ToolAnnotations.ts",
+      "sha256": "250293972f6e237c58cce62c783e4dd47a78a3c14a56b1368ad6b6686276206f",
+      "bytes": 672,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ToolInputSchema.ts",
+      "target": "reference/legacy-host/src/codex/generated/ToolInputSchema.ts",
+      "sha256": "4811c980ce8d6b4ca6bc24bee20f2b436a1485b2d678b5b7e53954c8a3c81ea5",
+      "bytes": 388,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ToolOutputSchema.ts",
+      "target": "reference/legacy-host/src/codex/generated/ToolOutputSchema.ts",
+      "sha256": "785e435cc3d66bd9d989423c12243572a89132147dbf52b87bd8f3102a72fb09",
+      "bytes": 460,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/Tools.ts",
+      "target": "reference/legacy-host/src/codex/generated/Tools.ts",
+      "sha256": "b8b119eb94b60a19fdb9fb7299b48e832e5df6bbed31cb5a3e87047910a7ea50",
+      "bytes": 232,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/TurnAbortedEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/TurnAbortedEvent.ts",
+      "sha256": "9d26bb0e054e8d3d838d18817a0548ffe20cc424db9abed6de00540c0c80aedd",
+      "bytes": 272,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/TurnAbortReason.ts",
+      "target": "reference/legacy-host/src/codex/generated/TurnAbortReason.ts",
+      "sha256": "7e4e0c514b817b1e36760dd97ceff71ff29300c3ada10ac4d7069bbdca8dbeb4",
+      "bytes": 228,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/TurnDiffEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/TurnDiffEvent.ts",
+      "sha256": "cd61d89ab4c711dd52a43f007288b0bc2e91d97d49bdcf9d4494f0b9a7e9bde8",
+      "bytes": 208,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/TurnItem.ts",
+      "target": "reference/legacy-host/src/codex/generated/TurnItem.ts",
+      "sha256": "7b760f79093c0d09184501c333938e87c5c32eec443e477db1b5b4841b042f4e",
+      "bytes": 579,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/UndoCompletedEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/UndoCompletedEvent.ts",
+      "sha256": "34549253349890f1e1c58b2e77fcbf4d74e29d1251be86e325300459a1ca4f5a",
+      "bytes": 233,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/UndoStartedEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/UndoStartedEvent.ts",
+      "sha256": "616798b36a912af1fba81a31e441e52cfe06c2372513982d792542b3613eb39d",
+      "bytes": 213,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/UpdatePlanArgs.ts",
+      "target": "reference/legacy-host/src/codex/generated/UpdatePlanArgs.ts",
+      "sha256": "db38128fd75acbc82f7c5d6338c35823c7af224d20789c3aaa5048c06442574f",
+      "bytes": 291,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/UserInfoResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/UserInfoResponse.ts",
+      "sha256": "021515b92447a91b3d7a38720b707622f51438806a9bce7e098d677f65c8253e",
+      "bytes": 222,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/UserInput.ts",
+      "target": "reference/legacy-host/src/codex/generated/UserInput.ts",
+      "sha256": "d8ab47df5d5ee9b03e92f99866938ce6691c1dc001ebfeef25af1d03b4d55edf",
+      "bytes": 370,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/UserMessageEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/UserMessageEvent.ts",
+      "sha256": "dac1245bfb18e8f276ea7787da4a9a1e156e8421c657789f699f930b0f60c6c1",
+      "bytes": 236,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/UserMessageItem.ts",
+      "target": "reference/legacy-host/src/codex/generated/UserMessageItem.ts",
+      "sha256": "db0e6c29dfc83ef6cdb724ba867b4312416844ae80f91051cd67542ac83a8e73",
+      "bytes": 273,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/UserSavedConfig.ts",
+      "target": "reference/legacy-host/src/codex/generated/UserSavedConfig.ts",
+      "sha256": "54d78c24fdf1ab7e32c9cdaea13bb53a0f7e07794aac839f941fb358766d46f4",
+      "bytes": 1093,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/Account.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/Account.ts",
+      "sha256": "ba8adeb09e1db4a2cce0cd02159869006f38b7755258d5037d84f38fae591b2a",
+      "bytes": 303,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/AccountLoginCompletedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/AccountLoginCompletedNotification.ts",
+      "sha256": "f2b59323fbe2a5d36b8161d107b6fde4a5fbb4b47537f3514444cc1eaa9542b5",
+      "bytes": 270,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/AccountRateLimitsUpdatedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/AccountRateLimitsUpdatedNotification.ts",
+      "sha256": "6a4e8c2297d95bf89eccead5419b4b12cd481832627774d47e31c77f81c6fc54",
+      "bytes": 302,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/AccountUpdatedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/AccountUpdatedNotification.ts",
+      "sha256": "a13b83da0755e64fbfec41fbb293454460e70622cf927531fbb04d8fbcf55c91",
+      "bytes": 271,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/AgentMessageDeltaNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/AgentMessageDeltaNotification.ts",
+      "sha256": "bb538862f093bd22278bea3b3343037525a9218fbddef534e37e048347c10805",
+      "bytes": 267,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ApprovalDecision.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ApprovalDecision.ts",
+      "sha256": "91835a02fbf1772d265c99f0120d43da9985af02ddc80715771cc17dbd63b099",
+      "bytes": 390,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/AskForApproval.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/AskForApproval.ts",
+      "sha256": "29856970631e6893a525665a7da4a8e94aff5e8d948af593b01e8dcf5bd72c97",
+      "bytes": 235,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/CancelLoginAccountParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/CancelLoginAccountParams.ts",
+      "sha256": "35b16be0dd359e37d46ceb113c947efab47f485a85f1dffb06232c38e0d54554",
+      "bytes": 214,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/CancelLoginAccountResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/CancelLoginAccountResponse.ts",
+      "sha256": "51ad4cd0696ad9d7b3b90dc5248b63c802e198d5b1b12fa72e26f8188814b541",
+      "bytes": 309,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/CancelLoginAccountStatus.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/CancelLoginAccountStatus.ts",
+      "sha256": "4024fdc1f7a09ad82499e6743ba617599612ddbe0f9d2a292555e7faded876b8",
+      "bytes": 217,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/CodexErrorInfo.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/CodexErrorInfo.ts",
+      "sha256": "9b083d31c56c790cc05796ba77621249b0451a1deaf8c6fb60c40dfd44c7f92b",
+      "bytes": 871,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/CommandAction.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/CommandAction.ts",
+      "sha256": "3bde37a4ee26998cb2c83eb3e16b2a81bd4ff726ae28a0bf49e0499960674cd7",
+      "bytes": 438,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/CommandExecParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/CommandExecParams.ts",
+      "sha256": "6577fed820ef782b45936304492a14c1219ba9c3bb2acdd21c0240bcb8f1ec54",
+      "bytes": 351,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/CommandExecResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/CommandExecResponse.ts",
+      "sha256": "8dcf0e574d27f19d86a7245a32fac704c8b2980c61a514ca2589db7526b5759e",
+      "bytes": 242,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/CommandExecutionOutputDeltaNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/CommandExecutionOutputDeltaNotification.ts",
+      "sha256": "20e015b65e534534a846bbe6ec74bdbfff7cde1401728d3f0f81127dd20a9f89",
+      "bytes": 277,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/CommandExecutionRequestApprovalParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/CommandExecutionRequestApprovalParams.ts",
+      "sha256": "f170d4e0abe9ca017bb032293e3d1b070131223e9a80660da289c5ec58694b2c",
+      "bytes": 577,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/CommandExecutionRequestApprovalResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/CommandExecutionRequestApprovalResponse.ts",
+      "sha256": "c710e5ba23acf208c30f3093684fa2c36f3879b8b673d667eaaa9458056d27d2",
+      "bytes": 300,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/CommandExecutionStatus.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/CommandExecutionStatus.ts",
+      "sha256": "8e0e8aa0a3f4caeaa32f2ac2aa62d2e9737004f5ab33f5f37e2dfe114d4e3301",
+      "bytes": 242,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/Config.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/Config.ts",
+      "sha256": "a71a356e0fda4e021f05e8a4830ac887d9c6413324b0f2ef5c4947832cc5af1d",
+      "bytes": 1551,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ConfigBatchWriteParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ConfigBatchWriteParams.ts",
+      "sha256": "399ad85c54b285e2b3cc17e210f6c2d849168198b7b71ddcbcb845b764d91a7e",
+      "bytes": 423,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ConfigEdit.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ConfigEdit.ts",
+      "sha256": "67ee51dde287fc9587981fa1da666fd8ff5eedc5123fc72025807d1812e31543",
+      "bytes": 360,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ConfigLayer.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ConfigLayer.ts",
+      "sha256": "79b1f2f43baa234ca5a61f3dbddbd284bfb4e8e4e002c44cc46728157ed22d95",
+      "bytes": 375,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ConfigLayerMetadata.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ConfigLayerMetadata.ts",
+      "sha256": "daf0f06e958f16b3c01a9c46a09363549bcaf2d680b5c5d4fd9f557d4ea3f3a2",
+      "bytes": 306,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ConfigLayerName.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ConfigLayerName.ts",
+      "sha256": "9c3c949be667d4a263d2887ffd103a3d26269717e05fe49612664c05ba6b9844",
+      "bytes": 227,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ConfigReadParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ConfigReadParams.ts",
+      "sha256": "4f3496a982c6eda55a05ddb910b371556a5d84bed1087b954ba7c6fbc883189c",
+      "bytes": 213,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ConfigReadResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ConfigReadResponse.ts",
+      "sha256": "9efa2d02c6ccb42cf509010727c9d27b4ac3783ac8b47e41f92eb6556848cb15",
+      "bytes": 450,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ConfigValueWriteParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ConfigValueWriteParams.ts",
+      "sha256": "acd7e960e09a42e921f9b78ef6ce692173aef95a169aee5df4b9342a6ded57fc",
+      "bytes": 526,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ConfigWriteResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ConfigWriteResponse.ts",
+      "sha256": "53265d317ba1323007216c0c3103f57ee3cb2febea3e1b48ccec0835b3b664ed",
+      "bytes": 473,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ContextCompactedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ContextCompactedNotification.ts",
+      "sha256": "f3e4cd987638f779f03ce1328ed8d0bb9a822347420e69161cf91918e5b9601f",
+      "bytes": 235,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/CreditsSnapshot.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/CreditsSnapshot.ts",
+      "sha256": "e56bf82bc93959ed95748dc7363520d4cf477d9c7ac2b8e40e48c91b03c2575a",
+      "bytes": 253,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ErrorNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ErrorNotification.ts",
+      "sha256": "f30701035a45042495c0cbf41d4002f9e1a2c2b8c41bd4762ed6588338c6d5e1",
+      "bytes": 308,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ExecPolicyAmendment.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ExecPolicyAmendment.ts",
+      "sha256": "eae3c3f9c81a40ffffe5de29e274b322db8200591ba39306daa27794a2deffa0",
+      "bytes": 202,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/FeedbackUploadParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/FeedbackUploadParams.ts",
+      "sha256": "05bd9b9e13bd381df51a27ba5650b02a7417ffe350e9f95599907160b10144ab",
+      "bytes": 287,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/FeedbackUploadResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/FeedbackUploadResponse.ts",
+      "sha256": "9034eb7ed8d454e15cd4cb005508fa05312862669058fe6c3f89aa9817741d34",
+      "bytes": 213,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/FileChangeOutputDeltaNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/FileChangeOutputDeltaNotification.ts",
+      "sha256": "99ee2b20987dbd94fac8612c4e272fd20023812c003d2dbb0d0bdf0e71f8e890",
+      "bytes": 271,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/FileChangeRequestApprovalParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/FileChangeRequestApprovalParams.ts",
+      "sha256": "06d42c547838e34c30121d39ccd45684a2931f58d4d98d40a7a70355f811fc6c",
+      "bytes": 548,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/FileChangeRequestApprovalResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/FileChangeRequestApprovalResponse.ts",
+      "sha256": "20b50dc3725148f34a53e2bfc91a82171a4da64f7c41cb54e2ba6fb9f7ae8324",
+      "bytes": 294,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/FileUpdateChange.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/FileUpdateChange.ts",
+      "sha256": "71acccec19639609d9a2a7f42de4bc53e540692afcbd29de0735826541dbe5a0",
+      "bytes": 298,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/GetAccountParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/GetAccountParams.ts",
+      "sha256": "547dec0fc425dce9f7c97ca5aa900c0dced331050ccb9a30ace96decda771477",
+      "bytes": 212,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/GetAccountRateLimitsResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/GetAccountRateLimitsResponse.ts",
+      "sha256": "23a13aa7d9c3c428fb5c4d3add6a52c4738a3b98f94267444a0b1df4a61e44ec",
+      "bytes": 294,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/GetAccountResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/GetAccountResponse.ts",
+      "sha256": "f16f348c9c37a760bd7b4c75c0b7d86a57d6cbd16bd6a1c4b06dffa39157b6a9",
+      "bytes": 287,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/GitInfo.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/GitInfo.ts",
+      "sha256": "ae05c1fdc69bba0d6aea22f2f7a8e2f7c5b494330d6827cfac9ec9a9cc290269",
+      "bytes": 249,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/index.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/index.ts",
+      "sha256": "6786a7101d48d21b5e79e1b3026bc9749d7318c89fe95862d9b5a329e2cef0ad",
+      "bytes": 7731,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ItemCompletedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ItemCompletedNotification.ts",
+      "sha256": "ba347219616a9ff497f84622af5ff337ba13b6dfbfd4e6722a2438c03a038065",
+      "bytes": 298,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ItemStartedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ItemStartedNotification.ts",
+      "sha256": "adc1ff5954da47cb28fe823a0b842d285266f346b65fe1b211a74136975c5be3",
+      "bytes": 296,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ListMcpServersParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ListMcpServersParams.ts",
+      "sha256": "c5b388ad9d877f723e18c65e1490c73abb30c5fa744df15a92fb6cae8a153af6",
+      "bytes": 372,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ListMcpServersResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ListMcpServersResponse.ts",
+      "sha256": "dbde0074311dd6c962cd169ab78082c6bb981a38b692c5cc957ff2c6786af043",
+      "bytes": 423,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/LoginAccountParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/LoginAccountParams.ts",
+      "sha256": "a999748b0c000e0401a0efe9291162068eb4ca3e48140dbe7f39a6eb70febdf3",
+      "bytes": 249,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/LoginAccountResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/LoginAccountResponse.ts",
+      "sha256": "66c98b203d1854de1a6aba3cca6b764455eded192bb6e44a36a405fec24c8ee3",
+      "bytes": 350,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/LogoutAccountResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/LogoutAccountResponse.ts",
+      "sha256": "c6ed4a457bb58b0b508530ff2e646552766ec62a498253285543f0b9170d2c29",
+      "bytes": 212,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/McpAuthStatus.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/McpAuthStatus.ts",
+      "sha256": "30edf28396495cba1e584198462f004f691911a107ee06735d10b08da5526c91",
+      "bytes": 238,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/McpServer.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/McpServer.ts",
+      "sha256": "6410a9a24e3a4c36b50e79b256306a9703d9476bb21a4468759d622e8446b69d",
+      "bytes": 527,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/McpServerOauthLoginCompletedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/McpServerOauthLoginCompletedNotification.ts",
+      "sha256": "42658b1de34aee56bddbc35a2ef36a1c3548497a449943b886af3e0d2c4b296d",
+      "bytes": 261,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/McpServerOauthLoginParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/McpServerOauthLoginParams.ts",
+      "sha256": "613b058d07988f770e5b7047a60a2dba03ee0bd1d908f4d63201df66b5bd9071",
+      "bytes": 258,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/McpServerOauthLoginResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/McpServerOauthLoginResponse.ts",
+      "sha256": "0a0fc60ee64195866fee1b99cc593854975bf8e2472fe24fa08fac23b5286c84",
+      "bytes": 226,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/McpToolCallError.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/McpToolCallError.ts",
+      "sha256": "639a626f2b8932812fd0c94c027b35aea0dd8fad18bcc720d690ef5f824d2c75",
+      "bytes": 206,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/McpToolCallProgressNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/McpToolCallProgressNotification.ts",
+      "sha256": "39ff4bfe3cbd0d2b886dbba70e4916182c9e75802217e3ae2a5e4914569c6e16",
+      "bytes": 271,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/McpToolCallResult.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/McpToolCallResult.ts",
+      "sha256": "07c11d24fdcd1e1cb03dbe9f57c6af0c57067275d0b5534a21fd9857b40ad2a6",
+      "bytes": 368,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/McpToolCallStatus.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/McpToolCallStatus.ts",
+      "sha256": "cd64f4dbfbeccfd1c5a5c5982ccddd803b6ea1a909c8756e0b9274bbf34e515c",
+      "bytes": 224,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/MergeStrategy.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/MergeStrategy.ts",
+      "sha256": "88a0e2d63b3b3c9d463a5b6f2d72f7480a7be30f34451664173ea6e37a4fabfa",
+      "bytes": 203,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/Model.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/Model.ts",
+      "sha256": "050334fe15cd16b6afdce079199c461baa80ca32db93df0009a658e2d473ad1d",
+      "bytes": 494,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ModelListParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ModelListParams.ts",
+      "sha256": "afc23f3c564d33d389d1dccfda19b6ff43a4e49eb2d67ba763e5c7df747203ca",
+      "bytes": 375,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ModelListResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ModelListResponse.ts",
+      "sha256": "63d024c7956360101ae564c2b55563f354f3326b2989fef84cf64f8a0fefbfd6",
+      "bytes": 406,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/OverriddenMetadata.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/OverriddenMetadata.ts",
+      "sha256": "5fd0c4e3191494dd262616335858b44fb635ae9d2a02e39632cdcf02acca0d68",
+      "bytes": 397,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/PatchApplyStatus.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/PatchApplyStatus.ts",
+      "sha256": "b2a140e4b5f2de8f051bf5c52ce2cf975987180253b29287d64fd52715bca192",
+      "bytes": 236,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/PatchChangeKind.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/PatchChangeKind.ts",
+      "sha256": "20e95907d698efbef2fa9d9ab00392b10caf127dfc5e0df1ba9878ad6f42531d",
+      "bytes": 275,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ProfileV2.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ProfileV2.ts",
+      "sha256": "bd412ffee12e64ba7b40124282b342fe453defd0dfc5ed38dbebc0f46c2354a8",
+      "bytes": 834,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/RateLimitSnapshot.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/RateLimitSnapshot.ts",
+      "sha256": "78ccd32aa4d55397d24071364b4dcd0e764a0fb782adcd7ab6acc93f0c1675e2",
+      "bytes": 479,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/RateLimitWindow.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/RateLimitWindow.ts",
+      "sha256": "d1c57b5226a87ef3c02643835d62fe2c95b78c6c37cd53fd4aeccf68be9a7f1b",
+      "bytes": 269,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ReasoningEffortOption.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ReasoningEffortOption.ts",
+      "sha256": "5d1f91ca1bff16730604514f5d6a6102c74e5912af7f5c8fa474d6fcf8c90dde",
+      "bytes": 308,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ReasoningSummaryPartAddedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ReasoningSummaryPartAddedNotification.ts",
+      "sha256": "beeae50a6a6f7a3438d7cb6e49e4353228f92c554e5331bf6f288ff7a50b1932",
+      "bytes": 282,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ReasoningSummaryTextDeltaNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ReasoningSummaryTextDeltaNotification.ts",
+      "sha256": "46edaeb45c009106583d4793419b1a60b621cf93aecba734b7ef103178416261",
+      "bytes": 297,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ReasoningTextDeltaNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ReasoningTextDeltaNotification.ts",
+      "sha256": "be86447b21cca238370ec3074d903dbedd6f28f298b482d2938e46f39fd1c2ae",
+      "bytes": 290,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ReviewDelivery.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ReviewDelivery.ts",
+      "sha256": "b5bd1bc04a73c1e8f954ce2f4f316e3d370f3aba03358e1aef7f3c3bcffd6d19",
+      "bytes": 205,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ReviewStartParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ReviewStartParams.ts",
+      "sha256": "7ae5a410902a9bc37ad8dc2576ad07bb083710add6a72bb7591d5d3f964a049e",
+      "bytes": 510,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ReviewStartResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ReviewStartResponse.ts",
+      "sha256": "88f296d59949f04726e2910d4728bf9dd39ad40d196c1b3bf590418101d5b61d",
+      "bytes": 445,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ReviewTarget.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ReviewTarget.ts",
+      "sha256": "fd0578ec697150df7ab5d7967cc6b2c5e4b87375579b8af2fe0f156a1888251c",
+      "bytes": 437,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/SandboxMode.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/SandboxMode.ts",
+      "sha256": "8a59381e04efa84f9001e5c24444ee26fccf8f9e10bcfb02d2f6a24e85898843",
+      "bytes": 235,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/SandboxPolicy.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/SandboxPolicy.ts",
+      "sha256": "21b6fa761961345e31012b365906469a5886a54afcc63109be6ca0efcc52eeb7",
+      "bytes": 380,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/SandboxWorkspaceWrite.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/SandboxWorkspaceWrite.ts",
+      "sha256": "c89562de861371f0c98a7577f680c0a5067ad2af688992c7d9b0c94c1170a85a",
+      "bytes": 311,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/SessionSource.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/SessionSource.ts",
+      "sha256": "ed8903a4c1b08e96f0dfbc3a98d2b0a446bc6c8c2fdbb809d562bd1ec4dff3e2",
+      "bytes": 234,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TerminalInteractionNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TerminalInteractionNotification.ts",
+      "sha256": "c22bbace10fb3c79e3ff5f04721ecf6f3fb15919ea29ff3dfd7168a18a97b74f",
+      "bytes": 288,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/Thread.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/Thread.ts",
+      "sha256": "a087f1c9d373d18fa018784ca518e6d4573a3d6b2203726b9da8aeafa8ba2725",
+      "bytes": 1194,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadArchiveParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadArchiveParams.ts",
+      "sha256": "63bf71301b897cf74c0a3b48c49ba61823d549de8f66f434e9e2eb705e594db2",
+      "bytes": 210,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadArchiveResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadArchiveResponse.ts",
+      "sha256": "d6c8715393f98c0de93e31ee024687f3ac6f766941d656871d977e401eebaf18",
+      "bytes": 212,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadCompactParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadCompactParams.ts",
+      "sha256": "58da7304ec85b6ca66e2249e36b3a1d9aa7fd40cbc99d749875e68d140c4d8a5",
+      "bytes": 210,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadCompactResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadCompactResponse.ts",
+      "sha256": "e6dc364e419d54f0ca72d508c5f0bfb019b9d772b9441933604cd91ed7a3d12a",
+      "bytes": 212,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadItem.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadItem.ts",
+      "sha256": "273df8232c46e4c68913591a1be8031449d1564a7181da00f854b440cf2aff42",
+      "bytes": 2342,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadListParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadListParams.ts",
+      "sha256": "dbf2f74da8de840f971797355356eea9147a2ffaad7df5850659e0e77b43072e",
+      "bytes": 572,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadListResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadListResponse.ts",
+      "sha256": "0c0a6bb8976df5d2750879e4820c6b61aaabf7e1a6a970c23182123968af3356",
+      "bytes": 410,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadResumeParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadResumeParams.ts",
+      "sha256": "c7ddc49e1fcb40776ac5b7d66c6e0bb27ac8e204866502e1555702979f13cb5c",
+      "bytes": 1509,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadResumeResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadResumeResponse.ts",
+      "sha256": "b11c8b852cf12dcd457079f48d5516b3ee46a94b64b0531c6a384847246659c7",
+      "bytes": 566,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadStartedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadStartedNotification.ts",
+      "sha256": "bc5031158412e7c533afcc0dee1453be2b797de211f7252336c226fa2ed3c532",
+      "bytes": 254,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadStartParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadStartParams.ts",
+      "sha256": "eea6b3f0769cb7b92b0573ef6b192e81cf15d27dc36f5432385b74022ab95035",
+      "bytes": 613,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadStartResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadStartResponse.ts",
+      "sha256": "beeaabfea5f98b2ed7905203647492586290b322e77d19101aa84fe6a0b2464b",
+      "bytes": 565,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadTokenUsage.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadTokenUsage.ts",
+      "sha256": "27cae6c3e6c44696225e9a0903e0531c6eff126c6de3da2176bc5cdd904def4e",
+      "bytes": 345,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ThreadTokenUsageUpdatedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ThreadTokenUsageUpdatedNotification.ts",
+      "sha256": "53ce4421d686b8a7f9a86c5ad54de2a7dceecfb95df74fa5f441947e136f063d",
+      "bytes": 332,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TokenUsageBreakdown.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TokenUsageBreakdown.ts",
+      "sha256": "5b28aaf482e581e0c552b3efc60417cf9b1107d3464e1f12849da4f0fadbe7d2",
+      "bytes": 314,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/ToolsV2.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/ToolsV2.ts",
+      "sha256": "066b6f7001e4d8607289bf2e2a6608a3c6cf6d14aee3272e57ee878cc48b5723",
+      "bytes": 236,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/Turn.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/Turn.ts",
+      "sha256": "8ef3c3b11f64aa8fa977a5889d48941fb50902e3376d094549376aa3fedea7e1",
+      "bytes": 626,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TurnCompletedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TurnCompletedNotification.ts",
+      "sha256": "1f56d73cb06876533fb224cd285634d3e090b21b647009be0e7c622937e40d3e",
+      "bytes": 264,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TurnDiffUpdatedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TurnDiffUpdatedNotification.ts",
+      "sha256": "fe6d3f22009556852bd6d3fb4c7a557fe7ce182d36f6dd9c741597555c0beef9",
+      "bytes": 394,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TurnError.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TurnError.ts",
+      "sha256": "a98251c15e6998d0b108ef239f0022e0b3b33664165e216942da70dd59e44560",
+      "bytes": 294,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TurnInterruptParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TurnInterruptParams.ts",
+      "sha256": "643034c3d25c23c7700236d4d1ff16286565786d48148e85b0c4761fe46d3804",
+      "bytes": 226,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TurnInterruptResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TurnInterruptResponse.ts",
+      "sha256": "3994cb114b2c4a2e81ba3a349c3a7d1f13ce1b165776b2162b52c9a114c24bc4",
+      "bytes": 212,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TurnPlanStep.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TurnPlanStep.ts",
+      "sha256": "85759fa22b92588b549c1d637a5270bbb585a17338a666726eacac79819b24b2",
+      "bytes": 291,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TurnPlanStepStatus.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TurnPlanStepStatus.ts",
+      "sha256": "ab9c561f1910a2fd7e624dfa4481eedb0636725643c5925479cd358406202c19",
+      "bytes": 226,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TurnPlanUpdatedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TurnPlanUpdatedNotification.ts",
+      "sha256": "9f7505555f199125bc2774878d488a3dcbc4d7304a54967993e68053d9915d01",
+      "bytes": 341,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TurnStartedNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TurnStartedNotification.ts",
+      "sha256": "95135229129526d7d9e1db077962210ca5b564adc5fe414ff07e9a65ba43adcf",
+      "bytes": 262,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TurnStartParams.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TurnStartParams.ts",
+      "sha256": "62da2ba09a90fae06409b4756e91200d57e5496288328c30106a6f0462ee1226",
+      "bytes": 1147,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TurnStartResponse.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TurnStartResponse.ts",
+      "sha256": "974c520197188b7399836fda0ef1b11e43df618d25295463d2e229e1efa88ffd",
+      "bytes": 238,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/TurnStatus.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/TurnStatus.ts",
+      "sha256": "c69049363f97e97844e9fc851f0cd4122da057ba1371de003a28c00ab7a6ef1a",
+      "bytes": 233,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/UserInput.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/UserInput.ts",
+      "sha256": "d5dd1011f45f1bf887ea988c03eed5fc59ddaec16a416154a0ac59e860950200",
+      "bytes": 290,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/WindowsWorldWritableWarningNotification.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/WindowsWorldWritableWarningNotification.ts",
+      "sha256": "e72526faa6bd3e8983c6aec0899cc3f705bb5f0c84c9f3d671901fe5d2cef2c2",
+      "bytes": 281,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/v2/WriteStatus.ts",
+      "target": "reference/legacy-host/src/codex/generated/v2/WriteStatus.ts",
+      "sha256": "7b0285ae8fbb239002d76ddd79e5b2249a12544377750ccd0aea32cf53a5f7a3",
+      "bytes": 202,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/Verbosity.ts",
+      "target": "reference/legacy-host/src/codex/generated/Verbosity.ts",
+      "sha256": "013756f9bce2e17c367c9f4f3c0d7098b0cfbe56c5f0ce9e6473d23fb127aed4",
+      "bytes": 345,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/ViewImageToolCallEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/ViewImageToolCallEvent.ts",
+      "sha256": "0fbc197fb6f2cdeeea52456f948e2c7919b1e27bb6d830dda39d9be4adfe98ac",
+      "bytes": 336,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/WarningEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/WarningEvent.ts",
+      "sha256": "18cfdb225703407e1d8a91b5e939bb37d24651736d6678ac4f6ff24f07962758",
+      "bytes": 202,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/WebSearchAction.ts",
+      "target": "reference/legacy-host/src/codex/generated/WebSearchAction.ts",
+      "sha256": "c932fb971613001890098d73db0ada214ad6883ae508a5918c60dd83ad422ee4",
+      "bytes": 347,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/WebSearchBeginEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/WebSearchBeginEvent.ts",
+      "sha256": "88f47156eea4d29bd269ec7fa04d8a828a30eeae1db475e822e6a8894ca17625",
+      "bytes": 209,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/WebSearchEndEvent.ts",
+      "target": "reference/legacy-host/src/codex/generated/WebSearchEndEvent.ts",
+      "sha256": "db819c0e0a89e49f1ee15258c3c6b6284007ed5e37a7c835809e119a9224bfb6",
+      "bytes": 222,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/codex/generated/WebSearchItem.ts",
+      "target": "reference/legacy-host/src/codex/generated/WebSearchItem.ts",
+      "sha256": "5cb78625853093466463a079ceae6815c5106c884d14a45f31045f5bfc709d13",
+      "bytes": 213,
+      "tracked": false,
+      "role": "generated-provider-schema"
+    },
+    {
+      "source": "host/src/harness/antigravity.ts",
+      "target": "reference/legacy-host/src/harness/antigravity.ts",
+      "sha256": "246f5fb64614f830221b62d04bf501fd992ce972988f0f5102ca5c20fd8b3808",
+      "bytes": 13363,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/harness/codex.ts",
+      "target": "reference/legacy-host/src/harness/codex.ts",
+      "sha256": "bd609c6ef74df969f7579204ed8be12651715924b63f33d581d98e031d5004f4",
+      "bytes": 11639,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/harness/opencode.ts",
+      "target": "reference/legacy-host/src/harness/opencode.ts",
+      "sha256": "c7ed481f0d01c46f399f6db0b1a075c004361bafae2c904c4ede07a1b3077813",
+      "bytes": 13342,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/harness/types.ts",
+      "target": "reference/legacy-host/src/harness/types.ts",
+      "sha256": "2bbe0c4df5e2071406df41faa777dd4892edcfe2aadeb4cf7fd292a3bf5b10a9",
+      "bytes": 1333,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/index.ts",
+      "target": "reference/legacy-host/src/index.ts",
+      "sha256": "4cff9e32b5b38d8265e466da417bf2d78fdb2a79aba9e98d4089ce7a177395f0",
+      "bytes": 917,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/legacy-main.ts",
+      "target": "reference/legacy-host/src/legacy-main.ts",
+      "sha256": "b8ecc0515521c3503653da6e165bee221bb2f0931b6aafe2dbc4f8fb18cef983",
+      "bytes": 31158,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/peer/mesh.ts",
+      "target": "reference/legacy-host/src/peer/mesh.ts",
+      "sha256": "48e9ca531f9d4610be4ba3c468ec415641436379c0d949ec40d99275318d9f25",
+      "bytes": 8198,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/protocol/messages.ts",
+      "target": "reference/legacy-host/src/protocol/messages.ts",
+      "sha256": "2c7a9f53cb3f9c467bbb9c09bcb80b1bf9186d9bb9bf4b1e3967d3ea7fe049ab",
+      "bytes": 1411,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/state/context.ts",
+      "target": "reference/legacy-host/src/state/context.ts",
+      "sha256": "129b28549bc316882a0f28cd4896c5ccf83b30780917dcbb8156c4fedef1cb09",
+      "bytes": 58666,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/state/mvp-controller.ts",
+      "target": "reference/legacy-host/src/state/mvp-controller.ts",
+      "sha256": "70a68f4c9495a843760c85f73c01567385fcd865a5c8f8780984b4f96ca3367f",
+      "bytes": 40880,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/test-codex.ts",
+      "target": "reference/legacy-host/src/test-codex.ts",
+      "sha256": "900fd7e36c4ce352784c13ac1b40b3a339c9e0725761732be46c8b0802733d54",
+      "bytes": 1635,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/transport/udp.ts",
+      "target": "reference/legacy-host/src/transport/udp.ts",
+      "sha256": "ecc64735a8c767291017254fa21ff42f2f4e5730d07f2c3c748615f3bb5853f7",
+      "bytes": 4548,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/types.ts",
+      "target": "reference/legacy-host/src/types.ts",
+      "sha256": "28fb820deedbb562b0123031f9d489a02099f0a34120b55ae2b1791d7e50b6f2",
+      "bytes": 2742,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/vcs/git.ts",
+      "target": "reference/legacy-host/src/vcs/git.ts",
+      "sha256": "6d2172e5a1bdd86868e2fd4ec9bf8637286832d48c9cd4479ecdb4f4625dbecc",
+      "bytes": 2833,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/src/verify-sync.ts",
+      "target": "reference/legacy-host/src/verify-sync.ts",
+      "sha256": "fddcce939649cb438934717793fdf474d8e675596bbcda42a2ba4d1e3791fda1",
+      "bytes": 2870,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    },
+    {
+      "source": "host/tests/antigravity.test.mjs",
+      "target": "reference/legacy-host/tests/antigravity.test.mjs",
+      "sha256": "7e4cfb2737aab1ba916a4ec9de414036ecde1a0a029951882b2b8aceb5ad4cd5",
+      "bytes": 2892,
+      "tracked": false,
+      "role": "regression-test"
+    },
+    {
+      "source": "host/tests/audio.test.mjs",
+      "target": "reference/legacy-host/tests/audio.test.mjs",
+      "sha256": "c653b235b608eef9ed5c9c679930b2180d609bcf75082477eee06393d3054af6",
+      "bytes": 1811,
+      "tracked": false,
+      "role": "regression-test"
+    },
+    {
+      "source": "host/tests/context.test.mjs",
+      "target": "reference/legacy-host/tests/context.test.mjs",
+      "sha256": "11d5121ac9e9f681a3a6224fa39352c1ef84c5c043a93481b3298b1c6c3b2250",
+      "bytes": 14646,
+      "tracked": false,
+      "role": "regression-test"
+    },
+    {
+      "source": "host/tests/draft.test.mjs",
+      "target": "reference/legacy-host/tests/draft.test.mjs",
+      "sha256": "df09217b1fb311a129fc84dcd9bb47a37d9df7f5961c354d9a6ab5b9b917b9f8",
+      "bytes": 3936,
+      "tracked": false,
+      "role": "regression-test"
+    },
+    {
+      "source": "host/tests/integration.test.mjs",
+      "target": "reference/legacy-host/tests/integration.test.mjs",
+      "sha256": "6745f0e6d18acce93980dde58fed0f4753c3cadf6e381c362e6b75ddee8080b5",
+      "bytes": 3327,
+      "tracked": false,
+      "role": "regression-test"
+    },
+    {
+      "source": "host/tests/mesh.test.mjs",
+      "target": "reference/legacy-host/tests/mesh.test.mjs",
+      "sha256": "a3ea9e6224a9bf5bc8d561419d2acf5b81dba898348c712e65a2ec43e19f01da",
+      "bytes": 3493,
+      "tracked": false,
+      "role": "regression-test"
+    },
+    {
+      "source": "host/tests/mvp-controller.test.mjs",
+      "target": "reference/legacy-host/tests/mvp-controller.test.mjs",
+      "sha256": "b460370b77f24f7a0bffbc8498d7c6dd73fcb54b08d85d80f5b05aef21ca716a",
+      "bytes": 10999,
+      "tracked": false,
+      "role": "regression-test"
+    },
+    {
+      "source": "host/tests/mvp-state.test.mjs",
+      "target": "reference/legacy-host/tests/mvp-state.test.mjs",
+      "sha256": "d3d9a9fbdf5b804931c02e2ac86c5288ce72f25f26674660f4bb5ba62a46aa34",
+      "bytes": 4423,
+      "tracked": false,
+      "role": "regression-test"
+    },
+    {
+      "source": "host/tests/opencode.test.mjs",
+      "target": "reference/legacy-host/tests/opencode.test.mjs",
+      "sha256": "9f850b02d075d133ce31a4c68b6b09c6a593945b484baa238965ebc32b83ae55",
+      "bytes": 5416,
+      "tracked": false,
+      "role": "regression-test"
+    },
+    {
+      "source": "host/tests/protocol.test.mjs",
+      "target": "reference/legacy-host/tests/protocol.test.mjs",
+      "sha256": "41065ab12692d36b339b063de900beaa95048eb72dab9b8f15facb395eea6bfe",
+      "bytes": 2730,
+      "tracked": false,
+      "role": "regression-test"
+    },
+    {
+      "source": "host/tests/whisper-worker.test.mjs",
+      "target": "reference/legacy-host/tests/whisper-worker.test.mjs",
+      "sha256": "664c49cfd8edb7ae698202a03be9cfc5322637fb36aea8fd280b8c24b3d3fb10",
+      "bytes": 3174,
+      "tracked": false,
+      "role": "regression-test"
+    },
+    {
+      "source": "host/tsconfig.json",
+      "target": "reference/legacy-host/tsconfig.json",
+      "sha256": "ffddd7748e12dc428c98ca313cd47af90541ee6311d79c34d2f2a56f1d678fe4",
+      "bytes": 357,
+      "tracked": false,
+      "role": "prototype-source-or-build-config"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "snowball-middleware",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=20.19" },
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "npm run build && node --test tests",
+    "test:reference": "node scripts/test-reference.mjs",
+    "test:reference:speech": "node scripts/test-reference.mjs --speech",
+    "plan": "node docs/middleware/validate-plan.mjs --next"
+  },
+  "devDependencies": { "@types/node": "20.19.43", "typescript": "5.9.3" }
+}

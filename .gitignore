@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.state/
+.env
+.env.*
+!.env.example
+*.log
+.venv*/
+__pycache__/
+*.wav
+*.raw
+*.pyc

@@ -1,0 +1,140 @@
+# Middleware task tree
+
+Generated from PLAN.json. Edit the ledger, then run `node docs/middleware/validate-plan.mjs --write-tree`.
+
+Depth: L0 product → L1 outcome → L2 journey → L3 work package → L4 task → L5 acceptance.
+
+All implementation checks are pending unless their evidence says otherwise.
+
+- **MW** 하드웨어 독립 로컬 harness 제어 — 3/28 tasks done
+  - **MW.01** 분리 저장소와 계약 — 3/3 tasks done
+    - **MW.01.01** 기존 작업을 보존하며 추출 — 2/2 tasks done
+      - **MW.01.01.01** 소스 export와 재현 기반 — 2/2 tasks done
+        - **MW.01.01.01.01** 선별 소스/테스트/라이선스 inventory — done
+          - **MW.01.01.01.01.A1** 현재 index/controller와 46-test source가 allowlist에 있고 민감/runtime 데이터가 없는지 검토한다. — pass
+          - **MW.01.01.01.01.A2** source의 파일 변경/삭제 없이 export 대상별 해시·라이선스·용도를 추적할 수 있다. — pass
+        - **MW.01.01.01.02** 별도 repository scaffold와 기준 테스트 이식 — done
+          - **MW.01.01.01.02.A1** 새 repo clean dependency install/build와 기존 유효 회귀 suite 결과를 재현하고 분류별 결과를 기록한다. — pass
+          - **MW.01.01.01.02.A2** source 파일이 보존되고 두 repo가 서로 다른 Git root이며 authoritative plan 경로가 양쪽에 명시된다. — pass
+    - **MW.01.02** 독립 확장 계약 설정 — 1/1 tasks done
+      - **MW.01.02.01** SDK 및 compatibility — 1/1 tasks done
+        - **MW.01.02.01.01** Versioned plugin contract와 process lifecycle — done
+          - **MW.01.02.01.01.A1** 잘못된 manifest/version/hanging/crashing plugin이 거부·격리되고 core가 생존한다. — pass
+          - **MW.01.02.01.01.A2** MK20와 provider code 없이 SDK/core build 및 virtual conformance가 통과한다. — pass
+  - **MW.02** 로컬 제어 Core — 0/3 tasks done
+    - **MW.02.01** 대상을 선택하고 명령 수행 — 0/2 tasks done
+      - **MW.02.01.01** identity와 journal — 0/2 tasks done
+        - **MW.02.01.01.01** Host/Controller/Instance/Workspace identity와 context 분리 — ready
+          - **MW.02.01.01.01.A1** 같은 nativeSessionId가 다른 instance/host에서 충돌하지 않는다. — pending
+          - **MW.02.01.01.01.A2** 두 controller의 scope 변경과 pending draft/approval 목적지가 독립적으로 유지된다. — pending
+        - **MW.02.01.01.02** Durable command/decision 처리와 복구 — todo
+          - **MW.02.01.01.02.A1** 전송 직전/직후 crash와 reconnect가 중복 send를 만들지 않고 불확실하면 unknown을 유지한다. — pending
+          - **MW.02.01.01.02.A2** 두 controller가 동일 decision을 답하면 한 번만 적용되고 stale 요청은 실패한다. — pending
+    - **MW.02.02** 로컬 client 연결 — 0/1 tasks done
+      - **MW.02.02.01** API와 인증 — 0/1 tasks done
+        - **MW.02.02.01.01** 인증된 localhost API와 event stream — todo
+          - **MW.02.02.01.01.A1** 허용되지 않은 origin/host/인증과 stale revision 요청이 차단되고 token이 로그/URL에 남지 않는다. — pending
+          - **MW.02.02.01.01.A2** event gap/reconnect에서 snapshot이 일관되고 LAN 비활성 시 외부 interface listener가 없다. — pending
+  - **MW.03** Harness discovery — 0/5 tasks done
+    - **MW.03.01** 최초 발견과 검증 — 0/2 tasks done
+      - **MW.03.01.01** 후보와 상태 모델 — 0/2 tasks done
+        - **MW.03.01.01.01** 제한된 harness 후보 수집과 deduplication — todo
+          - **MW.03.01.01.01.A1** Windows/macOS fixture에서 empty·다중 설치·GUI PATH 누락·수동 경로가 정확히 표시된다. — pending
+          - **MW.03.01.01.01.A2** cancel/timeout/연속 scan의 늦은 응답이 새 결과를 덮어쓰지 않고 전체 디스크/포트를 스캔하지 않는다. — pending
+        - **MW.03.01.01.02** 읽기 probe와 진실한 capability 상태 — todo
+          - **MW.03.01.01.02.A1** 401은 needs_auth, 미실행은 not_running, 기록만 있으면 readonly로 분류된다. — pending
+          - **MW.03.01.01.02.A2** 잘못된 서비스/redirect/version/permission failure가 차단되며 discovery가 server 시작 또는 command send를 하지 않는다. — pending
+    - **MW.03.02** 연결하고 계속 사용 — 0/3 tasks done
+      - **MW.03.02.01** owner와 lifecycle — 0/3 tasks done
+        - **MW.03.02.01.01** Codex reference plugin의 명시적 연결 — todo
+          - **MW.03.02.01.01.A1** 실제 지원 OS/설치 버전에서 owned session create/read/send/events/decision/cancel을 검증한다. — pending
+          - **MW.03.02.01.01.A2** existing Desktop owner 경합은 오송신 없이 제한되고 macOS/Windows 지원 여부를 각각 증거로 기록한다. — pending
+        - **MW.03.02.01.02** 두 번째 harness와 제한된 Antigravity 지원 — todo
+          - **MW.03.02.01.02.A1** 실제 OpenCode instance에서 read/send/stop/decision/reconnect와 session identity를 검증한다. — pending
+          - **MW.03.02.01.02.A2** Antigravity transcript fixture pass가 full control로 표시되지 않고 실제 검증한 기능만 활성화된다. — pending
+        - **MW.03.02.01.03** Harness 재연결·변경·disable/remove — todo
+          - **MW.03.02.01.03.A1** 재설치/계정 교체와 owner PID 변화가 기존 세션/초안을 잘못 합치지 않는다. — pending
+          - **MW.03.02.01.03.A2** remove/disable/reconnect가 외부 앱 종료나 unknown 명령 replay를 일으키지 않는다. — pending
+  - **MW.04** Device discovery — 0/5 tasks done
+    - **MW.04.01** 장치 없이 시작하고 USB 연결 — 0/2 tasks done
+      - **MW.04.01.01** HID와 identity — 0/2 tasks done
+        - **MW.04.01.01.01** Device registry와 hardware-free 기본 경로 — todo
+          - **MW.04.01.01.01.A1** 장치 0개에서 API/Web 작업 경로가 사용 가능하고 hardware probing 실패가 core를 막지 않는다. — pending
+          - **MW.04.01.01.01.A2** virtual 두 장치 입력이 서로의 선택 상태/출력으로 섞이지 않는다. — pending
+        - **MW.04.01.01.02** HID enumeration/권한/물리 식별과 안전 테스트 — todo
+          - **MW.04.01.01.02.A1** Windows/macOS 해당 실제 모델에서 권한 거부/재검사/hotplug/안전 입력 test를 증거로 남긴다. — pending
+          - **MW.04.01.01.02.A2** 동일 모델 두 장치·serial 없음·USB port 변경에서 오결합이 없고 일반 키보드 타이핑을 탈취하지 않는다. — pending
+    - **MW.04.02** LAN 장치 연결 — 0/2 tasks done
+      - **MW.04.02.01** pairing와 transport — 0/2 tasks done
+        - **MW.04.02.01.01** Opt-in LAN 탐색과 수동 주소 fallback — todo
+          - **MW.04.02.01.01.A1** network-off에서 listener/discovery가 없고 enable/disable 후 즉시 반영된다. — pending
+          - **MW.04.02.01.01.A2** 차단된 mDNS/주소 변화/수동 잘못된 endpoint가 명확한 결과를 내며 subnet sweep을 하지 않는다. — pending
+        - **MW.04.02.01.02** MK20 plugin 추출과 인증 pairing 계약 — todo
+          - **MW.04.02.01.02.A1** 실제 MK20에서 물리 pairing 성공/취소/만료/잘못된 identity/replay를 검증한다; firmware 미지원이면 blocked다. — pending
+          - **MW.04.02.01.02.A2** 인증 없는 legacy 장치가 production ready가 되지 않고 USB+LAN identity는 검증된 경우에만 합친다. — pending
+    - **MW.04.03** 장치를 계속 사용하거나 제거 — 0/1 tasks done
+      - **MW.04.03.01** controller lifecycle — 0/1 tasks done
+        - **MW.04.03.01.01** 장치 재접속·plugin 장애·제거 — todo
+          - **MW.04.03.01.01.A1** unplug/reset/crash 뒤 안전 복구하고 오래된 button event/unknown 명령을 replay하지 않는다. — pending
+          - **MW.04.03.01.01.A2** 두 장치+Web 동시 조작과 revoke가 타 controller 또는 실행 중 harness task를 종료시키지 않는다. — pending
+  - **MW.05** Project와 Session — 0/2 tasks done
+    - **MW.05.01** 작업 공간 선택 — 0/1 tasks done
+      - **MW.05.01.01** workspace registry — 0/1 tasks done
+        - **MW.05.01.01.01** 로컬 workspace 등록과 프로젝트 연결 — todo
+          - **MW.05.01.01.01.A1** 빈 목록/이동/삭제/권한 거부와 case-sensitive root에서 잘못된 project 병합이 없다. — pending
+          - **MW.05.01.01.01.A2** symlink/비슷한 sibling 경로/다른 worktree로 등록된 읽기 경계를 벗어나지 않는다. — pending
+    - **MW.05.02** 기존/새 작업 제어 — 0/1 tasks done
+      - **MW.05.02.01** session owner — 0/1 tasks done
+        - **MW.05.02.01.01** 기존 작업 attach와 새 task 전체 왕복 — todo
+          - **MW.05.02.01.01.A1** 장치 0개로 실제 local harness task create→send→events→decision→cancel/recovery 흐름을 완료한다. — pending
+          - **MW.05.02.01.01.A2** 기존 owner 접근 불가 시 read-only이고 scope 변경/새 task 선택이 pending 목적지를 바꾸지 않는다. — pending
+  - **MW.06** 로컬 사용자 경험 — 0/3 tasks done
+    - **MW.06.01** 설치 후 설정 — 0/2 tasks done
+      - **MW.06.01.01** onboarding와 tray — 0/2 tasks done
+        - **MW.06.01.01.01** 실패/skip 가능한 local onboarding — todo
+          - **MW.06.01.01.01.A1** J01 전체 흐름에서 미설치·장치 없음·auth 취소·수동 경로·restart를 거쳐 Supervisor에 도달한다. — pending
+          - **MW.06.01.01.01.A2** discovered/authenticated/controllable을 구분하고 Internet 차단이 local onboarding을 막지 않는다. — pending
+        - **MW.06.01.01.02** Tray-only shell과 Settings — todo
+          - **MW.06.01.01.02.A1** 브라우저 닫기와 제어 pause가 작업 종료로 오해되지 않으며 native 주 창이 자동 생성되지 않는다. — pending
+          - **MW.06.01.01.02.A2** Settings 변경/취소와 tray 상태가 같은 API revision을 반영하고 비밀이 URL에 노출되지 않는다. — pending
+    - **MW.06.02** 여러 작업 supervision — 0/1 tasks done
+      - **MW.06.02.01** 목록과 attention — 0/1 tasks done
+        - **MW.06.02.01.01** Overview/Attention와 목적지 고정 상세 — todo
+          - **MW.06.02.01.01.A1** 다중 project/harness fixture와 실제 지원 task에서 상태/lastSeen/unsupported가 사실대로 표시된다. — pending
+          - **MW.06.02.01.01.A2** 동시 decision 처리·필터 전환·reconnect에도 초안 목적지와 읽던 목록 위치가 보존된다. — pending
+  - **MW.07** 선택형 음성 — 0/2 tasks done
+    - **MW.07.01** 입력과 인식 설정 — 0/1 tasks done
+      - **MW.07.01.01** AudioSource와 SpeechProvider — 0/1 tasks done
+        - **MW.07.01.01.01** AudioSource와 선택형 SpeechProvider 분리 — todo
+          - **MW.07.01.01.01.A1** Python/모델/마이크가 없는 clean 환경에서도 core가 정상 사용 가능하다. — pending
+          - **MW.07.01.01.01.A2** source 권한 거부/STT 미설치·실패·취소에서 이유와 복구 동작이 명확하다. — pending
+    - **MW.07.02** 음성 draft 사용 — 0/1 tasks done
+      - **MW.07.02.01** 취소와 복구 — 0/1 tasks done
+        - **MW.07.02.01.01** Review/명시 Send와 음성 lifecycle 복구 — todo
+          - **MW.07.02.01.01.A1** late transcript와 새 capture가 섞이지 않고 unknown 상태에서 재송신하지 않는다. — pending
+          - **MW.07.02.01.01.A2** 실제 지원 source의 capture와 별도 STT fixture 결과를 구분하고 offline/재시작 시 draft가 복구된다. — pending
+  - **MW.08** 배포와 운영 — 0/3 tasks done
+    - **MW.08.01** OS에 설치하고 상주 — 0/1 tasks done
+      - **MW.08.01.01** desktop lifecycle — 0/1 tasks done
+        - **MW.08.01.01.01** Mac/Windows clean install과 사용자 세션 lifecycle — todo
+          - **MW.08.01.01.01.A1** macOS arm64/x64와 Windows x64 clean 환경에서 외부 Node/Python 없이 core가 실행된다; 미확보 환경은 blocked다. — pending
+          - **MW.08.01.01.01.A2** 다른 OS 사용자 secret 격리, login toggle, port 충돌과 crash recovery를 검증한다. — pending
+    - **MW.08.02** 업데이트와 출시 — 0/2 tasks done
+      - **MW.08.02.01** release evidence — 0/2 tasks done
+        - **MW.08.02.01.01** 서명·업데이트·rollback·uninstall — todo
+          - **MW.08.02.01.01.A1** 실제 서명·공증/설치/업데이트/변조 거부/중단 복구를 플랫폼별 검증한다; 계정 미확보는 blocked다. — pending
+          - **MW.08.02.01.01.A2** uninstall/reinstall 시 로그인 항목/credentials 정책이 일관되고 오래된 trust가 자동 부활하지 않는다. — pending
+        - **MW.08.02.01.02** 로컬 제품 통합 검수와 support matrix — todo
+          - **MW.08.02.01.02.A1** G0-G3 필수 task가 증거와 함께 완료되고 pending/blocked를 pass로 계산하지 않는다. — pending
+          - **MW.08.02.01.02.A2** Internet 및 LAN 비활성에서 core 제어 UI가 유지되며 cloud harness 연결 실패는 별도로 표시된다. — pending
+  - **MW.09** 선택형 local LAN multi-host — 0/2 tasks done
+    - **MW.09.01** 사용자 소유 PC 연결 — 0/1 tasks done
+      - **MW.09.01.01** host trust — 0/1 tasks done
+        - **MW.09.01.01.01** 선택적 LAN Host pairing과 해제 — todo
+          - **MW.09.01.01.01.A1** 미등록 host/spoof/expired credential이 거부되고 network-off 즉시 discovery/listener가 닫힌다. — pending
+          - **MW.09.01.01.01.A2** Mac↔Windows 실제 pairing/취소/해제 후 현재 PC 제어가 독립적으로 유지된다. — pending
+    - **MW.09.02** 여러 PC 작업 관찰/제어 — 0/1 tasks done
+      - **MW.09.02.01** federation — 0/1 tasks done
+        - **MW.09.02.01.01** Paired local host 집계와 장애 분리 — todo
+          - **MW.09.02.01.01.A1** remote disconnect/집계 host 재시작이 local task와 unknown 목적지를 바꾸지 않는다. — pending
+          - **MW.09.02.01.01.A2** 실제 두 OS multi-host matrix가 통과하기 전 G4 또는 multi-host 지원 완료를 표시하지 않는다. — pending

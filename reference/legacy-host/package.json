@@ -1,0 +1,17 @@
+{
+  "name": "snowball-control-host",
+  "version": "0.1.0",
+  "description": "Host middleware daemon for Snowball Control MK20 panel",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc && node -e \"import('node:fs').then(fs => fs.copyFileSync('src/audio/whisper_worker.py', 'dist/audio/whisper_worker.py'))\"",
+    "test": "npm run build && node --test tests",
+    "start": "node dist/index.js",
+    "dev": "tsc -w"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3"
+  }
+}

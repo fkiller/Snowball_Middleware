@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const root = 'reference/legacy-host';
+execFileSync(process.execPath, [require.resolve('typescript/lib/tsc.js'), '-p', `${root}/tsconfig.json`], { stdio: 'inherit' });
+fs.copyFileSync(`${root}/src/audio/whisper_worker.py`, `${root}/dist/audio/whisper_worker.py`);
+const speech = new Set(['integration.test.mjs', 'whisper-worker.test.mjs']);
+const files = fs.readdirSync(`${root}/tests`).filter(file => file.endsWith('.test.mjs') && speech.has(file) === process.argv.includes('--speech'));
+execFileSync(process.execPath, ['--test', ...files.map(file => `${root}/tests/${file}`)], { stdio: 'inherit' });

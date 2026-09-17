@@ -1,0 +1,2336 @@
+{
+  "schemaVersion": 1,
+  "planRevision": 3,
+  "updatedAt": "2026-09-17",
+  "scope": "Local control first; optional explicitly enabled local-LAN extension. Planning complete; new middleware implementation not started.",
+  "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
+  "targetRepository": "E:/developments/projects/Snowball_Middleware",
+  "resumeTaskId": "MW.02.01.01.01",
+  "requirements": [
+    {
+      "id": "R-LOCAL",
+      "title": "현재 사용자/PC 로컬 제어가 기본"
+    },
+    {
+      "id": "R-NET",
+      "title": "loopback 기본, LAN 명시 활성화"
+    },
+    {
+      "id": "R-TRUTH",
+      "title": "discovery와 제어 capability 분리"
+    },
+    {
+      "id": "R-TARGET",
+      "title": "명령의 owner/목적지 고정"
+    },
+    {
+      "id": "R-RECOVER",
+      "title": "durable recovery, unknown replay 금지"
+    },
+    {
+      "id": "R-PLUGIN",
+      "title": "core와 provider/device 구현 분리"
+    },
+    {
+      "id": "R-OPTIONAL",
+      "title": "hardware/voice/cloud control plane 비필수"
+    },
+    {
+      "id": "R-PRIVACY",
+      "title": "제한 탐색과 로컬 비밀 저장"
+    }
+  ],
+  "scenarioCatalog": "DISCOVERY_JOURNEYS.md",
+  "nodes": [
+    {
+      "id": "MW",
+      "depth": 0,
+      "parent": null,
+      "kind": "product",
+      "title": "하드웨어 독립 로컬 harness 제어",
+      "requirements": [
+        "R-LOCAL",
+        "R-NET",
+        "R-TRUTH",
+        "R-TARGET",
+        "R-RECOVER",
+        "R-PLUGIN",
+        "R-OPTIONAL",
+        "R-PRIVACY"
+      ]
+    },
+    {
+      "id": "MW.01",
+      "depth": 1,
+      "parent": "MW",
+      "kind": "outcome",
+      "title": "분리 저장소와 계약",
+      "gate": "G0",
+      "requirements": []
+    },
+    {
+      "id": "MW.01.01",
+      "depth": 2,
+      "parent": "MW.01",
+      "kind": "journey",
+      "title": "기존 작업을 보존하며 추출",
+      "requirements": []
+    },
+    {
+      "id": "MW.01.01.01",
+      "depth": 3,
+      "parent": "MW.01.01",
+      "kind": "work_package",
+      "title": "소스 export와 재현 기반",
+      "requirements": []
+    },
+    {
+      "id": "MW.01.02",
+      "depth": 2,
+      "parent": "MW.01",
+      "kind": "journey",
+      "title": "독립 확장 계약 설정",
+      "requirements": []
+    },
+    {
+      "id": "MW.01.02.01",
+      "depth": 3,
+      "parent": "MW.01.02",
+      "kind": "work_package",
+      "title": "SDK 및 compatibility",
+      "requirements": []
+    },
+    {
+      "id": "MW.02",
+      "depth": 1,
+      "parent": "MW",
+      "kind": "outcome",
+      "title": "로컬 제어 Core",
+      "gate": "G1",
+      "requirements": []
+    },
+    {
+      "id": "MW.02.01",
+      "depth": 2,
+      "parent": "MW.02",
+      "kind": "journey",
+      "title": "대상을 선택하고 명령 수행",
+      "requirements": []
+    },
+    {
+      "id": "MW.02.01.01",
+      "depth": 3,
+      "parent": "MW.02.01",
+      "kind": "work_package",
+      "title": "identity와 journal",
+      "requirements": []
+    },
+    {
+      "id": "MW.02.02",
+      "depth": 2,
+      "parent": "MW.02",
+      "kind": "journey",
+      "title": "로컬 client 연결",
+      "requirements": []
+    },
+    {
+      "id": "MW.02.02.01",
+      "depth": 3,
+      "parent": "MW.02.02",
+      "kind": "work_package",
+      "title": "API와 인증",
+      "requirements": []
+    },
+    {
+      "id": "MW.03",
+      "depth": 1,
+      "parent": "MW",
+      "kind": "outcome",
+      "title": "Harness discovery",
+      "gate": "G1",
+      "requirements": []
+    },
+    {
+      "id": "MW.03.01",
+      "depth": 2,
+      "parent": "MW.03",
+      "kind": "journey",
+      "title": "최초 발견과 검증",
+      "requirements": []
+    },
+    {
+      "id": "MW.03.01.01",
+      "depth": 3,
+      "parent": "MW.03.01",
+      "kind": "work_package",
+      "title": "후보와 상태 모델",
+      "requirements": []
+    },
+    {
+      "id": "MW.03.02",
+      "depth": 2,
+      "parent": "MW.03",
+      "kind": "journey",
+      "title": "연결하고 계속 사용",
+      "requirements": []
+    },
+    {
+      "id": "MW.03.02.01",
+      "depth": 3,
+      "parent": "MW.03.02",
+      "kind": "work_package",
+      "title": "owner와 lifecycle",
+      "requirements": []
+    },
+    {
+      "id": "MW.04",
+      "depth": 1,
+      "parent": "MW",
+      "kind": "outcome",
+      "title": "Device discovery",
+      "gate": "G2",
+      "requirements": []
+    },
+    {
+      "id": "MW.04.01",
+      "depth": 2,
+      "parent": "MW.04",
+      "kind": "journey",
+      "title": "장치 없이 시작하고 USB 연결",
+      "requirements": []
+    },
+    {
+      "id": "MW.04.01.01",
+      "depth": 3,
+      "parent": "MW.04.01",
+      "kind": "work_package",
+      "title": "HID와 identity",
+      "requirements": []
+    },
+    {
+      "id": "MW.04.02",
+      "depth": 2,
+      "parent": "MW.04",
+      "kind": "journey",
+      "title": "LAN 장치 연결",
+      "requirements": []
+    },
+    {
+      "id": "MW.04.02.01",
+      "depth": 3,
+      "parent": "MW.04.02",
+      "kind": "work_package",
+      "title": "pairing와 transport",
+      "requirements": []
+    },
+    {
+      "id": "MW.04.03",
+      "depth": 2,
+      "parent": "MW.04",
+      "kind": "journey",
+      "title": "장치를 계속 사용하거나 제거",
+      "requirements": []
+    },
+    {
+      "id": "MW.04.03.01",
+      "depth": 3,
+      "parent": "MW.04.03",
+      "kind": "work_package",
+      "title": "controller lifecycle",
+      "requirements": []
+    },
+    {
+      "id": "MW.05",
+      "depth": 1,
+      "parent": "MW",
+      "kind": "outcome",
+      "title": "Project와 Session",
+      "gate": "G1",
+      "requirements": []
+    },
+    {
+      "id": "MW.05.01",
+      "depth": 2,
+      "parent": "MW.05",
+      "kind": "journey",
+      "title": "작업 공간 선택",
+      "requirements": []
+    },
+    {
+      "id": "MW.05.01.01",
+      "depth": 3,
+      "parent": "MW.05.01",
+      "kind": "work_package",
+      "title": "workspace registry",
+      "requirements": []
+    },
+    {
+      "id": "MW.05.02",
+      "depth": 2,
+      "parent": "MW.05",
+      "kind": "journey",
+      "title": "기존/새 작업 제어",
+      "requirements": []
+    },
+    {
+      "id": "MW.05.02.01",
+      "depth": 3,
+      "parent": "MW.05.02",
+      "kind": "work_package",
+      "title": "session owner",
+      "requirements": []
+    },
+    {
+      "id": "MW.06",
+      "depth": 1,
+      "parent": "MW",
+      "kind": "outcome",
+      "title": "로컬 사용자 경험",
+      "gate": "G1",
+      "requirements": []
+    },
+    {
+      "id": "MW.06.01",
+      "depth": 2,
+      "parent": "MW.06",
+      "kind": "journey",
+      "title": "설치 후 설정",
+      "requirements": []
+    },
+    {
+      "id": "MW.06.01.01",
+      "depth": 3,
+      "parent": "MW.06.01",
+      "kind": "work_package",
+      "title": "onboarding와 tray",
+      "requirements": []
+    },
+    {
+      "id": "MW.06.02",
+      "depth": 2,
+      "parent": "MW.06",
+      "kind": "journey",
+      "title": "여러 작업 supervision",
+      "requirements": []
+    },
+    {
+      "id": "MW.06.02.01",
+      "depth": 3,
+      "parent": "MW.06.02",
+      "kind": "work_package",
+      "title": "목록과 attention",
+      "requirements": []
+    },
+    {
+      "id": "MW.07",
+      "depth": 1,
+      "parent": "MW",
+      "kind": "outcome",
+      "title": "선택형 음성",
+      "gate": "G2",
+      "requirements": []
+    },
+    {
+      "id": "MW.07.01",
+      "depth": 2,
+      "parent": "MW.07",
+      "kind": "journey",
+      "title": "입력과 인식 설정",
+      "requirements": []
+    },
+    {
+      "id": "MW.07.01.01",
+      "depth": 3,
+      "parent": "MW.07.01",
+      "kind": "work_package",
+      "title": "AudioSource와 SpeechProvider",
+      "requirements": []
+    },
+    {
+      "id": "MW.07.02",
+      "depth": 2,
+      "parent": "MW.07",
+      "kind": "journey",
+      "title": "음성 draft 사용",
+      "requirements": []
+    },
+    {
+      "id": "MW.07.02.01",
+      "depth": 3,
+      "parent": "MW.07.02",
+      "kind": "work_package",
+      "title": "취소와 복구",
+      "requirements": []
+    },
+    {
+      "id": "MW.08",
+      "depth": 1,
+      "parent": "MW",
+      "kind": "outcome",
+      "title": "배포와 운영",
+      "gate": "G3",
+      "requirements": []
+    },
+    {
+      "id": "MW.08.01",
+      "depth": 2,
+      "parent": "MW.08",
+      "kind": "journey",
+      "title": "OS에 설치하고 상주",
+      "requirements": []
+    },
+    {
+      "id": "MW.08.01.01",
+      "depth": 3,
+      "parent": "MW.08.01",
+      "kind": "work_package",
+      "title": "desktop lifecycle",
+      "requirements": []
+    },
+    {
+      "id": "MW.08.02",
+      "depth": 2,
+      "parent": "MW.08",
+      "kind": "journey",
+      "title": "업데이트와 출시",
+      "requirements": []
+    },
+    {
+      "id": "MW.08.02.01",
+      "depth": 3,
+      "parent": "MW.08.02",
+      "kind": "work_package",
+      "title": "release evidence",
+      "requirements": []
+    },
+    {
+      "id": "MW.09",
+      "depth": 1,
+      "parent": "MW",
+      "kind": "outcome",
+      "title": "선택형 local LAN multi-host",
+      "gate": "G4",
+      "requirements": []
+    },
+    {
+      "id": "MW.09.01",
+      "depth": 2,
+      "parent": "MW.09",
+      "kind": "journey",
+      "title": "사용자 소유 PC 연결",
+      "requirements": []
+    },
+    {
+      "id": "MW.09.01.01",
+      "depth": 3,
+      "parent": "MW.09.01",
+      "kind": "work_package",
+      "title": "host trust",
+      "requirements": []
+    },
+    {
+      "id": "MW.09.02",
+      "depth": 2,
+      "parent": "MW.09",
+      "kind": "journey",
+      "title": "여러 PC 작업 관찰/제어",
+      "requirements": []
+    },
+    {
+      "id": "MW.09.02.01",
+      "depth": 3,
+      "parent": "MW.09.02",
+      "kind": "work_package",
+      "title": "federation",
+      "requirements": []
+    },
+    {
+      "id": "MW.01.01.01.01",
+      "depth": 4,
+      "parent": "MW.01.01.01",
+      "kind": "task",
+      "title": "선별 소스/테스트/라이선스 inventory",
+      "requirements": [],
+      "status": "done",
+      "dependsOn": [],
+      "inputs": [
+        "host/package.json",
+        "host/src",
+        "host/tests",
+        "docs",
+        "hardware/mk20",
+        "AGENTS.md"
+      ],
+      "outputs": [
+        "docs/middleware/evidence/source-inventory.json",
+        "explicit export allowlist"
+      ],
+      "steps": [
+        "Git tracked/untracked 소스와 실제 실행 entrypoint를 목록화한다.",
+        "필수 fixture/generated schema/license를 식별하고 파일 해시를 기록한다.",
+        "venv/state/audio/probe/SDK binary를 제외한 export allowlist와 누락 이유를 만든다."
+      ],
+      "scenarios": [],
+      "checkpoint": {
+        "owner": "Codex current task",
+        "baseCommit": "c4513bb",
+        "changedFiles": [
+          "docs/middleware/export-source.mjs",
+          "docs/middleware/evidence/MW.01.01.01.01/source-inventory.json"
+        ],
+        "completedSteps": [
+          1,
+          2,
+          3
+        ],
+        "nextAction": "Proceed to separate repository export and scaffold.",
+        "blockers": [],
+        "updatedAt": "2026-09-17T18:23:48.477Z"
+      },
+      "priority": {
+        "designDemand": 5,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.01.01.01.01.A1",
+      "depth": 5,
+      "parent": "MW.01.01.01.01",
+      "kind": "acceptance",
+      "title": "현재 index/controller와 46-test source가 allowlist에 있고 민감/runtime 데이터가 없는지 검토한다.",
+      "requirements": [],
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17T18:23:48.477Z",
+          "environment": "Windows x64 / Node 20.19.6",
+          "procedure": "node docs/middleware/export-source.mjs; inspect explicit src/tests/config allowlist and exclusions",
+          "result": "346 source/test/config files hashed; original bytes preserved. 44 portable tests + 2 optional speech tests classified. Root redistribution license missing, recorded as release constraint.",
+          "reference": "docs/middleware/evidence/MW.01.01.01.01/source-inventory.json (uncommitted)"
+        }
+      ]
+    },
+    {
+      "id": "MW.01.01.01.01.A2",
+      "depth": 5,
+      "parent": "MW.01.01.01.01",
+      "kind": "acceptance",
+      "title": "source의 파일 변경/삭제 없이 export 대상별 해시·라이선스·용도를 추적할 수 있다.",
+      "requirements": [],
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17T18:23:48.477Z",
+          "environment": "Windows x64 / Node 20.19.6",
+          "procedure": "node docs/middleware/export-source.mjs; inspect explicit src/tests/config allowlist and exclusions",
+          "result": "346 source/test/config files hashed; original bytes preserved. 44 portable tests + 2 optional speech tests classified. Root redistribution license missing, recorded as release constraint.",
+          "reference": "docs/middleware/evidence/MW.01.01.01.01/source-inventory.json (uncommitted)"
+        }
+      ]
+    },
+    {
+      "id": "MW.01.01.01.02",
+      "depth": 4,
+      "parent": "MW.01.01.01",
+      "kind": "task",
+      "title": "별도 repository scaffold와 기준 테스트 이식",
+      "requirements": [],
+      "status": "done",
+      "dependsOn": [
+        "MW.01.01.01.01"
+      ],
+      "inputs": [
+        "source-inventory.json",
+        "host/package.json",
+        "host/tests"
+      ],
+      "outputs": [
+        "new repository root + origin record",
+        "packages/core skeleton",
+        "reference test classification"
+      ],
+      "steps": [
+        "제안 sibling 경로 충돌과 Git root를 확인하고 새 로컬 repo를 만든다.",
+        "inventory allowlist로 source를 복사하고 원본 해시를 대조한다.",
+        "빌드/테스트를 unit·fixture-STT·live로 분류하고 계획 원장의 authority를 새 repo로 이전한다."
+      ],
+      "scenarios": [],
+      "checkpoint": {
+        "owner": "Codex current task",
+        "baseCommit": "source:c4513bb / new repository initial implementation",
+        "changedFiles": [
+          "reference/legacy-host",
+          "package.json",
+          "scripts",
+          "docs/middleware"
+        ],
+        "completedSteps": [
+          1,
+          2,
+          3
+        ],
+        "nextAction": "Continue highest-priority eligible task MW.02.01.01.01.",
+        "blockers": [],
+        "updatedAt": "2026-09-17T18:33:09.853Z"
+      },
+      "priority": {
+        "designDemand": 5,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.01.01.01.02.A1",
+      "depth": 5,
+      "parent": "MW.01.01.01.02",
+      "kind": "acceptance",
+      "title": "새 repo clean dependency install/build와 기존 유효 회귀 suite 결과를 재현하고 분류별 결과를 기록한다.",
+      "requirements": [],
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17T18:33:09.853Z",
+          "environment": "Windows x64 / Node 20.19.6",
+          "procedure": "npm run test:reference; npm run test:reference:speech; source/destination hash comparison; npm ci --ignore-scripts",
+          "result": "346 hashes match; portable 44/44 and optional speech 2/2 pass; separate Git root",
+          "reference": "docs/middleware/evidence/MW.01.01.01.02/verification.md"
+        }
+      ]
+    },
+    {
+      "id": "MW.01.01.01.02.A2",
+      "depth": 5,
+      "parent": "MW.01.01.01.02",
+      "kind": "acceptance",
+      "title": "source 파일이 보존되고 두 repo가 서로 다른 Git root이며 authoritative plan 경로가 양쪽에 명시된다.",
+      "requirements": [],
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17T18:33:09.853Z",
+          "environment": "Windows x64 / Node 20.19.6",
+          "procedure": "npm run test:reference; npm run test:reference:speech; source/destination hash comparison; npm ci --ignore-scripts",
+          "result": "346 hashes match; portable 44/44 and optional speech 2/2 pass; separate Git root",
+          "reference": "docs/middleware/evidence/MW.01.01.01.02/verification.md"
+        }
+      ]
+    },
+    {
+      "id": "MW.01.02.01.01",
+      "depth": 4,
+      "parent": "MW.01.02.01",
+      "kind": "task",
+      "title": "Versioned plugin contract와 process lifecycle",
+      "requirements": [],
+      "status": "done",
+      "dependsOn": [
+        "MW.01.01.01.02"
+      ],
+      "inputs": [
+        "host/src/harness/types.ts",
+        "host/src/protocol/messages.ts",
+        "MIDDLEWARE_PACKAGING_MVP_2026-09-17.md"
+      ],
+      "outputs": [
+        "packages/plugin-sdk",
+        "packages/plugin-host",
+        "plugins/device-virtual"
+      ],
+      "steps": [
+        "manifest/RPC/schema와 namespaced ID, capabilities/config를 정의한다.",
+        "probe/start/stop/request timeout/event limit/crash backoff를 구현한다.",
+        "version mismatch와 permission/trust 설명, virtual/reference fixtures를 추가한다."
+      ],
+      "scenarios": [],
+      "checkpoint": {
+        "owner": "Codex current task",
+        "baseCommit": "source:c4513bb / new repository initial implementation",
+        "changedFiles": [
+          "packages/plugin-sdk",
+          "packages/plugin-host",
+          "packages/device-virtual",
+          "tests/plugin-host.test.mjs",
+          "docs/ADR-001-PLUGIN-BOUNDARY.md"
+        ],
+        "completedSteps": [
+          1,
+          2,
+          3
+        ],
+        "nextAction": "Continue highest-priority eligible task MW.02.01.01.01.",
+        "blockers": [],
+        "updatedAt": "2026-09-17T18:33:09.853Z"
+      },
+      "priority": {
+        "designDemand": 5,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.01.02.01.01.A1",
+      "depth": 5,
+      "parent": "MW.01.02.01.01",
+      "kind": "acceptance",
+      "title": "잘못된 manifest/version/hanging/crashing plugin이 거부·격리되고 core가 생존한다.",
+      "requirements": [],
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17T18:33:09.853Z",
+          "environment": "Windows x64 / Node 20.19.6",
+          "procedure": "npm ci --ignore-scripts; npm test",
+          "result": "9/9 process contract tests pass; TypeScript build passes",
+          "reference": "docs/middleware/evidence/MW.01.02.01.01/verification.md"
+        }
+      ]
+    },
+    {
+      "id": "MW.01.02.01.01.A2",
+      "depth": 5,
+      "parent": "MW.01.02.01.01",
+      "kind": "acceptance",
+      "title": "MK20와 provider code 없이 SDK/core build 및 virtual conformance가 통과한다.",
+      "requirements": [],
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17T18:33:09.853Z",
+          "environment": "Windows x64 / Node 20.19.6",
+          "procedure": "npm ci --ignore-scripts; npm test",
+          "result": "9/9 process contract tests pass; TypeScript build passes",
+          "reference": "docs/middleware/evidence/MW.01.02.01.01/verification.md"
+        }
+      ]
+    },
+    {
+      "id": "MW.02.01.01.01",
+      "depth": 4,
+      "parent": "MW.02.01.01",
+      "kind": "task",
+      "title": "Host/Controller/Instance/Workspace identity와 context 분리",
+      "requirements": [],
+      "status": "ready",
+      "dependsOn": [
+        "MW.01.02.01.01"
+      ],
+      "inputs": [
+        "host/src/state/context.ts",
+        "host/src/state/mvp-controller.ts",
+        "host/src/types.ts"
+      ],
+      "outputs": [
+        "packages/core/identity",
+        "packages/core/context"
+      ],
+      "steps": [
+        "stable hostId, 복합 Session key, Workspace와 Project 모델을 정의한다.",
+        "Controller별 선택/context와 draft 목적지 분리를 구현한다.",
+        "persist schema와 migration, 사용자별 데이터 위치를 정의한다."
+      ],
+      "scenarios": [
+        "J03",
+        "J06",
+        "D17"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "stable hostId, 복합 Session key, Workspace와 Project 모델을 정의한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 5,
+        "implementationDifficulty": 5
+      }
+    },
+    {
+      "id": "MW.02.01.01.01.A1",
+      "depth": 5,
+      "parent": "MW.02.01.01.01",
+      "kind": "acceptance",
+      "title": "같은 nativeSessionId가 다른 instance/host에서 충돌하지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.02.01.01.01.A2",
+      "depth": 5,
+      "parent": "MW.02.01.01.01",
+      "kind": "acceptance",
+      "title": "두 controller의 scope 변경과 pending draft/approval 목적지가 독립적으로 유지된다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.02.01.01.02",
+      "depth": 4,
+      "parent": "MW.02.01.01",
+      "kind": "task",
+      "title": "Durable command/decision 처리와 복구",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.02.01.01.01"
+      ],
+      "inputs": [
+        "host/src/audio/draft.ts",
+        "host/src/state/mvp-controller.ts"
+      ],
+      "outputs": [
+        "packages/core/commands",
+        "packages/core/decisions",
+        "durable store migrations"
+      ],
+      "steps": [
+        "commandId·expectedRevision·owner 고정·Session별 큐를 구현한다.",
+        "dispatched/ack/completed/unknown과 idempotent API retry를 분리한다.",
+        "crash recovery, read-only reconciliation, approval stale rejection을 구현한다."
+      ],
+      "scenarios": [
+        "J03",
+        "J04",
+        "D17",
+        "D18"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "commandId·expectedRevision·owner 고정·Session별 큐를 구현한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 5,
+        "implementationDifficulty": 5
+      }
+    },
+    {
+      "id": "MW.02.01.01.02.A1",
+      "depth": 5,
+      "parent": "MW.02.01.01.02",
+      "kind": "acceptance",
+      "title": "전송 직전/직후 crash와 reconnect가 중복 send를 만들지 않고 불확실하면 unknown을 유지한다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.02.01.01.02.A2",
+      "depth": 5,
+      "parent": "MW.02.01.01.02",
+      "kind": "acceptance",
+      "title": "두 controller가 동일 decision을 답하면 한 번만 적용되고 stale 요청은 실패한다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.02.02.01.01",
+      "depth": 4,
+      "parent": "MW.02.02.01",
+      "kind": "task",
+      "title": "인증된 localhost API와 event stream",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.02.01.01.02"
+      ],
+      "inputs": [
+        "host/src/index.ts",
+        "packages/core contracts"
+      ],
+      "outputs": [
+        "packages/api",
+        "packages/client-sdk",
+        "OpenAPI v1"
+      ],
+      "steps": [
+        "loopback-only listener, Host/Origin/CSRF/session bootstrap을 구현한다.",
+        "명령/목록/상태/SSE cursor와 snapshot recovery를 구현한다.",
+        "payload/time/queue limits와 registered Workspace 파일 접근 경계를 적용한다."
+      ],
+      "scenarios": [
+        "J05",
+        "J06"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "loopback-only listener, Host/Origin/CSRF/session bootstrap을 구현한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 5,
+        "implementationDifficulty": 5
+      }
+    },
+    {
+      "id": "MW.02.02.01.01.A1",
+      "depth": 5,
+      "parent": "MW.02.02.01.01",
+      "kind": "acceptance",
+      "title": "허용되지 않은 origin/host/인증과 stale revision 요청이 차단되고 token이 로그/URL에 남지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.02.02.01.01.A2",
+      "depth": 5,
+      "parent": "MW.02.02.01.01",
+      "kind": "acceptance",
+      "title": "event gap/reconnect에서 snapshot이 일관되고 LAN 비활성 시 외부 interface listener가 없다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.03.01.01.01",
+      "depth": 4,
+      "parent": "MW.03.01.01",
+      "kind": "task",
+      "title": "제한된 harness 후보 수집과 deduplication",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.01.02.01.01"
+      ],
+      "inputs": [
+        "host/src/codex/adapter.ts",
+        "host/src/harness/codex.ts",
+        "host/src/harness/antigravity.ts",
+        "host/src/harness/opencode.ts"
+      ],
+      "outputs": [
+        "packages/core/discovery",
+        "harness plugin discovery providers"
+      ],
+      "steps": [
+        "H01-H04/H11에 따라 override/known install/PATH/등록 endpoint를 수집한다.",
+        "후보 source/version/locator와 scan generation/cancel/deadline을 저장한다.",
+        "다중 설치를 보존하고 단순 동일 실행 경로만 deduplicate한다."
+      ],
+      "scenarios": [
+        "H01",
+        "H02",
+        "H03",
+        "H04",
+        "H11"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "H01-H04/H11에 따라 override/known install/PATH/등록 endpoint를 수집한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.03.01.01.01.A1",
+      "depth": 5,
+      "parent": "MW.03.01.01.01",
+      "kind": "acceptance",
+      "title": "Windows/macOS fixture에서 empty·다중 설치·GUI PATH 누락·수동 경로가 정확히 표시된다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.03.01.01.01.A2",
+      "depth": 5,
+      "parent": "MW.03.01.01.01",
+      "kind": "acceptance",
+      "title": "cancel/timeout/연속 scan의 늦은 응답이 새 결과를 덮어쓰지 않고 전체 디스크/포트를 스캔하지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.03.01.01.02",
+      "depth": 4,
+      "parent": "MW.03.01.01",
+      "kind": "task",
+      "title": "읽기 probe와 진실한 capability 상태",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.03.01.01.01"
+      ],
+      "inputs": [
+        "host/src/harness/opencode.ts",
+        "host/src/harness/codex.ts",
+        "host/src/harness/antigravity.ts"
+      ],
+      "outputs": [
+        "harness probe results/reason codes",
+        "capability schema"
+      ],
+      "steps": [
+        "호환성/auth/permission/presence/control 상태를 분리한다.",
+        "검토된 binary probe와 local health/schema handshake에 제한을 적용한다.",
+        "401/기록 발견/owner 없음/unsupported를 connected와 분리한다."
+      ],
+      "scenarios": [
+        "H05",
+        "H06",
+        "H07",
+        "H08",
+        "H09",
+        "H10"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "호환성/auth/permission/presence/control 상태를 분리한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.03.01.01.02.A1",
+      "depth": 5,
+      "parent": "MW.03.01.01.02",
+      "kind": "acceptance",
+      "title": "401은 needs_auth, 미실행은 not_running, 기록만 있으면 readonly로 분류된다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.03.01.01.02.A2",
+      "depth": 5,
+      "parent": "MW.03.01.01.02",
+      "kind": "acceptance",
+      "title": "잘못된 서비스/redirect/version/permission failure가 차단되며 discovery가 server 시작 또는 command send를 하지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.03.02.01.01",
+      "depth": 4,
+      "parent": "MW.03.02.01",
+      "kind": "task",
+      "title": "Codex reference plugin의 명시적 연결",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.03.01.01.02",
+        "MW.02.02.01.01"
+      ],
+      "inputs": [
+        "host/src/codex/adapter.ts",
+        "host/src/codex/desktop.ts",
+        "host/src/state/mvp-controller.ts"
+      ],
+      "outputs": [
+        "plugins/harness-codex",
+        "surface-specific support matrix"
+      ],
+      "steps": [
+        "선택 instance만 start/attach하고 owner와 credentials source를 보존한다.",
+        "Codex RPC를 plugin으로 이동하고 public API로 normalize한다.",
+        "Desktop private route는 experimental로 격리하며 미검증 OS는 readonly/unsupported 처리한다."
+      ],
+      "scenarios": [
+        "H06",
+        "H07",
+        "H08",
+        "H09"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "선택 instance만 start/attach하고 owner와 credentials source를 보존한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.03.02.01.01.A1",
+      "depth": 5,
+      "parent": "MW.03.02.01.01",
+      "kind": "acceptance",
+      "title": "실제 지원 OS/설치 버전에서 owned session create/read/send/events/decision/cancel을 검증한다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.03.02.01.01.A2",
+      "depth": 5,
+      "parent": "MW.03.02.01.01",
+      "kind": "acceptance",
+      "title": "existing Desktop owner 경합은 오송신 없이 제한되고 macOS/Windows 지원 여부를 각각 증거로 기록한다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.03.02.01.02",
+      "depth": 4,
+      "parent": "MW.03.02.01",
+      "kind": "task",
+      "title": "두 번째 harness와 제한된 Antigravity 지원",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.03.02.01.01"
+      ],
+      "inputs": [
+        "host/src/harness/opencode.ts",
+        "host/src/harness/antigravity.ts"
+      ],
+      "outputs": [
+        "plugins/harness-opencode",
+        "plugins/harness-antigravity",
+        "per-capability evidence"
+      ],
+      "steps": [
+        "OpenCode의 기존 local server/auth/SSE owner 연결을 구현한다.",
+        "Antigravity discovery/관찰과 제어 가능한 범위를 분리한다.",
+        "동일 SDK conformance를 적용하고 미검증 동작을 노출하지 않는다."
+      ],
+      "scenarios": [
+        "H08",
+        "H09"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "OpenCode의 기존 local server/auth/SSE owner 연결을 구현한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.03.02.01.02.A1",
+      "depth": 5,
+      "parent": "MW.03.02.01.02",
+      "kind": "acceptance",
+      "title": "실제 OpenCode instance에서 read/send/stop/decision/reconnect와 session identity를 검증한다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.03.02.01.02.A2",
+      "depth": 5,
+      "parent": "MW.03.02.01.02",
+      "kind": "acceptance",
+      "title": "Antigravity transcript fixture pass가 full control로 표시되지 않고 실제 검증한 기능만 활성화된다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.03.02.01.03",
+      "depth": 4,
+      "parent": "MW.03.02.01",
+      "kind": "task",
+      "title": "Harness 재연결·변경·disable/remove",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.03.02.01.01"
+      ],
+      "inputs": [
+        "harness discovery registry",
+        "command journal"
+      ],
+      "outputs": [
+        "registered harness lifecycle",
+        "credential cleanup policy"
+      ],
+      "steps": [
+        "H12-H14에 맞춰 pause/wake/restart/version/account change를 재검증한다.",
+        "기존 등록/새 후보 merge 규칙과 manual repair UI state를 구현한다.",
+        "disable/remove 시 owned connection/helper만 정리하고 외부 앱은 보존한다."
+      ],
+      "scenarios": [
+        "H12",
+        "H13",
+        "H14",
+        "J04"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "H12-H14에 맞춰 pause/wake/restart/version/account change를 재검증한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.03.02.01.03.A1",
+      "depth": 5,
+      "parent": "MW.03.02.01.03",
+      "kind": "acceptance",
+      "title": "재설치/계정 교체와 owner PID 변화가 기존 세션/초안을 잘못 합치지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.03.02.01.03.A2",
+      "depth": 5,
+      "parent": "MW.03.02.01.03",
+      "kind": "acceptance",
+      "title": "remove/disable/reconnect가 외부 앱 종료나 unknown 명령 replay를 일으키지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.04.01.01.01",
+      "depth": 4,
+      "parent": "MW.04.01.01",
+      "kind": "task",
+      "title": "Device registry와 hardware-free 기본 경로",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.02.01.01.01"
+      ],
+      "inputs": [
+        "host/src/transport/udp.ts",
+        "host/src/protocol/messages.ts"
+      ],
+      "outputs": [
+        "device/controller registry",
+        "virtual device plugin"
+      ],
+      "steps": [
+        "장치 후보와 등록 controller를 분리하고 stable identity/transport/capability를 저장한다.",
+        "하드웨어 없음과 unsupported plugin 상태를 정상 흐름으로 제공한다.",
+        "가상 device로 의미 입력/출력 contract와 독립 context를 검증한다."
+      ],
+      "scenarios": [
+        "D01",
+        "D03",
+        "D17"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "장치 후보와 등록 controller를 분리하고 stable identity/transport/capability를 저장한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 5
+      }
+    },
+    {
+      "id": "MW.04.01.01.01.A1",
+      "depth": 5,
+      "parent": "MW.04.01.01.01",
+      "kind": "acceptance",
+      "title": "장치 0개에서 API/Web 작업 경로가 사용 가능하고 hardware probing 실패가 core를 막지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.04.01.01.01.A2",
+      "depth": 5,
+      "parent": "MW.04.01.01.01",
+      "kind": "acceptance",
+      "title": "virtual 두 장치 입력이 서로의 선택 상태/출력으로 섞이지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.04.01.01.02",
+      "depth": 4,
+      "parent": "MW.04.01.01",
+      "kind": "task",
+      "title": "HID enumeration/권한/물리 식별과 안전 테스트",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.04.01.01.01",
+        "MW.01.02.01.01"
+      ],
+      "inputs": [
+        "hardware plugin SDK",
+        "DISCOVERY_JOURNEYS.md D02-D08"
+      ],
+      "outputs": [
+        "HID plugin backend",
+        "mapping/identify workflow"
+      ],
+      "steps": [
+        "OS별 HID enumeration 및 VID/PID/usage/interface 검증을 구현한다.",
+        "serial 없음/동일 모델/composite를 물리 확인하고 권한·busy 상태를 처리한다.",
+        "선택한 실제 HID 1종의 event-only 테스트와 mapping을 구현한다."
+      ],
+      "scenarios": [
+        "D02",
+        "D03",
+        "D04",
+        "D06",
+        "D07",
+        "D08"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "OS별 HID enumeration 및 VID/PID/usage/interface 검증을 구현한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 5
+      }
+    },
+    {
+      "id": "MW.04.01.01.02.A1",
+      "depth": 5,
+      "parent": "MW.04.01.01.02",
+      "kind": "acceptance",
+      "title": "Windows/macOS 해당 실제 모델에서 권한 거부/재검사/hotplug/안전 입력 test를 증거로 남긴다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.04.01.01.02.A2",
+      "depth": 5,
+      "parent": "MW.04.01.01.02",
+      "kind": "acceptance",
+      "title": "동일 모델 두 장치·serial 없음·USB port 변경에서 오결합이 없고 일반 키보드 타이핑을 탈취하지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.04.02.01.01",
+      "depth": 4,
+      "parent": "MW.04.02.01",
+      "kind": "task",
+      "title": "Opt-in LAN 탐색과 수동 주소 fallback",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.04.01.01.01"
+      ],
+      "inputs": [
+        "host/src/transport/udp.ts",
+        "device plugin discovery contract"
+      ],
+      "outputs": [
+        "LAN device discovery provider",
+        "manual endpoint validation"
+      ],
+      "steps": [
+        "사용자가 활성화한 local interface에만 지원 discovery를 연다.",
+        "multicast 차단/VPN/다중 NIC에 manual host/port 진단 경로를 둔다.",
+        "후보 정보만 수집하고 unpaired 장치에 제어 권한을 주지 않는다."
+      ],
+      "scenarios": [
+        "D09",
+        "D10"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "사용자가 활성화한 local interface에만 지원 discovery를 연다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 5
+      }
+    },
+    {
+      "id": "MW.04.02.01.01.A1",
+      "depth": 5,
+      "parent": "MW.04.02.01.01",
+      "kind": "acceptance",
+      "title": "network-off에서 listener/discovery가 없고 enable/disable 후 즉시 반영된다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.04.02.01.01.A2",
+      "depth": 5,
+      "parent": "MW.04.02.01.01",
+      "kind": "acceptance",
+      "title": "차단된 mDNS/주소 변화/수동 잘못된 endpoint가 명확한 결과를 내며 subnet sweep을 하지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.04.02.01.02",
+      "depth": 4,
+      "parent": "MW.04.02.01",
+      "kind": "task",
+      "title": "MK20 plugin 추출과 인증 pairing 계약",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.04.02.01.01",
+        "MW.02.01.01.02"
+      ],
+      "inputs": [
+        "host/src/transport/udp.ts",
+        "host/src/state/context.ts",
+        "hardware/mk20/hud",
+        "hardware/mk20/orchestration/SCHEMA.md"
+      ],
+      "outputs": [
+        "Snowball_Control/plugins/device-mk20",
+        "separate firmware/transport compatibility contract"
+      ],
+      "steps": [
+        "MK20 키/렌더링/UDP 변환을 hardware repo plugin으로 옮긴다.",
+        "paired identity/protocol version과 승인/timeout/revoke 계약을 구현한다.",
+        "필요한 firmware 변경은 별도 검증하며 legacy UDP/ADB는 lab-only로 표시한다."
+      ],
+      "scenarios": [
+        "D05",
+        "D11",
+        "D12",
+        "D14"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "MK20 키/렌더링/UDP 변환을 hardware repo plugin으로 옮긴다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 5
+      }
+    },
+    {
+      "id": "MW.04.02.01.02.A1",
+      "depth": 5,
+      "parent": "MW.04.02.01.02",
+      "kind": "acceptance",
+      "title": "실제 MK20에서 물리 pairing 성공/취소/만료/잘못된 identity/replay를 검증한다; firmware 미지원이면 blocked다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.04.02.01.02.A2",
+      "depth": 5,
+      "parent": "MW.04.02.01.02",
+      "kind": "acceptance",
+      "title": "인증 없는 legacy 장치가 production ready가 되지 않고 USB+LAN identity는 검증된 경우에만 합친다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.04.03.01.01",
+      "depth": 4,
+      "parent": "MW.04.03.01",
+      "kind": "task",
+      "title": "장치 재접속·plugin 장애·제거",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.04.01.01.02",
+        "MW.04.02.01.02"
+      ],
+      "inputs": [
+        "controller registry",
+        "plugin-host",
+        "command journal"
+      ],
+      "outputs": [
+        "device lifecycle/leases",
+        "diagnostic reason codes"
+      ],
+      "steps": [
+        "IP/port 변화·sleep/wake·factory reset 시 identity와 trust를 재확인한다.",
+        "plugin crash/incompatibility와 출력 backpressure를 처리한다.",
+        "disable/forget/revoke 시 handle/credential/lease를 정리하고 draft는 보존한다."
+      ],
+      "scenarios": [
+        "D08",
+        "D13",
+        "D15",
+        "D16",
+        "D17",
+        "D18"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "IP/port 변화·sleep/wake·factory reset 시 identity와 trust를 재확인한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 5
+      }
+    },
+    {
+      "id": "MW.04.03.01.01.A1",
+      "depth": 5,
+      "parent": "MW.04.03.01.01",
+      "kind": "acceptance",
+      "title": "unplug/reset/crash 뒤 안전 복구하고 오래된 button event/unknown 명령을 replay하지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.04.03.01.01.A2",
+      "depth": 5,
+      "parent": "MW.04.03.01.01",
+      "kind": "acceptance",
+      "title": "두 장치+Web 동시 조작과 revoke가 타 controller 또는 실행 중 harness task를 종료시키지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.05.01.01.01",
+      "depth": 4,
+      "parent": "MW.05.01.01",
+      "kind": "task",
+      "title": "로컬 workspace 등록과 프로젝트 연결",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.02.01.01.01",
+        "MW.03.01.01.02"
+      ],
+      "inputs": [
+        "host/src/vcs/git.ts",
+        "host/src/state/mvp-controller.ts",
+        "host/src/harness/codex.ts"
+      ],
+      "outputs": [
+        "workspace registry",
+        "project discovery/read service"
+      ],
+      "steps": [
+        "harness가 노출한 projects와 사용자 등록 root를 구분한다.",
+        "path/realpath/worktree identity, 이동/권한/empty 상태를 처리한다.",
+        "동일 논리 Project 연결은 명시적으로만 허용한다."
+      ],
+      "scenarios": [
+        "J02",
+        "J06"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "harness가 노출한 projects와 사용자 등록 root를 구분한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.05.01.01.01.A1",
+      "depth": 5,
+      "parent": "MW.05.01.01.01",
+      "kind": "acceptance",
+      "title": "빈 목록/이동/삭제/권한 거부와 case-sensitive root에서 잘못된 project 병합이 없다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.05.01.01.01.A2",
+      "depth": 5,
+      "parent": "MW.05.01.01.01",
+      "kind": "acceptance",
+      "title": "symlink/비슷한 sibling 경로/다른 worktree로 등록된 읽기 경계를 벗어나지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.05.02.01.01",
+      "depth": 4,
+      "parent": "MW.05.02.01",
+      "kind": "task",
+      "title": "기존 작업 attach와 새 task 전체 왕복",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.03.02.01.01",
+        "MW.05.01.01.01",
+        "MW.02.01.01.02"
+      ],
+      "inputs": [
+        "host/src/state/mvp-controller.ts",
+        "host/tests/mvp-controller.test.mjs"
+      ],
+      "outputs": [
+        "session service",
+        "local vertical-slice acceptance"
+      ],
+      "steps": [
+        "조회-only/owned/external owner를 구분하여 list/read/create를 연결한다.",
+        "native turn/decision/cancel 상태를 normalize한다.",
+        "text/draft 목적지를 고정하고 capability별 command를 제한한다."
+      ],
+      "scenarios": [
+        "H08",
+        "H09",
+        "J03"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "조회-only/owned/external owner를 구분하여 list/read/create를 연결한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.05.02.01.01.A1",
+      "depth": 5,
+      "parent": "MW.05.02.01.01",
+      "kind": "acceptance",
+      "title": "장치 0개로 실제 local harness task create→send→events→decision→cancel/recovery 흐름을 완료한다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.05.02.01.01.A2",
+      "depth": 5,
+      "parent": "MW.05.02.01.01",
+      "kind": "acceptance",
+      "title": "기존 owner 접근 불가 시 read-only이고 scope 변경/새 task 선택이 pending 목적지를 바꾸지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.06.01.01.01",
+      "depth": 4,
+      "parent": "MW.06.01.01",
+      "kind": "task",
+      "title": "실패/skip 가능한 local onboarding",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.03.01.01.02",
+        "MW.04.01.01.01",
+        "MW.05.01.01.01",
+        "MW.02.02.01.01"
+      ],
+      "inputs": [
+        "DISCOVERY_JOURNEYS.md",
+        "client-sdk"
+      ],
+      "outputs": [
+        "apps/supervisor/onboarding",
+        "Connections views"
+      ],
+      "steps": [
+        "local 상태→harness→workspace→optional device 순으로 같은 registry API를 사용한다.",
+        "manual 등록, auth/permission guidance, skip/cancel/retry를 구현한다.",
+        "discovery partial/empty/error와 user next action을 표시한다."
+      ],
+      "scenarios": [
+        "J01",
+        "J05",
+        "H01",
+        "H04",
+        "H06",
+        "H11",
+        "D01",
+        "D06",
+        "D10"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "local 상태→harness→workspace→optional device 순으로 같은 registry API를 사용한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.06.01.01.01.A1",
+      "depth": 5,
+      "parent": "MW.06.01.01.01",
+      "kind": "acceptance",
+      "title": "J01 전체 흐름에서 미설치·장치 없음·auth 취소·수동 경로·restart를 거쳐 Supervisor에 도달한다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.06.01.01.01.A2",
+      "depth": 5,
+      "parent": "MW.06.01.01.01",
+      "kind": "acceptance",
+      "title": "discovered/authenticated/controllable을 구분하고 Internet 차단이 local onboarding을 막지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.06.01.01.02",
+      "depth": 4,
+      "parent": "MW.06.01.01",
+      "kind": "task",
+      "title": "Tray-only shell과 Settings",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.02.02.01.01",
+        "MW.06.01.01.01"
+      ],
+      "inputs": [
+        "MIDDLEWARE_PACKAGING_MVP_2026-09-17.md sections 6-7"
+      ],
+      "outputs": [
+        "apps/desktop",
+        "apps/supervisor/settings"
+      ],
+      "steps": [
+        "주 창 없는 tray와 기본 브라우저 Settings/Supervisor 진입을 구현한다.",
+        "상태/attention/연결/명령 pause/진단/update/quit 메뉴를 연결한다.",
+        "설정 schema/revision과 quit 영향 범위를 표시한다."
+      ],
+      "scenarios": [
+        "J04",
+        "J05"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "주 창 없는 tray와 기본 브라우저 Settings/Supervisor 진입을 구현한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.06.01.01.02.A1",
+      "depth": 5,
+      "parent": "MW.06.01.01.02",
+      "kind": "acceptance",
+      "title": "브라우저 닫기와 제어 pause가 작업 종료로 오해되지 않으며 native 주 창이 자동 생성되지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.06.01.01.02.A2",
+      "depth": 5,
+      "parent": "MW.06.01.01.02",
+      "kind": "acceptance",
+      "title": "Settings 변경/취소와 tray 상태가 같은 API revision을 반영하고 비밀이 URL에 노출되지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.06.02.01.01",
+      "depth": 4,
+      "parent": "MW.06.02.01",
+      "kind": "task",
+      "title": "Overview/Attention와 목적지 고정 상세",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.05.02.01.01",
+        "MW.06.01.01.01",
+        "MW.02.01.01.02"
+      ],
+      "inputs": [
+        "client-sdk",
+        "MIDDLEWARE_PACKAGING_MVP_2026-09-17.md section 8"
+      ],
+      "outputs": [
+        "apps/supervisor/overview",
+        "decisions/draft/activity detail"
+      ],
+      "steps": [
+        "Project group과 Host/Harness filters, freshness/연결 상태를 구현한다.",
+        "attention queue, capability action, escaped transcript/diff와 draft shelf를 만든다.",
+        "SSE gap recovery, keyboard 접근, empty/offline/large-list 동작을 검증한다."
+      ],
+      "scenarios": [
+        "J02",
+        "J03",
+        "J04",
+        "D17"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "Project group과 Host/Harness filters, freshness/연결 상태를 구현한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.06.02.01.01.A1",
+      "depth": 5,
+      "parent": "MW.06.02.01.01",
+      "kind": "acceptance",
+      "title": "다중 project/harness fixture와 실제 지원 task에서 상태/lastSeen/unsupported가 사실대로 표시된다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.06.02.01.01.A2",
+      "depth": 5,
+      "parent": "MW.06.02.01.01",
+      "kind": "acceptance",
+      "title": "동시 decision 처리·필터 전환·reconnect에도 초안 목적지와 읽던 목록 위치가 보존된다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.07.01.01.01",
+      "depth": 4,
+      "parent": "MW.07.01.01",
+      "kind": "task",
+      "title": "AudioSource와 선택형 SpeechProvider 분리",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.01.02.01.01",
+        "MW.02.01.01.02"
+      ],
+      "inputs": [
+        "host/src/audio/local-whisper.ts",
+        "host/src/audio/transport.ts",
+        "host/src/audio/provider.ts"
+      ],
+      "outputs": [
+        "audio source/provider SDK",
+        "optional voice-pack lifecycle"
+      ],
+      "steps": [
+        "MK20 capture를 STT에서 분리하고 host/browser source 계약을 만든다.",
+        "로컬 worker/model의 선택 설치/위치/언어/크기/삭제를 구현한다.",
+        "microphone 권한과 provider unavailable을 독립 상태로 표시한다."
+      ],
+      "scenarios": [
+        "J01",
+        "J05",
+        "D06"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "MK20 capture를 STT에서 분리하고 host/browser source 계약을 만든다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.07.01.01.01.A1",
+      "depth": 5,
+      "parent": "MW.07.01.01.01",
+      "kind": "acceptance",
+      "title": "Python/모델/마이크가 없는 clean 환경에서도 core가 정상 사용 가능하다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.07.01.01.01.A2",
+      "depth": 5,
+      "parent": "MW.07.01.01.01",
+      "kind": "acceptance",
+      "title": "source 권한 거부/STT 미설치·실패·취소에서 이유와 복구 동작이 명확하다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.07.02.01.01",
+      "depth": 4,
+      "parent": "MW.07.02.01",
+      "kind": "task",
+      "title": "Review/명시 Send와 음성 lifecycle 복구",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.07.01.01.01",
+        "MW.05.02.01.01"
+      ],
+      "inputs": [
+        "host/src/audio/draft.ts",
+        "host/tests/draft.test.mjs",
+        "host/tests/whisper-worker.test.mjs"
+      ],
+      "outputs": [
+        "audio/draft conformance",
+        "voice retention settings"
+      ],
+      "steps": [
+        "기존 review/edit/undo/explicit Send 동작과 고정 destination을 이식한다.",
+        "capture cancel/late transcript/source unplug/provider crash를 처리한다.",
+        "raw audio 기본 비보관과 사용자 삭제/export 범위를 구현한다."
+      ],
+      "scenarios": [
+        "J03",
+        "J04",
+        "D08"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "기존 review/edit/undo/explicit Send 동작과 고정 destination을 이식한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.07.02.01.01.A1",
+      "depth": 5,
+      "parent": "MW.07.02.01.01",
+      "kind": "acceptance",
+      "title": "late transcript와 새 capture가 섞이지 않고 unknown 상태에서 재송신하지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.07.02.01.01.A2",
+      "depth": 5,
+      "parent": "MW.07.02.01.01",
+      "kind": "acceptance",
+      "title": "실제 지원 source의 capture와 별도 STT fixture 결과를 구분하고 offline/재시작 시 draft가 복구된다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.08.01.01.01",
+      "depth": 4,
+      "parent": "MW.08.01.01",
+      "kind": "task",
+      "title": "Mac/Windows clean install과 사용자 세션 lifecycle",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.06.01.01.02",
+        "MW.01.02.01.01"
+      ],
+      "inputs": [
+        "host/package.json",
+        "apps/desktop",
+        "packaging design"
+      ],
+      "outputs": [
+        "OS installers",
+        "user-data/secret storage",
+        "platform smoke evidence"
+      ],
+      "steps": [
+        "bundle runtime과 OS data/credential 경로, single instance/login opt-in을 구성한다.",
+        "macOS/Windows install·sleep/wake·port 충돌·logout·restart를 구현한다.",
+        "문서/plan reference의 target repo 경로를 확정한다."
+      ],
+      "scenarios": [
+        "J04",
+        "J05",
+        "J06"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "bundle runtime과 OS data/credential 경로, single instance/login opt-in을 구성한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.08.01.01.01.A1",
+      "depth": 5,
+      "parent": "MW.08.01.01.01",
+      "kind": "acceptance",
+      "title": "macOS arm64/x64와 Windows x64 clean 환경에서 외부 Node/Python 없이 core가 실행된다; 미확보 환경은 blocked다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.08.01.01.01.A2",
+      "depth": 5,
+      "parent": "MW.08.01.01.01",
+      "kind": "acceptance",
+      "title": "다른 OS 사용자 secret 격리, login toggle, port 충돌과 crash recovery를 검증한다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.08.02.01.01",
+      "depth": 4,
+      "parent": "MW.08.02.01",
+      "kind": "task",
+      "title": "서명·업데이트·rollback·uninstall",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.08.01.01.01"
+      ],
+      "inputs": [
+        "release pipeline",
+        "schema migrations"
+      ],
+      "outputs": [
+        "signed/notarized release artifacts",
+        "update/uninstall evidence",
+        "winget manifest"
+      ],
+      "steps": [
+        "보호된 signing credential과 immutable artifact/hash를 사용한다.",
+        "단일 updater lock, 서명 확인, migration backup/실패 복구를 구현한다.",
+        "uninstall/reinstall 데이터 선택과 credential/trust 정리, winget manifest를 준비한다."
+      ],
+      "scenarios": [
+        "J04",
+        "J08"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "보호된 signing credential과 immutable artifact/hash를 사용한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.08.02.01.01.A1",
+      "depth": 5,
+      "parent": "MW.08.02.01.01",
+      "kind": "acceptance",
+      "title": "실제 서명·공증/설치/업데이트/변조 거부/중단 복구를 플랫폼별 검증한다; 계정 미확보는 blocked다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.08.02.01.01.A2",
+      "depth": 5,
+      "parent": "MW.08.02.01.01",
+      "kind": "acceptance",
+      "title": "uninstall/reinstall 시 로그인 항목/credentials 정책이 일관되고 오래된 trust가 자동 부활하지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.08.02.01.02",
+      "depth": 4,
+      "parent": "MW.08.02.01",
+      "kind": "task",
+      "title": "로컬 제품 통합 검수와 support matrix",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.08.02.01.01",
+        "MW.03.02.01.03",
+        "MW.03.02.01.02",
+        "MW.04.03.01.01",
+        "MW.06.02.01.01",
+        "MW.07.02.01.01"
+      ],
+      "inputs": [
+        "all scenario/check evidence"
+      ],
+      "outputs": [
+        "local release acceptance report",
+        "support matrix + known limitations"
+      ],
+      "steps": [
+        "H/D/J 시나리오를 OS별 실제/fixture/미실행으로 정리한다.",
+        "로컬 listener/인터넷 차단/선택 기능 없음/오류 복구를 통합 검증한다.",
+        "지원 모델/firmware/harness surface/version과 미지원 기능을 릴리스에 명시한다."
+      ],
+      "scenarios": [
+        "J01",
+        "J04",
+        "J05",
+        "J06",
+        "J08"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "H/D/J 시나리오를 OS별 실제/fixture/미실행으로 정리한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 4,
+        "implementationDifficulty": 4
+      }
+    },
+    {
+      "id": "MW.08.02.01.02.A1",
+      "depth": 5,
+      "parent": "MW.08.02.01.02",
+      "kind": "acceptance",
+      "title": "G0-G3 필수 task가 증거와 함께 완료되고 pending/blocked를 pass로 계산하지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.08.02.01.02.A2",
+      "depth": 5,
+      "parent": "MW.08.02.01.02",
+      "kind": "acceptance",
+      "title": "Internet 및 LAN 비활성에서 core 제어 UI가 유지되며 cloud harness 연결 실패는 별도로 표시된다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.09.01.01.01",
+      "depth": 4,
+      "parent": "MW.09.01.01",
+      "kind": "task",
+      "title": "선택적 LAN Host pairing과 해제",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.02.02.01.01",
+        "MW.08.01.01.01"
+      ],
+      "inputs": [
+        "PLAN.md R-NET",
+        "LAN trust design"
+      ],
+      "outputs": [
+        "optional host registry/listener",
+        "host credential revocation"
+      ],
+      "steps": [
+        "현재 PC만 기본으로 두고 사용자가 다른 PC 연결을 켤 때만 별도 listener를 연다.",
+        "양측 identity 승인/인증서/권한과 manual endpoint를 검증한다.",
+        "network-off/revoke/주소 변화의 trust lifecycle을 구현한다."
+      ],
+      "scenarios": [
+        "J07"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "현재 PC만 기본으로 두고 사용자가 다른 PC 연결을 켤 때만 별도 listener를 연다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 5,
+        "implementationDifficulty": 5
+      }
+    },
+    {
+      "id": "MW.09.01.01.01.A1",
+      "depth": 5,
+      "parent": "MW.09.01.01.01",
+      "kind": "acceptance",
+      "title": "미등록 host/spoof/expired credential이 거부되고 network-off 즉시 discovery/listener가 닫힌다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.09.01.01.01.A2",
+      "depth": 5,
+      "parent": "MW.09.01.01.01",
+      "kind": "acceptance",
+      "title": "Mac↔Windows 실제 pairing/취소/해제 후 현재 PC 제어가 독립적으로 유지된다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.09.02.01.01",
+      "depth": 4,
+      "parent": "MW.09.02.01",
+      "kind": "task",
+      "title": "Paired local host 집계와 장애 분리",
+      "requirements": [],
+      "status": "todo",
+      "dependsOn": [
+        "MW.09.01.01.01",
+        "MW.06.02.01.01",
+        "MW.08.02.01.02"
+      ],
+      "inputs": [
+        "client-sdk",
+        "host registry",
+        "command journal"
+      ],
+      "outputs": [
+        "optional federation API",
+        "G4 evidence"
+      ],
+      "steps": [
+        "명시 paired host만 query/command proxy하고 목적지 권한을 remote에서 재검증한다.",
+        "offline host freshness와 현재 host 상태를 분리하고 per-host cursor를 유지한다.",
+        "두 Host/두 harness/두 controller/Web의 충돌·복구를 검증한다."
+      ],
+      "scenarios": [
+        "J07",
+        "D17",
+        "J03"
+      ],
+      "checkpoint": {
+        "owner": null,
+        "baseCommit": null,
+        "changedFiles": [],
+        "completedSteps": [],
+        "nextAction": "명시 paired host만 query/command proxy하고 목적지 권한을 remote에서 재검증한다.",
+        "blockers": [],
+        "updatedAt": null
+      },
+      "priority": {
+        "designDemand": 5,
+        "implementationDifficulty": 5
+      }
+    },
+    {
+      "id": "MW.09.02.01.01.A1",
+      "depth": 5,
+      "parent": "MW.09.02.01.01",
+      "kind": "acceptance",
+      "title": "remote disconnect/집계 host 재시작이 local task와 unknown 목적지를 바꾸지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "MW.09.02.01.01.A2",
+      "depth": 5,
+      "parent": "MW.09.02.01.01",
+      "kind": "acceptance",
+      "title": "실제 두 OS multi-host matrix가 통과하기 전 G4 또는 multi-host 지원 완료를 표시하지 않는다.",
+      "requirements": [],
+      "status": "pending",
+      "evidence": []
+    }
+  ]
+}
