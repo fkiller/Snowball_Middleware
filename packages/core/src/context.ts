@@ -136,7 +136,21 @@ export class ControllerContext {
    * destinations are left untouched (J03).
    */
   selectScope(patch: ControllerSelection): ControllerSelection {
-    this.selection = { ...this.selection, ...parseSelectionPatch(patch) };
+    const parsed = parseSelectionPatch(patch);
+    const next = { ...this.selection };
+    if ((parsed.harnessPluginId !== undefined && parsed.harnessPluginId !== next.harnessPluginId)
+      || (parsed.harnessInstanceId !== undefined && parsed.harnessInstanceId !== next.harnessInstanceId)) {
+      delete next.projectId; delete next.sessionKey;
+      if (parsed.harnessPluginId !== undefined && parsed.harnessPluginId !== next.harnessPluginId) delete next.harnessInstanceId;
+    }
+    if (parsed.projectId !== undefined && parsed.projectId !== next.projectId) delete next.sessionKey;
+    if (parsed.sessionKey !== undefined) {
+      const { harness } = parseSessionKey(parsed.sessionKey);
+      if ((parsed.harnessPluginId !== undefined && parsed.harnessPluginId !== harness.pluginId)
+        || (parsed.harnessInstanceId !== undefined && parsed.harnessInstanceId !== harness.instanceId)) throw new Error('Session and selected harness disagree');
+      parsed.harnessPluginId = harness.pluginId; parsed.harnessInstanceId = harness.instanceId;
+    }
+    this.selection = { ...next, ...parsed };
     return this.getSelection();
   }
 
@@ -209,10 +223,10 @@ export class ControllerContext {
    * without applying it locally (D17). Returns true when a pending approval
    * was marked resolved as a peer notification.
    */
-  notePeerApprovalResolved(approvalId: string, revision: number, at: string = nowIso()): boolean {
+  notePeerApprovalResolved(approvalId: string, revision: number, destinationKey: string, at: string = nowIso()): boolean {
     const current = this.approval;
     if (current === undefined || current.status !== 'pending') return false;
-    if (current.approvalId !== approvalId || current.revision !== revision) return false;
+    if (current.approvalId !== approvalId || current.revision !== revision || current.destinationKey !== destinationKey) return false;
     if (Number.isNaN(Date.parse(at))) throw new Error('Invalid timestamp');
     this.approval = { ...current, status: 'resolved', updatedAt: at };
     return true;
@@ -240,13 +254,13 @@ export class ControllerContext {
     this.selection = parseSelectionPatch(persisted.selection);
     if (persisted.draft !== undefined) {
       parseSessionKey(persisted.draft.destinationKey);
-      // Recovery restores the destination exactly; review/sending resume as
+      // Recovery restores the destination exactly; only sending resumes as
       // unknown so nothing replays without evidence (R-RECOVER).
       const phase = parseDraftPhase(persisted.draft.phase);
       this.draft = {
         draftId: persisted.draft.draftId,
         destinationKey: persisted.draft.destinationKey,
-        phase: phase === 'review' || phase === 'sending' ? 'unknown' : phase,
+        phase: phase === 'sending' ? 'unknown' : phase,
         updatedAt: persisted.draft.updatedAt,
       };
     } else {

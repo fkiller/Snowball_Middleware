@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "planRevision": 3,
+  "planRevision": 4,
   "updatedAt": "2026-09-17",
-  "scope": "Local control first; optional explicitly enabled local-LAN extension. Planning complete; new middleware implementation not started.",
+  "scope": "Local control first. Plugin, identity and durable command foundation implemented; authenticated loopback API next.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
   "targetRepository": "E:/developments/projects/Snowball_Middleware",
-  "resumeTaskId": "MW.02.01.01.02",
+  "resumeTaskId": "MW.02.02.01.01",
   "requirements": [
     {
       "id": "R-LOCAL",
@@ -801,7 +801,7 @@
       "kind": "task",
       "title": "Durable command/decision 처리와 복구",
       "requirements": [],
-      "status": "todo",
+      "status": "done",
       "dependsOn": [
         "MW.02.01.01.01"
       ],
@@ -810,9 +810,10 @@
         "host/src/state/mvp-controller.ts"
       ],
       "outputs": [
-        "packages/core/commands",
-        "packages/core/decisions",
-        "durable store migrations"
+        "packages/core/src/commands.ts",
+        "packages/core/src/durable-log.ts",
+        "packages/core/src/journal-model.ts",
+        "docs/ADR-002-DURABLE-COMMANDS.md"
       ],
       "steps": [
         "commandId·expectedRevision·owner 고정·Session별 큐를 구현한다.",
@@ -826,13 +827,25 @@
         "D18"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "commandId·expectedRevision·owner 고정·Session별 큐를 구현한다.",
+        "owner": "Codex / 2026-09-17 continuation",
+        "baseCommit": "09ff529",
+        "changedFiles": [
+          "packages/core/src/commands.ts",
+          "packages/core/src/durable-log.ts",
+          "packages/core/src/journal-model.ts",
+          "docs/ADR-002-DURABLE-COMMANDS.md",
+          "tests/core-journal.test.mjs",
+          "tests/fixtures/journal-crash.mjs",
+          "tests/core-recovery-boundaries.test.mjs"
+        ],
+        "completedSteps": [
+          "commandId·expectedRevision·owner 고정·Session별 큐를 구현한다.",
+          "dispatched/ack/completed/unknown과 idempotent API retry를 분리한다.",
+          "crash recovery, read-only reconciliation, approval stale rejection을 구현한다."
+        ],
+        "nextAction": "Proceed to MW.02.02.01.01 authenticated loopback API and cursor recovery.",
         "blockers": [],
-        "updatedAt": null
+        "updatedAt": "2026-09-17T23:40:36.872Z"
       },
       "priority": {
         "designDemand": 5,
@@ -846,8 +859,16 @@
       "kind": "acceptance",
       "title": "전송 직전/직후 crash와 reconnect가 중복 send를 만들지 않고 불확실하면 unknown을 유지한다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17",
+          "environment": "Windows x64 / Node 20.19.6",
+          "procedure": "npm test; npm run test:reference",
+          "result": "32/32 middleware and 44/44 reference tests pass; real child-process crash and central claim tests included.",
+          "reference": "docs/middleware/evidence/MW.02.01.01.02/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.02.01.01.02.A2",
@@ -856,8 +877,16 @@
       "kind": "acceptance",
       "title": "두 controller가 동일 decision을 답하면 한 번만 적용되고 stale 요청은 실패한다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17",
+          "environment": "Windows x64 / Node 20.19.6",
+          "procedure": "npm test; npm run test:reference",
+          "result": "32/32 middleware and 44/44 reference tests pass; real child-process crash and central claim tests included.",
+          "reference": "docs/middleware/evidence/MW.02.01.01.02/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.02.02.01.01",

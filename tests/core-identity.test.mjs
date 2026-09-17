@@ -101,7 +101,8 @@ test('MW.02.01.01.01.A2: controller scope, draft and approval bindings are indep
   assert.equal(first.resolveApproval('approval-1', 3), 'stale');
   assert.equal(first.resolveApproval('approval-1', 4), 'stale');
   second.beginApproval('approval-1', keyY, 3);
-  assert.equal(second.notePeerApprovalResolved('approval-1', 3), true);
+  assert.equal(second.notePeerApprovalResolved('approval-1', 3, keyX), false);
+  assert.equal(second.notePeerApprovalResolved('approval-1', 3, keyY), true);
   assert.equal(second.getApproval()?.status, 'resolved');
   assert.equal(second.resolveApproval('approval-1', 3), 'stale');
 });
@@ -132,6 +133,7 @@ test('project roots stay inside their workspace and state is per-user', () => {
   const project = createProject(workspace, 'E:\\work\\root\\app', 'App');
   assert.equal(project.workspaceId, workspace.workspaceId);
   assert.throws(() => createProject(workspace, 'E:\\other\\app', 'Escape'), /escapes/);
+  assert.throws(() => createProject(workspace, 'E:\\work\\root\\..\\outside', 'Escape'), /escapes/);
   assert.throws(() => createWorkspace('relative/path', 'Relative'), /absolute/);
 
   const windowsDir = resolveUserDataDir({ APPDATA: 'C:\\Users\\wondo\\AppData\\Roaming' }, 'win32', 'C:\\Users\\wondo');

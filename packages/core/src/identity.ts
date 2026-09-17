@@ -182,7 +182,7 @@ function isWindowsStyleRoot(root: string): boolean {
 export function normalizeRoot(root: string, platform: NodeJS.Platform = process.platform): string {
   if (typeof root !== 'string' || root.length === 0) throw new Error('Invalid root path');
   if (platform === 'win32' || isWindowsStyleRoot(root)) {
-    let normalized = root.replace(/\//g, '\\');
+    let normalized = path.win32.normalize(root.replace(/\//g, '\\'));
     const drive = normalized.match(/^([A-Za-z]):\\/);
     if (drive?.[1]) normalized = drive[1].toUpperCase() + normalized.slice(1);
     if (normalized.length > 3 && normalized.endsWith('\\')) normalized = normalized.slice(0, -1);
@@ -190,8 +190,8 @@ export function normalizeRoot(root: string, platform: NodeJS.Platform = process.
     return normalized;
   }
   if (!root.startsWith('/')) throw new Error('Root path must be absolute');
-  if (root.length > 1 && root.endsWith('/')) return root.slice(0, -1);
-  return root;
+  const normalized = path.posix.normalize(root);
+  return normalized.length > 1 && normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
 }
 
 function separatorFor(root: string): string {
@@ -439,7 +439,7 @@ export function parseState(text: string): CorePersistV1 {
   const workspaceRoots = new Set<string>();
   for (const workspace of workspaces) {
     if (workspaceIds.has(workspace.workspaceId)) throw new Error('Duplicate workspace id');
-    const rootKey = workspace.root.toLowerCase();
+    const rootKey = isWindowsStyleRoot(workspace.root) ? workspace.root.toLowerCase() : workspace.root;
     if (workspaceRoots.has(rootKey)) throw new Error('Duplicate workspace root');
     workspaceIds.add(workspace.workspaceId);
     workspaceRoots.add(rootKey);
