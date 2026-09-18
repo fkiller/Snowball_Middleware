@@ -1,120 +1,86 @@
-# MW.02.01.01.01 done — identity/context core — 2026-09-17 (muse-spark)
+# Local middleware — resumable checkpoint, 2026-09-17
 
-Handoff state: READY. MW.02.01.01.01 is implemented, tested, and recorded done
-in PLAN.json with L5 evidence. Stopped before MW.02.01.01.02 (durable
-command/decision journal), whose delivery/replay contract shapes the future
-localhost API and plugin capabilities — planner (Astra) review recommended
-before implementation. No quota guard triggered (Muse Spark session;
-codexbar not consulted).
+Handoff state: READY — MANDATORY QUOTA HANDOFF. Final actual desktop usage check reports 5% of the five-hour window remaining (95% used), crossing AGENTS' <=10% stop threshold. Implementation had already ended during the 13% preparation phase; only handoff preservation followed. No new implementation may begin in this usage window. This is not a claim that the full MVP is complete. Check fresh usage when resuming, or continue with another agent. CodexBar authentication remains unavailable; the desktop usage tool supplied actual figures. No reset credit was consumed.
 
-Objective: 로컬 제어 middleware / MW.02 local core (identity → durable journal → auth API).
-Plan: E:/developments/projects/Snowball_Middleware, docs/middleware/PLAN.json rev 3, resumeTaskId MW.02.01.01.02.
-Active task ID / ancestor path: MW.02.01.01.01 (done) under MW > MW.02 > MW.02.01 > MW.02.01.01.
-Actual Git branch / HEAD / dirty and untracked files: branch
-codex/local-control-core, HEAD 75f98dc475cb6e3ed9123a614ed784bd2be5c29f.
-Dirty tracked: docs/middleware/PLAN.json, docs/middleware/TASK_TREE.md,
-packages/core/README.md. Untracked: packages/core/package.json,
-packages/core/tsconfig.json, packages/core/src/ (identity.ts, context.ts,
-index.ts), tests/core-identity.test.mjs,
-docs/middleware/evidence/MW.02.01.01.01/verification.md. Nothing committed;
-no stash. Build outputs (packages/*/dist) are git-ignored.
-Completed work and exact evidence: stable hostId, composite session key,
-Workspace/Project models, per-controller selection with immutable
-draft/approval destinations, versioned per-user persist schema plus legacy
-label migration. `npm test` 16/16 pass (7 new core + 9 plugin),
-`npm run test:reference` 44/44 pass, validator 132 nodes / 40-40 scenarios /
-4-28 tasks done / 8-56 checks pass. Evidence:
-docs/middleware/evidence/MW.02.01.01.01/verification.md; A1+A2 status pass.
-Current incomplete work / changed files: none for this task; all 3 steps
-done. MW.02.01.01.02 not started.
-Exact next action: Astra (planner) reviews MW.02.01.01.02 contract questions
-below; then implement packages/core/commands + packages/core/decisions with
-durable store migrations per its steps, starting with commandId,
-expectedRevision, owner pinning and per-session queue.
-Tests run / not run / failures: npm run build pass; npm test 16/16 pass;
-npm run test:reference 44/44 pass; test:reference:speech not run (optional
-local speech env, unrelated); no failures. macOS, HID/MK20, real harness,
-installer, network pairing not tested (out of scope for this task).
-Processes or device state to preserve: none started; no listener/provider
-login/device access. Sibling ../Snowball_Control prototype, daemon, and
-firmware untouched.
-Decisions / constraints / failed approaches: core imports only node:
-builtins, never reference/legacy-host (R-PLUGIN). Host id is persisted
-opaque `host_*`, never hostname. Drive letters uppercased only, no bulk
-lowercasing. Unknown draft phase resolves only to sent/failed, never replays
-(R-RECOVER). One failing iteration: new test used a POSIX fixture root on
-Windows and normalizeRoot correctly rejected it; test made platform-aware.
-No product-behavior dependence on agent identity.
-Blocker and alternative ready task: MW.02.01.01.02 needs planner contract
-review (questions below), not env-blocked. Alternatives already eligible:
-MW.03.01.01.01 harness candidate collection, MW.04.01.01.01 device registry
-hardware-free path — both dependency-ready but lower priority than the
-durable journal.
-Quota source / actual status (if available): not applicable to this runtime;
-no codexbar query made.
+## Current objective and authority
 
-## Planner (Astra) review requested for MW.02.01.01.02
+Build hardware-independent LOCAL control middleware in this separate repository. Current-PC/loopback operation is fundamental; hardware, speech and a cloud control plane are optional. Harness cloud inference is separate. LAN devices/other PCs require explicit future opt-in. Tray-only Mac/Windows shell plus a local browser Supervisor must eventually supervise multiple harnesses, projects and devices.
 
-1. Idempotent retry API shape: which command fields form the idempotency key
-   (commandId alone vs commandId+expectedRevision+sessionKey), and where the
-   retry response contract lives (core return type vs localhost API envelope)?
-2. Approval lifecycle across restart: does a pending approval survive crash
-   as pending, or degrade to needs_reauth/needs_review? Who owns the timeout?
-3. Read-only reconciliation scope: which sources are authoritative at startup
-   (persisted journal only vs journal + harness read probe), and what may a
-   probe never do (no send/start/login — confirm)?
-4. Queue bounds: per-session depth, overflow policy (reject-new vs
-   drop-oldest with evidence), and whether D18 degraded-input queue shares
-   the same store.
-5. Decision after planner answers: implement, add tests glanced from
-   MW.02.01.01.02 L5 checks, record evidence, advance resumeTaskId.
+Authoritative repository: E:/developments/projects/Snowball_Middleware.
+Branch: codex/local-control-core. PLAN.json revision 6 is the sole implementation ledger; source Snowball_Control holds a redirect only. There are 132 L0–L5 nodes, 28 tasks, 56 checks and 40 mapped discovery scenarios. Current result: 7/28 tasks done; 14/56 checks passed. Choose dependency-ready work by designDemand, then implementationDifficulty, then stable task ID. Do not start easier UI work merely because it is visible.
 
----
+## Completed work and relevant commits
 
-# Local middleware foundation — 2026-09-17
+- 93a56e9: separate repository, 346-file hash-preserved reference export, SDK, isolated plugin host and initial virtual device. 75f98dc: previous quota handoff.
+- 09ff529: reviewed and preserved the other model's identity/context implementation (MW.02.01.01.01). It had been uncommitted at entry; baseline tests passed before commit.
+- f17a769: MW.02.01.01.02 durable commands/central decision claims/recovery. Includes destination-sensitive approval cache updates, review-draft restore preservation and lexical path normalization fixes.
+- f8e1e07: MW.02.02.01.01 authenticated loopback API, client SDK, OpenAPI v1 and real HTTP/SSE tests.
+- d8678d1: MW.04.01.01.01 optional device registry, versioned offline restore, per-device leases/context, two-device real virtual-plugin integration and API snapshot fields.
+- The next documentation-only commit records this handoff. Use git log to obtain its exact hash; d8678d1 is the latest implementation commit.
 
-Handoff state: READY — MANDATORY QUOTA HANDOFF. Final actual app check reports 8% five-hour remaining (92% used), crossing the AGENTS <=10% threshold. Implementation has stopped; only safe preservation/handoff followed. Continue with Antigravity or after Codex quota resets. CodexBar authentication is unavailable; recheck real app usage in the next session.
+## Current state and architecture
 
-## Current objective and priority
-Local control first; hardware is optional. The user explicitly requests highest design-demand/difficulty work first while respecting dependencies. PLAN.json priority fields and validator --next implement that order. No mandatory cloud control plane; local-LAN is opt-in.
+Core and plugin packages build and test on Windows with Node 20.19.6 and pinned TypeScript 5.9.3. Production core imports Node builtins only, never reference/legacy-host or a concrete provider. No installed tray/GUI/runtime service is delivered yet. Packages are reusable foundations, not a completed executable local alpha.
 
-## Current repository and completed tasks
-Authoritative repository: E:/developments/projects/Snowball_Middleware. Branch codex/local-control-core. Latest implementation commit: 93a56e9 (extract local middleware and establish isolated plugin protocol). A subsequent documentation-only handoff commit may be HEAD; use git log -2. Source prototype remains separately at ../Snowball_Control, source HEAD c4513bb plus preserved dirty/untracked work.
+1. ADR-001 defines reviewed entrypoint digests, explicit child-process start, bounded frames and no implicit retry. Process separation is not a sandbox.
+2. ADR-002 defines host-local commandId + immutable canonical fingerprint, pinned owner and session revision, centrally claimed decisions, queue limits and explicit dispatch. A synchronous bounded append-only SHA-256-chain WAL is fsynced before adapter entry. Startup cancels queued work, marks uncertain delivery unknown and never calls an adapter. Exact retries return retained state; changed intent conflicts. ACK is authoritative owner acceptance, not bytes written. The journal lock is never stolen automatically. Explicit offline dead-process recovery is exported. Corrupt/torn/future data fails closed. No provider-level exactly-once promise.
+3. ADR-003 defines 127.0.0.1-only API, exact Host/Origin, one-use tray/CLI bootstrap, memory bearer + CSRF, actor-bound mutation and read-only host supervision. HTTP only admits commands, never dispatches or injects owner/proof. SSE is bounded invalidation with epoch:sequence and resnapshot on gaps. SDK never retries mutations. Credentials are not URL/storage/log fields. Workspace read paths are registered, bounded and reject traversal/ADS/symlinks; hostile concurrent same-user filesystem swaps are not an OS-sandbox guarantee.
+4. ADR-004 defines discovered candidates versus explicit device registration, plugin/instance identity, independent Controller IDs, volatile leases and timestamp/sequence checks. Device registry export/restore preserves bindings/context but starts offline. Verified identity is adapter-supplied evidence, never inferred from IP/name/path. Missing stable identity requires physical reconfirmation. No cross-transport merge or generic keyboard capture. Device buttons emit semantics; central journal admission is still required by future runtime wiring.
 
-Completed: MW.01.01.01.01 inventory (346 hashes); MW.01.01.01.02 separate repo/scaffold/reference suite; MW.01.02.01.01 SDK and isolated plugin-host foundation. PLAN.json: 3/28 tasks done, 6/56 checks passed. Source plan is a redirect, not a second ledger.
-
-Production files: packages/plugin-sdk/src/index.ts, packages/plugin-host/src/index.ts, packages/device-virtual/src/index.ts. Contract/security limits: docs/ADR-001-PLUGIN-BOUNDARY.md. New tests: tests/plugin-host.test.mjs. packages/core is reserved for next implementation; no Core/API/tray/browser/installer implemented yet.
+Important files: packages/core/src/{identity,context,commands,durable-log,journal-model,devices}.ts; packages/api/src/{index,workspaces}.ts; packages/api/openapi.v1.json; packages/client-sdk/src/index.ts; packages/device-virtual/src/index.ts; tests/{core-journal,core-recovery-boundaries,local-api,device-registry}.test.mjs; tests/fixtures/journal-crash.mjs; docs/ADR-002 through ADR-004; task evidence folders.
 
 ## Exact next action
-Read AGENTS.md, docs/middleware/PLAN.md, DISCOVERY_JOURNEYS.md, PLAN.json and RESUME.md. Run node docs/middleware/validate-plan.mjs --next. Start MW.02.01.01.01: define stable Host identity, composite Session identity, registered Workspace/Project identity, and per-Controller context/draft destinations. Read reference/legacy-host/src/state/context.ts and mvp-controller.ts as behavior evidence; do not import them into Core. Add collision, independent-context and persistence/migration tests. Then durable command journal/recovery is the next high-demand dependency; do not skip to UI.
 
-## Architecture decisions and constraints
-TypeScript/Node retained. Reference files are byte-preserved, not the production daemon. JSON-RPC over bounded stdio; explicit plugin digest approval; OS/architecture/version checks; immutable manifest; realpath entry containment; fixed operations; pending/frame/event bounds. Cancellation or timeout after dispatch is unknown. No automatic process restart or command replay; explicit exponential cooldown. Plugin events receive authoritative process identity/generation. Separate process is not a security sandbox. Digest covers only entrypoint, not transitive dependencies or publisher authenticity. Config schema is a declared contract; no runtime configure API exists yet. Native plugin package signing, immutable artifact install and child-descendant lifecycle remain future release work.
+Read AGENTS.md, this file, PLAN.md, PLAN.json and DISCOVERY_JOURNEYS.md; verify git status/log/diff. Run the plan validator with --next. Resume MW.04.01.01.02 under MW > MW.04 > MW.04.01 > MW.04.01.01 (hardware discovery/control journey).
 
-No USB/network listener/provider login/real harness command was started. Existing user daemon and MK20 firmware remain untouched. No new registry/GitHub/npm release was published. Root source license is missing, so public redistribution must wait for provenance/license review; all packages are private/UNLICENSED for now.
+First implementation step: inspect D02–D08, the DeviceRegistry contract and existing reference hardware facts; choose a bounded HID backend contract that checks VID/PID, usage/interface and report support before opening handles. Inspect currently available hardware read-only before assuming a model or two-OS test access. No broad keyboard capture. A2 requires duplicate models/no serial/USB-port changes to avoid wrong association. A1 requires real Windows/macOS evidence; fixtures alone cannot pass it. Keep actual unsupported/no-device/permission outcomes visible and do not conflate enumeration with verified control.
 
-## Tests and evidence
-- npm ci --ignore-scripts --no-audit --no-fund: clean dependency install succeeded.
-- npm test: TypeScript build and 9/9 new plugin tests pass. Real child processes cover manifest rejection, approval/integrity, unknown timeout/cancel, resource bounds, crash isolation, event spoof/flood and startup/stop cancellation.
-- npm run test:reference: 44/44 pass, mocked providers/local sockets only.
-- npm run test:reference:speech: 2/2 pass using source machine's existing host/.venv-whisper/Scripts on PATH and cached model/temp fixture. Python/models/audio were not exported. This is not portable speech-install evidence.
-- 346 source AND destination SHA-256 hashes matched after copy; original host source untouched.
-- Plan hierarchy/dependency/evidence validation: 132 nodes, 40/40 discovery scenarios mapped.
-Not tested: macOS execution, physical HID/MK20, real harness ownership/control, installers, network pairing, sandbox security.
+Then continue priority/dependency ordering: opt-in LAN discovery (MW.04.02.01.01), relevant device pairing/lifecycle; bounded harness candidate discovery and probes (MW.03.01.01.01/.02) when eligible. If a real-device/OS gate is externally blocked, record exact evidence and continue other dependency-ready work instead of fabricating acceptance. Higher-level discovery, harness integration, workspace onboarding, Supervisor UX, tray, signing/install/update gates all remain unfinished.
 
-## Failed approaches / remaining issues
-Initial exporter resolved root one directory too high; it failed before writing exported files, then was corrected. Node 20 Windows does not expand the shell test glob; use node --test tests. TypeScript async state narrowing required generation-based startup cancellation. All were fixed and passing checks recorded. Host stop terminates the directly owned child; descendant process trees are not yet managed. Third-party malicious plugin isolation is not claimed.
+## Tests and verification
 
-## Git / files to preserve
-This is a new repository: commit only its explicit source/docs/reference/test/config files. The original Snowball_Control remains extensively dirty with valuable existing work; no blanket commit/reset/stash there. Runtime dependencies/dist/audio/state are ignored. .gitattributes marks reference files -text to preserve hashes across checkout. Historical context is in docs/PROTOTYPE_HANDOFF_ARCHIVE.md, not a current instruction.
+- npm test: 47/47 pass (build plus identity, WAL, real crash processes, real loopback HTTP/SSE, registry/two-device virtual plugin, isolated plugin tests).
+- node --test tests/local-api.test.mjs after the final OpenAPI device-field update: 10/10 pass.
+- npm run test:reference: 44/44 pass earlier in this session; reference files unchanged afterward.
+- Plan validator: valid 132 nodes / 40 of 40 discovery scenarios / 7 tasks done / 14 checks passed.
+- git diff --check: passed before implementation commits.
+- Not run this session: optional speech tests, macOS, actual HID/MK20/provider, installed UI, signed installers, power-loss durability or LAN pairing. Historical speech fixture evidence exists but is not new evidence.
 
-## Commands
-npm ci --ignore-scripts
-npm test
-npm run test:reference
-npm run plan
-node docs/middleware/validate-plan.mjs --write-tree
+Tests leave no API listener or child plugin process running. The existing sibling hardware/daemon was not stopped or modified.
 
-Next agent should update the same task IDs, evidence and HANDOFF before stopping. Agent identity does not affect product behavior.
+## Known limitations / missing integration pieces
 
-Final whitespace audit: scoped new packages/scripts/tests/HANDOFF/README/middleware plan checks pass. The whole initial import has pre-existing whitespace/EOF warnings in generated/reference source and three inherited documents; preserved deliberately to retain exact source hashes. No runtime/test failures remain.
+- Durable WAL has bounded capacity and no compaction UI; full/corrupt storage fails closed and requires offline maintenance. Windows ACLs and sudden power loss are not verified.
+- Device configuration export/restore is a codec; the future installed local runtime must persist it atomically and wire adapter verification/lease revocation. It is not an installed storage service.
+- There is no actual HID backend or physical identification UX yet. Unverified devices cannot transparently reconnect. The virtual plugin's simulateInput operation is fixture-only.
+- API bootstrap is a trusted internal method. A tray grant/paste onboarding page and same-origin Supervisor hosting remain to be integrated. API snapshot includes device/source/candidate summaries but HTTP cannot register hardware or mint grants.
+- API submission does not call a harness. Real adapters must provide owner/correlation/decision proofs and explicit dispatch. The absence of any hardware does not block this core/API path.
+- Browser refresh/session expiry requires fresh bootstrap. Future UX may improve this without URL/localStorage secrets.
+- Native multi-question/freeform decision schemas, real-provider version compatibility, install/update rollback and support matrix are future work, not covered by mock acceptance.
+
+## Failed approaches worth remembering
+
+- Node fetch normalizes some hostile Host overrides. Host tests use native HTTP to actually send the invalid header.
+- A preexisting 150 ms plugin startup/timeout fixture flaked with parallel HTTP/filesystem tests. It now uses 1000 ms and delivers the first late reply while the second request is still pending; production timeouts were not relaxed.
+- Avoid assembling an entire queue of 64 KiB command payloads into one 1 MiB recovery transaction. Recovery and owner change are bounded per-command transactions; large-queue tests cover it.
+- CodexBar could not authenticate. Do not infer usage from token count or repeatedly repair the quota tool.
+
+## Git state and preservation
+
+Middleware implementation commits are clean and consistent. Only this handoff/RESUME documentation is being updated after d8678d1; commit it as a documentation checkpoint. No stash was created. Verify final git status rather than relying on this paragraph.
+
+Sibling E:/developments/projects/Snowball_Control remains on pilot/codex-app-recon at c4513bb with extensive preexisting dirty/untracked host/hardware/docs. Do not reset, bulk commit or discard that work. Only its top handoff pointer is refreshed to this checkpoint; historical paragraphs there are not current instructions. Reference export remains unchanged.
+
+## Useful commands (run in Snowball_Middleware)
+
+    npm ci --ignore-scripts
+    npm test
+    npm run test:reference
+    node docs/middleware/validate-plan.mjs --next
+    node docs/middleware/validate-plan.mjs --affected R-LOCAL
+    node docs/middleware/validate-plan.mjs --write-tree
+    git status --short
+    git log -10 --oneline
+    git diff
+
+No permission/planner-model confirmation is pending. The previous model's journal contract questions were resolved in ADR-002 and implemented; do not pause again for an Astra-only review.

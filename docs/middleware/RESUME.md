@@ -9,7 +9,7 @@
 5. `node docs/middleware/validate-plan.mjs --next`로 재개 우선 작업과 선행 조건이 만족된 task를 본다. 보고된 ready task를 자동 실행하기 전에 실제 증거와 task checkpoint를 대조한다.
 6. task의 L0→L3 조상 요구와 L5 checks를 읽고, steps[0] 또는 checkpoint.nextAction부터 실행한다. 이전 agent 이름/모델을 이유로 설계를 재작성하지 않는다.
 
-현재 재개 task: **MW.02.01.01.01** (Host/Controller/Instance/Workspace identity와 context 분리). 앞선 inventory, 별도 repo scaffold, plugin SDK/host 기반은 완료됐다. 이 저장소가 원장 authority다. 원본 `Snowball_Control`은 hardware와 기존 실행 상태를 유지한다.
+현재 재개 task: **MW.04.01.01.02** (HID enumeration/권한/물리 식별과 안전 테스트). 앞선 inventory, 별도 repo, plugin SDK/host, identity/context, durable command, 인증 API, device registry는 완료됐다. 이 저장소가 원장 authority다. 원본 `Snowball_Control`은 hardware와 기존 실행 상태를 유지한다. 현재 근거와 미검증 범위는 HANDOFF.md와 task evidence를 읽는다.
 
 원장의 기존 입력 경로 `host/src`, `host/tests`는 이제 `reference/legacy-host/src`, `reference/legacy-host/tests`에서 읽는다. 하드웨어 입력은 sibling `../Snowball_Control/hardware`에 남아 있다. 새 구현은 `packages/`에만 추가하고 reference 파일을 수정하지 않는다. 다음 작업부터 dependency 완료 여부와 designDemand/difficulty 우선순위를 `--next`로 확인한다.
 
@@ -32,7 +32,7 @@ L5 check.status는 pending/pass/fail/blocked. pass이면 evidence에 `date`, `en
 
 원장을 수정한 후 `node docs/middleware/validate-plan.mjs --write-tree`로 읽기용 TASK_TREE.md를 다시 생성한다. `--affected R-LOCAL`로 특정 요구를 상속한 task 목록을 확인한다. 이 명령은 영향 범위를 보여줄 뿐 상태를 자동 승인하거나 변경하지 않는다.
 
-구현 evidence는 `docs/middleware/evidence/<task-id>/` 아래 요약부터 만든다. 큰 바이너리/민감 자료는 저장하지 않는다. source task와 check ID를 증거에 적는다. 현재 이 폴더가 없는 것은 아직 새 구현 검수가 없기 때문이다.
+구현 evidence는 `docs/middleware/evidence/<task-id>/` 아래 요약부터 만든다. 큰 바이너리/민감 자료는 저장하지 않는다. source task와 check ID를 증거에 적는다. 이미 완료한 task의 증거를 읽고 실제 provider/device 검증과 fixture 검증을 구분한다.
 
 ## 3. 정상 중단과 handoff
 
@@ -70,8 +70,8 @@ in_progress와 checkpoint가 오래됐으면 Git diff/파일/실제 프로세스
 
 ## 6. 현재 checkpoint
 
-- 새 repository에서 3/28 task 완료, 6/56 acceptance pass. 전체 원장은 PLAN.json 기준.
-- `npm ci --ignore-scripts` 후 `npm test`: 새 plugin protocol 9/9 pass. `test:reference`: 44/44 pass, 선택형 speech: 2/2 pass (기존 Python/model 환경 사용).
+- 새 repository에서 7/28 task 완료, 14/56 acceptance pass. 전체 원장은 PLAN.json 기준.
+- `npm test`: core/API/device/plugin 47/47 pass. `test:reference`: 44/44 pass. 선택형 speech는 이번 세션에서 재실행하지 않았다.
 - 기존 Windows Codex/MK20 prototype과 extensive dirty work 보존. daemon/firmware 변경 없음.
-- CodexBar authentication 오류 지속. 앱의 실제 사용량은 인수인계 준비 시 5시간 8% remaining (의무 인수인계 기준 도달). 다음 세션은 다시 조회해야 한다.
+- CodexBar authentication 오류 지속. 앱의 실제 사용량은 준비 시 13%, 최종 확인 시 5시간 5% remaining으로 의무 인수인계 기준에 도달했다. 구현을 종료했고 다음 세션은 다시 조회해야 한다.
 - Astra 또는 다른 LLM이든 task ID, dependency, evidence, nextAction을 기준으로 이어간다. 모델별 별도 계획을 만들지 않는다.
