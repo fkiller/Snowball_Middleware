@@ -54,3 +54,4 @@ export {
 export { CommandJournal, type JournalOptions, type DispatchPort, type DispatchReceipt, type CommandProof, type DecisionProof } from './commands.js';
 export { JournalFault, recoverAbandonedJournalLock } from './durable-log.js';
 export type { CommandInput, CommandRecord, CommandStatus, DecisionInput, DecisionRecord, DecisionStatus, SessionRecord, Json } from './journal-model.js';
+export { DeviceRegistry, type DeviceSource, type DeviceTransport, type DeviceObservation, type DeviceCandidate, type DeviceBinding, type DeviceInput } from './devices.js';

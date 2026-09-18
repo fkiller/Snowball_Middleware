@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "planRevision": 5,
+  "planRevision": 6,
   "updatedAt": "2026-09-17",
-  "scope": "Local control first. Core journal and authenticated API verified; device registry next.",
+  "scope": "Local control first. Plugin, identity, durable commands, authenticated API and optional device registry foundation implemented. Physical discovery, harnesses, UI and packaging remain.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
   "targetRepository": "E:/developments/projects/Snowball_Middleware",
-  "resumeTaskId": "MW.04.01.01.01",
+  "resumeTaskId": "MW.04.01.01.02",
   "requirements": [
     {
       "id": "R-LOCAL",
@@ -1314,7 +1314,7 @@
       "kind": "task",
       "title": "Device registry와 hardware-free 기본 경로",
       "requirements": [],
-      "status": "todo",
+      "status": "done",
       "dependsOn": [
         "MW.02.01.01.01"
       ],
@@ -1323,8 +1323,9 @@
         "host/src/protocol/messages.ts"
       ],
       "outputs": [
-        "device/controller registry",
-        "virtual device plugin"
+        "packages/core/src/devices.ts",
+        "packages/device-virtual/src/index.ts",
+        "docs/ADR-004-DEVICE-REGISTRY.md"
       ],
       "steps": [
         "장치 후보와 등록 controller를 분리하고 stable identity/transport/capability를 저장한다.",
@@ -1337,13 +1338,23 @@
         "D17"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "장치 후보와 등록 controller를 분리하고 stable identity/transport/capability를 저장한다.",
+        "owner": "Codex / 2026-09-17 continuation",
+        "baseCommit": "f8e1e07",
+        "changedFiles": [
+          "packages/core/src/devices.ts",
+          "packages/device-virtual/src/index.ts",
+          "packages/api/src/index.ts",
+          "packages/client-sdk/src/index.ts",
+          "tests/device-registry.test.mjs"
+        ],
+        "completedSteps": [
+          "장치 후보와 등록 controller를 분리하고 stable identity/transport/capability를 저장한다.",
+          "하드웨어 없음과 unsupported plugin 상태를 정상 흐름으로 제공한다.",
+          "가상 device로 의미 입력/출력 contract와 독립 context를 검증한다."
+        ],
+        "nextAction": "Proceed to MW.04.01.01.02 HID backend and explicit physical identification. Actual two-OS hardware acceptance remains unverified.",
         "blockers": [],
-        "updatedAt": null
+        "updatedAt": "2026-09-18T00:00:43.716Z"
       },
       "priority": {
         "designDemand": 4,
@@ -1357,8 +1368,16 @@
       "kind": "acceptance",
       "title": "장치 0개에서 API/Web 작업 경로가 사용 가능하고 hardware probing 실패가 core를 막지 않는다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17",
+          "environment": "Windows x64 / Node 20.19.6",
+          "procedure": "npm test; real virtual plugin and zero-device HTTP/client integration",
+          "result": "47/47 tests pass. Device-free API admission and independent two-device semantic input/output verified.",
+          "reference": "docs/middleware/evidence/MW.04.01.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.04.01.01.01.A2",
@@ -1367,8 +1386,16 @@
       "kind": "acceptance",
       "title": "virtual 두 장치 입력이 서로의 선택 상태/출력으로 섞이지 않는다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-17",
+          "environment": "Windows x64 / Node 20.19.6",
+          "procedure": "npm test; real virtual plugin and zero-device HTTP/client integration",
+          "result": "47/47 tests pass. Device-free API admission and independent two-device semantic input/output verified.",
+          "reference": "docs/middleware/evidence/MW.04.01.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.04.01.01.02",

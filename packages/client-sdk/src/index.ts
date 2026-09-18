@@ -1,4 +1,4 @@
-import type { CommandInput, CommandRecord, DecisionRecord, SessionRecord } from '@snowball/core';
+import type { CommandInput, CommandRecord, DecisionRecord, SessionRecord, DeviceRegistry, DeviceCandidate } from '@snowball/core';
 
 export interface Credentials { token: string; csrfToken: string; controllerId: string; expiresAt: number }
 export interface Snapshot {
@@ -6,6 +6,9 @@ export interface Snapshot {
   commands: { commandId: string; actorId: string; sessionKey: string; ownerId: string; operation: string; status: CommandRecord['status']; revision: number; order: number; updatedAt: number }[];
   decisions: Pick<DecisionRecord, 'decisionId' | 'sessionKey' | 'ownerId' | 'status' | 'revision' | 'expiresAt'>[];
   workspaces: { workspaceId: string }[];
+  devices: ReturnType<DeviceRegistry['list']>;
+  deviceSources: ReturnType<DeviceRegistry['sourceStates']>;
+  deviceCandidates: DeviceCandidate[];
 }
 export class ClientFault extends Error {
   constructor(readonly status: number, readonly code: string) { super(code); }

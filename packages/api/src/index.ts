@@ -1,6 +1,6 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomBytes, createHash } from 'node:crypto';
-import { CommandJournal, createControllerId, JournalFault, type CommandInput } from '@snowball/core';
+import { CommandJournal, createControllerId, JournalFault, type CommandInput, type DeviceRegistry } from '@snowball/core';
 import { WorkspaceFiles } from './workspaces.js';
 export { WorkspaceFiles } from './workspaces.js';
 
@@ -13,7 +13,7 @@ interface Session { controllerId: string; csrfHash: string; expiresAt: number; r
 interface Stream { response: ServerResponse; session: Session }
 interface Event { cursor: string; data: string }
 export interface LocalApiOptions {
-  journal: CommandJournal; workspaces?: WorkspaceFiles; port?: number;
+  journal: CommandJournal; workspaces?: WorkspaceFiles; devices?: DeviceRegistry; port?: number;
   sessionTtlMs?: number; eventCapacity?: number; now?: () => number;
 }
 
@@ -31,6 +31,7 @@ export class LocalApi {
   private readonly ttl: number;
   private readonly eventCapacity: number;
   private readonly unsubscribe: () => void;
+  private readonly unsubscribeDevices?: () => void;
   private heartbeat?: ReturnType<typeof setInterval>;
   private attempts = 0;
   private attemptWindow = 0;
@@ -49,6 +50,7 @@ export class LocalApi {
     this.server.maxConnections = 64;
     this.server.on('clientError', (_, socket) => { socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); });
     this.unsubscribe = options.journal.subscribe(() => this.changed());
+    this.unsubscribeDevices = options.devices?.subscribe(() => this.changed());
   }
   get origin(): string { if (!this.originValue) throw new Error('API not listening'); return this.originValue; }
   get cursor(): string { return `${this.epoch}:${this.sequence}`; }
@@ -157,6 +159,9 @@ export class LocalApi {
       commands: this.options.journal.listCommands().map(c => ({ commandId: c.input.commandId, actorId: c.input.actorId, sessionKey: c.input.sessionKey, ownerId: c.input.ownerId, operation: c.input.operation, status: c.status, revision: c.revision, order: c.order, updatedAt: c.updatedAt })),
       decisions: this.options.journal.listDecisions().map(d => ({ decisionId: d.decisionId, sessionKey: d.sessionKey, ownerId: d.ownerId, status: d.status, revision: d.revision, ...(d.expiresAt !== undefined ? { expiresAt: d.expiresAt } : {}) })),
       workspaces: this.options.workspaces?.list() ?? [],
+      devices: this.options.devices?.list() ?? [],
+      deviceSources: this.options.devices?.sourceStates() ?? [],
+      deviceCandidates: this.options.devices?.listCandidates() ?? [],
     };
   }
   private async route(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -228,7 +233,7 @@ export class LocalApi {
   }
   async close(): Promise<void> {
     if (this.closed) return; this.closed = true;
-    this.unsubscribe(); if (this.heartbeat) clearInterval(this.heartbeat);
+    this.unsubscribe(); this.unsubscribeDevices?.(); if (this.heartbeat) clearInterval(this.heartbeat);
     for (const stream of this.streams) stream.response.destroy(); this.streams.clear();
     this.grants.clear(); this.sessions.clear();
     if (this.server.listening) await new Promise<void>((resolve, reject) => { this.server.close(error => error ? reject(error) : resolve()); this.server.closeAllConnections(); });

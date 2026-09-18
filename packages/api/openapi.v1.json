@@ -813,6 +813,207 @@
               ],
               "additionalProperties": false
             }
+          },
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "deviceId": {
+                  "type": "string"
+                },
+                "controllerId": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "object",
+                  "properties": {
+                    "pluginId": {
+                      "type": "string"
+                    },
+                    "instanceId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "pluginId",
+                    "instanceId"
+                  ],
+                  "additionalProperties": false
+                },
+                "label": {
+                  "type": "string"
+                },
+                "transport": {
+                  "type": "string",
+                  "enum": [
+                    "virtual",
+                    "hid",
+                    "lan"
+                  ]
+                },
+                "capabilities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "button",
+                      "select-session",
+                      "display"
+                    ]
+                  }
+                },
+                "verifiedIdentity": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "state": {
+                  "type": "string",
+                  "enum": [
+                    "ready",
+                    "offline",
+                    "degraded"
+                  ]
+                },
+                "selection": {
+                  "type": "object",
+                  "properties": {
+                    "harnessPluginId": {
+                      "type": "string"
+                    },
+                    "harnessInstanceId": {
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "sessionKey": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "deviceId",
+                "controllerId",
+                "source",
+                "label",
+                "transport",
+                "capabilities",
+                "revision",
+                "state",
+                "selection"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "deviceCandidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "candidateId": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "object",
+                  "properties": {
+                    "pluginId": {
+                      "type": "string"
+                    },
+                    "instanceId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "pluginId",
+                    "instanceId"
+                  ],
+                  "additionalProperties": false
+                },
+                "generation": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "nativeDeviceId": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "transport": {
+                  "type": "string",
+                  "enum": [
+                    "virtual",
+                    "hid",
+                    "lan"
+                  ]
+                },
+                "capabilities": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "button",
+                      "select-session",
+                      "display"
+                    ]
+                  }
+                },
+                "supported": {
+                  "type": "boolean"
+                },
+                "verifiedIdentity": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "candidateId",
+                "source",
+                "generation",
+                "nativeDeviceId",
+                "label",
+                "transport",
+                "capabilities",
+                "supported"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "deviceSources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "generation": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "scanning",
+                    "ready",
+                    "failed",
+                    "missing_plugin"
+                  ]
+                }
+              },
+              "required": [
+                "source",
+                "generation",
+                "status"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -820,7 +1021,10 @@
           "sessions",
           "commands",
           "decisions",
-          "workspaces"
+          "workspaces",
+          "devices",
+          "deviceCandidates",
+          "deviceSources"
         ],
         "additionalProperties": false
       }
