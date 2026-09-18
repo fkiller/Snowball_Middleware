@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "planRevision": 7,
+  "planRevision": 8,
   "updatedAt": "2026-09-18",
   "scope": "Local control first. Plugin, identity, durable commands, authenticated API and optional device registry foundation implemented. Physical discovery, harnesses, UI and packaging remain.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
   "targetRepository": "E:/developments/projects/Snowball_Middleware",
-  "resumeTaskId": "MW.04.02.01.02",
+  "resumeTaskId": "MW.03.01.01.02",
   "requirements": [
     {
       "id": "R-LOCAL",
@@ -987,7 +987,7 @@
       "kind": "task",
       "title": "제한된 harness 후보 수집과 deduplication",
       "requirements": [],
-      "status": "todo",
+      "status": "done",
       "dependsOn": [
         "MW.01.02.01.01"
       ],
@@ -1014,13 +1014,23 @@
         "H11"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "H01-H04/H11에 따라 override/known install/PATH/등록 endpoint를 수집한다.",
+        "owner": "Codex",
+        "baseCommit": "01d0144",
+        "changedFiles": [
+          "packages/core/src/discovery.ts",
+          "packages/core/src/index.ts",
+          "packages/core/DISCOVERY.md",
+          "tests/harness-discovery.test.mjs",
+          "docs/middleware/evidence/MW.03.01.01.01/verification.md"
+        ],
+        "completedSteps": [
+          "Bounded provider-supplied override/known/PATH/registered endpoint collection without execution or network requests.",
+          "Generation, cancellation, deadline, finite filesystem concurrency and stale snapshot retention.",
+          "Canonical path deduplication preserves multiple installs, source aliases, unknown version and unprobed control status."
+        ],
+        "nextAction": "MW.03.01.01.02: implement explicit bounded probes; candidate metadata never authorizes execution.",
         "blockers": [],
-        "updatedAt": null
+        "updatedAt": "2026-09-18T13:39:10.816Z"
       },
       "priority": {
         "designDemand": 4,
@@ -1034,8 +1044,16 @@
       "kind": "acceptance",
       "title": "Windows/macOS fixture에서 empty·다중 설치·GUI PATH 누락·수동 경로가 정확히 표시된다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-18",
+          "environment": "Windows x64 Node 20.19.6; macOS/Windows path fixtures",
+          "procedure": "npm test; npm run build; node --test tests/harness-discovery.test.mjs",
+          "result": "75/75 full tests; 8/8 focused discovery tests. No candidate execution or network discovery.",
+          "reference": "docs/middleware/evidence/MW.03.01.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.03.01.01.01.A2",
@@ -1044,8 +1062,16 @@
       "kind": "acceptance",
       "title": "cancel/timeout/연속 scan의 늦은 응답이 새 결과를 덮어쓰지 않고 전체 디스크/포트를 스캔하지 않는다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-18",
+          "environment": "Windows x64 Node 20.19.6; macOS/Windows path fixtures",
+          "procedure": "npm test; npm run build; node --test tests/harness-discovery.test.mjs",
+          "result": "75/75 full tests; 8/8 focused discovery tests. No candidate execution or network discovery.",
+          "reference": "docs/middleware/evidence/MW.03.01.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.03.01.01.02",
@@ -1586,7 +1612,7 @@
       "kind": "task",
       "title": "MK20 plugin 추출과 인증 pairing 계약",
       "requirements": [],
-      "status": "todo",
+      "status": "blocked",
       "dependsOn": [
         "MW.04.02.01.01",
         "MW.02.01.01.02"
@@ -1613,13 +1639,21 @@
         "D14"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "MK20 키/렌더링/UDP 변환을 hardware repo plugin으로 옮긴다.",
-        "blockers": [],
-        "updatedAt": null
+        "owner": "Codex",
+        "baseCommit": "01d0144",
+        "changedFiles": [
+          "../Snowball_Control/plugins/device-mk20",
+          "docs/middleware/evidence/MW.04.02.01.02/verification.md"
+        ],
+        "completedSteps": [
+          "Extracted bounded legacy key/knob decoder, preview renderer and explicitly opted-in lab UDP transport in hardware repository commit d5eabaf.",
+          "Documented future authenticated pairing requirements; current firmware always fails production control admission."
+        ],
+        "nextAction": "Implement and physically validate authenticated firmware pairing before enabling a production MK20 plugin; meanwhile resume MW.03.01.01.01.",
+        "blockers": [
+          "Current MK20 firmware has no authenticated pairing protocol. Real-device success/cancel/expiry/identity/replay verification is unavailable."
+        ],
+        "updatedAt": "2026-09-18T13:34:36.374Z"
       },
       "priority": {
         "designDemand": 4,
@@ -1633,8 +1667,16 @@
       "kind": "acceptance",
       "title": "실제 MK20에서 물리 pairing 성공/취소/만료/잘못된 identity/replay를 검증한다; firmware 미지원이면 blocked다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "blocked",
+      "evidence": [
+        {
+          "date": "2026-09-18",
+          "environment": "Windows x64 Node 20.19.6; no physical device",
+          "procedure": "npm test --prefix plugins/device-mk20 in Snowball_Control",
+          "result": "Blocked: legacy firmware lacks authentication; fixtures do not meet physical pairing gate.",
+          "reference": "docs/middleware/evidence/MW.04.02.01.02/verification.md; Snowball_Control d5eabaf"
+        }
+      ]
     },
     {
       "id": "MW.04.02.01.02.A2",
@@ -1643,8 +1685,16 @@
       "kind": "acceptance",
       "title": "인증 없는 legacy 장치가 production ready가 되지 않고 USB+LAN identity는 검증된 경우에만 합친다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-18",
+          "environment": "Windows x64 Node 20.19.6; no physical device",
+          "procedure": "npm test --prefix plugins/device-mk20 in Snowball_Control",
+          "result": "4/4 pass including fail-closed control/merge and actual loopback pinned-peer UDP.",
+          "reference": "docs/middleware/evidence/MW.04.02.01.02/verification.md; Snowball_Control d5eabaf"
+        }
+      ]
     },
     {
       "id": "MW.04.03.01.01",

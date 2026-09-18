@@ -6,7 +6,7 @@ Depth: L0 product → L1 outcome → L2 journey → L3 work package → L4 task 
 
 All implementation checks are pending unless their evidence says otherwise.
 
-- **MW** 하드웨어 독립 로컬 harness 제어 — 8/28 tasks done
+- **MW** 하드웨어 독립 로컬 harness 제어 — 9/28 tasks done
   - **MW.01** 분리 저장소와 계약 — 3/3 tasks done
     - **MW.01.01** 기존 작업을 보존하며 추출 — 2/2 tasks done
       - **MW.01.01.01** 소스 export와 재현 기반 — 2/2 tasks done
@@ -35,12 +35,12 @@ All implementation checks are pending unless their evidence says otherwise.
         - **MW.02.02.01.01** 인증된 localhost API와 event stream — done
           - **MW.02.02.01.01.A1** 허용되지 않은 origin/host/인증과 stale revision 요청이 차단되고 token이 로그/URL에 남지 않는다. — pass
           - **MW.02.02.01.01.A2** event gap/reconnect에서 snapshot이 일관되고 LAN 비활성 시 외부 interface listener가 없다. — pass
-  - **MW.03** Harness discovery — 0/5 tasks done
-    - **MW.03.01** 최초 발견과 검증 — 0/2 tasks done
-      - **MW.03.01.01** 후보와 상태 모델 — 0/2 tasks done
-        - **MW.03.01.01.01** 제한된 harness 후보 수집과 deduplication — todo
-          - **MW.03.01.01.01.A1** Windows/macOS fixture에서 empty·다중 설치·GUI PATH 누락·수동 경로가 정확히 표시된다. — pending
-          - **MW.03.01.01.01.A2** cancel/timeout/연속 scan의 늦은 응답이 새 결과를 덮어쓰지 않고 전체 디스크/포트를 스캔하지 않는다. — pending
+  - **MW.03** Harness discovery — 1/5 tasks done
+    - **MW.03.01** 최초 발견과 검증 — 1/2 tasks done
+      - **MW.03.01.01** 후보와 상태 모델 — 1/2 tasks done
+        - **MW.03.01.01.01** 제한된 harness 후보 수집과 deduplication — done
+          - **MW.03.01.01.01.A1** Windows/macOS fixture에서 empty·다중 설치·GUI PATH 누락·수동 경로가 정확히 표시된다. — pass
+          - **MW.03.01.01.01.A2** cancel/timeout/연속 scan의 늦은 응답이 새 결과를 덮어쓰지 않고 전체 디스크/포트를 스캔하지 않는다. — pass
         - **MW.03.01.01.02** 읽기 probe와 진실한 capability 상태 — todo
           - **MW.03.01.01.02.A1** 401은 needs_auth, 미실행은 not_running, 기록만 있으면 readonly로 분류된다. — pending
           - **MW.03.01.01.02.A2** 잘못된 서비스/redirect/version/permission failure가 차단되며 discovery가 server 시작 또는 command send를 하지 않는다. — pending
@@ -69,9 +69,9 @@ All implementation checks are pending unless their evidence says otherwise.
         - **MW.04.02.01.01** Opt-in LAN 탐색과 수동 주소 fallback — done
           - **MW.04.02.01.01.A1** network-off에서 listener/discovery가 없고 enable/disable 후 즉시 반영된다. — pass
           - **MW.04.02.01.01.A2** 차단된 mDNS/주소 변화/수동 잘못된 endpoint가 명확한 결과를 내며 subnet sweep을 하지 않는다. — pass
-        - **MW.04.02.01.02** MK20 plugin 추출과 인증 pairing 계약 — todo
-          - **MW.04.02.01.02.A1** 실제 MK20에서 물리 pairing 성공/취소/만료/잘못된 identity/replay를 검증한다; firmware 미지원이면 blocked다. — pending
-          - **MW.04.02.01.02.A2** 인증 없는 legacy 장치가 production ready가 되지 않고 USB+LAN identity는 검증된 경우에만 합친다. — pending
+        - **MW.04.02.01.02** MK20 plugin 추출과 인증 pairing 계약 — blocked
+          - **MW.04.02.01.02.A1** 실제 MK20에서 물리 pairing 성공/취소/만료/잘못된 identity/replay를 검증한다; firmware 미지원이면 blocked다. — blocked
+          - **MW.04.02.01.02.A2** 인증 없는 legacy 장치가 production ready가 되지 않고 USB+LAN identity는 검증된 경우에만 합친다. — pass
     - **MW.04.03** 장치를 계속 사용하거나 제거 — 0/1 tasks done
       - **MW.04.03.01** controller lifecycle — 0/1 tasks done
         - **MW.04.03.01.01** 장치 재접속·plugin 장애·제거 — todo
