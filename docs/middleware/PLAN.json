@@ -1479,7 +1479,7 @@
           "Implemented profile-gated Windows/macOS backend contract, isolated worker and bounded physical safe-test engine; 11 synthetic/worker tests pass.",
           "Real Windows native metadata enumeration verified (26 collections, zero handles opened)."
         ],
-        "nextAction": "Obtain selected model and reviewed HID report contract, then run actual OS/physical tests. Continue MW.04.02.01.01 meanwhile. Current independent resume: MW.03.01.01.02.",
+        "nextAction": "Obtain selected model and reviewed HID report contract, then run actual OS/physical tests. Independent resume: MW.03.01.01.02.",
         "blockers": [
           "Selected actual HID model/report contract and physical interaction required; production catalog intentionally empty.",
           "Actual macOS and two-unit/no-serial/port-change acceptance not available in this session."
@@ -1658,7 +1658,7 @@
           "Extracted bounded legacy key/knob decoder, preview renderer and explicitly opted-in lab UDP transport in hardware repository commit d5eabaf.",
           "Documented future authenticated pairing requirements; current firmware always fails production control admission."
         ],
-        "nextAction": "Implement and physically validate authenticated firmware pairing before enabling a production MK20 plugin; meanwhile resume MW.03.01.01.01. Current independent resume: MW.03.01.01.02.",
+        "nextAction": "Implement and physically validate authenticated firmware pairing before enabling a production MK20 plugin. Independent resume: MW.03.01.01.02.",
         "blockers": [
           "Current MK20 firmware has no authenticated pairing protocol. Real-device success/cancel/expiry/identity/replay verification is unavailable."
         ],

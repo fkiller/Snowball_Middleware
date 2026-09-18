@@ -1,86 +1,163 @@
-# Local middleware — resumable checkpoint, 2026-09-17
+# Local middleware — resumable checkpoint, 2026-09-18
 
-Handoff state: READY — MANDATORY QUOTA HANDOFF. Final actual desktop usage check reports 5% of the five-hour window remaining (95% used), crossing AGENTS' <=10% stop threshold. Implementation had already ended during the 13% preparation phase; only handoff preservation followed. No new implementation may begin in this usage window. This is not a claim that the full MVP is complete. Check fresh usage when resuming, or continue with another agent. CodexBar authentication remains unavailable; the desktop usage tool supplied actual figures. No reset credit was consumed.
+Handoff state: READY. This is a partial MVP checkpoint, not a completed product.
+Read fresh quota before implementation. CodexBar still reports Authentication
+required; actual desktop usage reached 14% five-hour remaining (86% used), weekly
+28% remaining: AGENTS PREPARE HANDOFF threshold. No large new implementation was
+started afterward. No reset credit consumed. Recheck actual quota on resume.
 
-## Current objective and authority
+## Objective and authority
 
-Build hardware-independent LOCAL control middleware in this separate repository. Current-PC/loopback operation is fundamental; hardware, speech and a cloud control plane are optional. Harness cloud inference is separate. LAN devices/other PCs require explicit future opt-in. Tray-only Mac/Windows shell plus a local browser Supervisor must eventually supervise multiple harnesses, projects and devices.
+Hardware-independent LOCAL control on the user's computer; no mandatory cloud
+control plane. Hardware and speech are optional. LAN is explicitly enabled only.
+Eventually deliver Mac/Windows tray plus local browser Supervisor for multiple
+harnesses, devices and projects. Current packages are foundations, not an installed
+tray/service/Supervisor or completed local alpha.
 
-Authoritative repository: E:/developments/projects/Snowball_Middleware.
-Branch: codex/local-control-core. PLAN.json revision 6 is the sole implementation ledger; source Snowball_Control holds a redirect only. There are 132 L0–L5 nodes, 28 tasks, 56 checks and 40 mapped discovery scenarios. Current result: 7/28 tasks done; 14/56 checks passed. Choose dependency-ready work by designDemand, then implementationDifficulty, then stable task ID. Do not start easier UI work merely because it is visible.
+Authoritative repo E:/developments/projects/Snowball_Middleware, branch
+codex/local-control-core. PLAN.json revision 8 is the only task ledger: 132 L0–L5
+nodes, 28 tasks, 56 checks, 40 discovery scenarios. 9/28 tasks done, 19/56 checks pass.
+Task tree is generated. Prioritize dependency-ready designDemand, then difficulty,
+then stable ID. Source Snowball_Control has a redirect, not a competing ledger.
 
-## Completed work and relevant commits
+## Exact next action and current task
 
-- 93a56e9: separate repository, 346-file hash-preserved reference export, SDK, isolated plugin host and initial virtual device. 75f98dc: previous quota handoff.
-- 09ff529: reviewed and preserved the other model's identity/context implementation (MW.02.01.01.01). It had been uncommitted at entry; baseline tests passed before commit.
-- f17a769: MW.02.01.01.02 durable commands/central decision claims/recovery. Includes destination-sensitive approval cache updates, review-draft restore preservation and lexical path normalization fixes.
-- f8e1e07: MW.02.02.01.01 authenticated loopback API, client SDK, OpenAPI v1 and real HTTP/SSE tests.
-- d8678d1: MW.04.01.01.01 optional device registry, versioned offline restore, per-device leases/context, two-device real virtual-plugin integration and API snapshot fields.
-- The next documentation-only commit records this handoff. Use git log to obtain its exact hash; d8678d1 is the latest implementation commit.
+Run `node docs/middleware/validate-plan.mjs --next`; resume MW.03.01.01.02 under
+MW > MW.03 > MW.03.01 > MW.03.01.01. Read ADR-005 and packages/core/src/probes.ts.
+Implement bounded read-only literal-loopback GET health/schema probing, with real
+fixture servers for 401, wrong service, redirect, malformed/oversize response,
+unsupported version, refusal, cancellation and timeout. Then implement explicitly
+selected/reviewed binary probes through isolated plugin-host approval. Never execute
+arbitrary discovered files or turn on a shell for .cmd shims. Do not start servers,
+authenticate automatically or send commands during discovery. A1/A2 are pending;
+classifier tests alone do not satisfy either. No planner/model approval is required.
 
-## Current state and architecture
+Current task step 1 is implemented: assessProbe validates separate presence,
+compatibility, auth, permission, connectivity and advertised-control facts. Reason
+projection distinguishes needs_auth, not_running, readonly_history, wrong_service,
+unsupported, etc. Even compatible stays unregistered/control-unverified. Drivers,
+provider version/schema facts and transport evidence are not implemented yet.
 
-Core and plugin packages build and test on Windows with Node 20.19.6 and pinned TypeScript 5.9.3. Production core imports Node builtins only, never reference/legacy-host or a concrete provider. No installed tray/GUI/runtime service is delivered yet. Packages are reusable foundations, not a completed executable local alpha.
+## Completed work and commits
 
-1. ADR-001 defines reviewed entrypoint digests, explicit child-process start, bounded frames and no implicit retry. Process separation is not a sandbox.
-2. ADR-002 defines host-local commandId + immutable canonical fingerprint, pinned owner and session revision, centrally claimed decisions, queue limits and explicit dispatch. A synchronous bounded append-only SHA-256-chain WAL is fsynced before adapter entry. Startup cancels queued work, marks uncertain delivery unknown and never calls an adapter. Exact retries return retained state; changed intent conflicts. ACK is authoritative owner acceptance, not bytes written. The journal lock is never stolen automatically. Explicit offline dead-process recovery is exported. Corrupt/torn/future data fails closed. No provider-level exactly-once promise.
-3. ADR-003 defines 127.0.0.1-only API, exact Host/Origin, one-use tray/CLI bootstrap, memory bearer + CSRF, actor-bound mutation and read-only host supervision. HTTP only admits commands, never dispatches or injects owner/proof. SSE is bounded invalidation with epoch:sequence and resnapshot on gaps. SDK never retries mutations. Credentials are not URL/storage/log fields. Workspace read paths are registered, bounded and reject traversal/ADS/symlinks; hostile concurrent same-user filesystem swaps are not an OS-sandbox guarantee.
-4. ADR-004 defines discovered candidates versus explicit device registration, plugin/instance identity, independent Controller IDs, volatile leases and timestamp/sequence checks. Device registry export/restore preserves bindings/context but starts offline. Verified identity is adapter-supplied evidence, never inferred from IP/name/path. Missing stable identity requires physical reconfirmation. No cross-transport merge or generic keyboard capture. Device buttons emit semantics; central journal admission is still required by future runtime wiring.
+Prior foundation: 93a56e9 separate repo/SDK/isolated plugins; 09ff529 identity/context;
+f17a769 durable journal; f8e1e07 loopback API/SDK; d8678d1 device registry; fe9eec0
+previous handoff. Reference/legacy-host remains a hash-preserved 346-file export.
 
-Important files: packages/core/src/{identity,context,commands,durable-log,journal-model,devices}.ts; packages/api/src/{index,workspaces}.ts; packages/api/openapi.v1.json; packages/client-sdk/src/index.ts; packages/device-virtual/src/index.ts; tests/{core-journal,core-recovery-boundaries,local-api,device-registry}.test.mjs; tests/fixtures/journal-crash.mjs; docs/ADR-002 through ADR-004; task evidence folders.
+This session:
+- f9bcc0f: HID backend and isolated worker, reviewed-profile-only enumeration and
+  safe identify gesture tests. Optional node-hid 3.4.0. Empty production profile
+  catalog means NO actual model is enabled. Native metadata inventory saw 26 Windows
+  collections; no handles opened. Task blocked on actual model/report and physical
+  Windows/macOS verification. Eleven tests do not replace those gates.
+- 01d0144: opt-in LAN candidate provider, selected-interface UDP mDNS query driver,
+  bounded PTR/SRV/TXT/A followups, manual endpoints, TTL/cancel/NIC-change handling.
+  Disabled default, all candidates unpaired/control=false. Nine tests including real
+  loopback UDP; user LAN never enabled. Task done for provider contract only.
+- 15d9f84: bounded harness candidate collection plus MK20 evidence. Core discovery
+  checks exact provider-supplied known/manual/PATH file paths and registered literal
+  loopback endpoint metadata; no executable, DNS, socket, recursive scan or guessed
+  service port. Canonical aliases deduplicate within provider; installs remain
+  separate. Version unknown, unprobed, control false. Eight tests include Windows/
+  macOS path fixtures and native Windows temporary-file inspection.
+- Source Snowball_Control commit d5eabaf: only new plugins/device-mk20 directory.
+  Legacy decoder/preview and pinned-peer explicit lab UDP; production control always
+  rejects and USB/LAN cannot merge. Four tests including real loopback. Current
+  firmware lacks authenticated pairing, so MW.04.02.01.02 A1/task BLOCKED. A2 passes
+  the fail-closed adapter boundary. PAIRING-CONTRACT.md is a requirement, not firmware.
+- e164bb5: probe classifier/ADR/evidence checkpoint. No production probe transport
+  has been implemented.
 
-## Exact next action
+## Architecture and constraints
 
-Read AGENTS.md, this file, PLAN.md, PLAN.json and DISCOVERY_JOURNEYS.md; verify git status/log/diff. Run the plan validator with --next. Resume MW.04.01.01.02 under MW > MW.04 > MW.04.01 > MW.04.01.01 (hardware discovery/control journey).
+Core imports Node builtins only, never hardware/provider/reference implementation.
+Plugins are isolated processes with reviewed artifact approval and bounded frames,
+but process separation is not an OS sandbox (ADR-001).
 
-First implementation step: inspect D02–D08, the DeviceRegistry contract and existing reference hardware facts; choose a bounded HID backend contract that checks VID/PID, usage/interface and report support before opening handles. Inspect currently available hardware read-only before assuming a model or two-OS test access. No broad keyboard capture. A2 requires duplicate models/no serial/USB-port changes to avoid wrong association. A1 requires real Windows/macOS evidence; fixtures alone cannot pass it. Keep actual unsupported/no-device/permission outcomes visible and do not conflate enumeration with verified control.
+ADR-002: journal fsyncs bounded SHA-256-chain WAL before adapter entry, pins owner
+and revision, deduplicates immutable command intent, centrally claims decisions.
+No automatic dispatch/replay. Startup cancels queued and marks uncertain delivery
+unknown. ACK requires authoritative owner acceptance, not socket write. Corrupt/full
+storage fails closed; explicit offline dead-PID lock recovery only. No compaction UI
+or sudden-power-loss/Windows ACL verification yet.
 
-Then continue priority/dependency ordering: opt-in LAN discovery (MW.04.02.01.01), relevant device pairing/lifecycle; bounded harness candidate discovery and probes (MW.03.01.01.01/.02) when eligible. If a real-device/OS gate is externally blocked, record exact evidence and continue other dependency-ready work instead of fabricating acceptance. Higher-level discovery, harness integration, workspace onboarding, Supervisor UX, tray, signing/install/update gates all remain unfinished.
+ADR-003: 127.0.0.1 API, exact Host/Origin, one-use trusted internal bootstrap,
+memory bearer/CSRF, actor-bound commands; HTTP only admits, never dispatches.
+SSE invalidations require resnapshot on gaps. No URL/storage/log credentials.
+Workspace reads registered/bounded; no same-user filesystem sandbox promise.
+Tray bootstrap integration, same-origin Supervisor and installed persistence remain.
+
+ADR-004: candidate != registered device, per-controller contexts and volatile leases,
+restored bindings start offline. Verified identity comes from adapter evidence, never
+IP/name/USB path. Physical reconfirmation for unstable identity; no generic keyboard
+capture. Driver input is semantic only, requires future journal/runtime wiring.
+
+HID: reviewedProfiles=[]; no model-specific approval exists. Native async operations
+are bounded in flight; worker termination contains a hung backend. Actual report
+contract and both-OS physical evidence are required before task completion.
+LAN: private/link-local IPv4 selected interface only, no subnet sweep, no automatic
+NIC fallback, no authenticated pairing inferred. IPv6/proxy advertisements excluded.
+Harness candidates: provider catalog construction/settings persistence belong to
+provider/runtime tasks. Finite exact metadata operations; a hung filesystem call
+retains one occupied slot, returns stale results, ignores late generation output.
+Metadata stamp is not executable approval. Invalid endpoint diagnostics redact URL.
+MK20: source adapter is a standalone lab library, not a ready production plugin.
+No firmware or existing daemon changed, no real device contacted this session.
 
 ## Tests and verification
 
-- npm test: 47/47 pass (build plus identity, WAL, real crash processes, real loopback HTTP/SSE, registry/two-device virtual plugin, isolated plugin tests).
-- node --test tests/local-api.test.mjs after the final OpenAPI device-field update: 10/10 pass.
-- npm run test:reference: 44/44 pass earlier in this session; reference files unchanged afterward.
-- Plan validator: valid 132 nodes / 40 of 40 discovery scenarios / 7 tasks done / 14 checks passed.
-- git diff --check: passed before implementation commits.
-- Not run this session: optional speech tests, macOS, actual HID/MK20/provider, installed UI, signed installers, power-loss durability or LAN pairing. Historical speech fixture evidence exists but is not new evidence.
+- Full `npm test`: 75/75 after discovery (build included).
+- After final endpoint redaction: build and discovery 8/8 pass.
+- Probe classifier: build and 2/2 pass. Final full `npm test`: 77/77 pass.
+- Source `npm test --prefix plugins/device-mk20`: 4/4 pass.
+- Plan validator valid: 132 nodes, 40/40 scenarios, 9 tasks/19 checks pass.
+- Historical reference suite 44/44 from prior session; reference unchanged, not rerun.
+- Not run: optional speech, actual macOS, physical HID/MK20, authenticated pairing,
+  real-provider control, installed tray/Supervisor, signing/installer/update gates.
+- No test listener/plugin process left running; existing hardware/daemon preserved.
 
-Tests leave no API listener or child plugin process running. The existing sibling hardware/daemon was not stopped or modified.
+## Remaining work and external inputs
 
-## Known limitations / missing integration pieces
+1. Finish MW.03.01.01.02 probe drivers/acceptance above.
+2. Follow --next; actual provider integration and owner proof before command control.
+3. HID blocked: user has been asked which model and physical/macOS test environment
+   is available. No answer received. Do not silently choose one of 26 collections.
+4. MK20 blocked: implement reviewed authenticated firmware protocol and physically
+   validate approval/cancel/expiry/identity/replay. No claim that legacy UDP is secure.
+5. Device lifecycle, workspace onboarding, Supervisor, tray/runtime wiring, signed
+   packaging/install/update and complete product integrity gates remain unfinished.
 
-- Durable WAL has bounded capacity and no compaction UI; full/corrupt storage fails closed and requires offline maintenance. Windows ACLs and sudden power loss are not verified.
-- Device configuration export/restore is a codec; the future installed local runtime must persist it atomically and wire adapter verification/lease revocation. It is not an installed storage service.
-- There is no actual HID backend or physical identification UX yet. Unverified devices cannot transparently reconnect. The virtual plugin's simulateInput operation is fixture-only.
-- API bootstrap is a trusted internal method. A tray grant/paste onboarding page and same-origin Supervisor hosting remain to be integrated. API snapshot includes device/source/candidate summaries but HTTP cannot register hardware or mint grants.
-- API submission does not call a harness. Real adapters must provide owner/correlation/decision proofs and explicit dispatch. The absence of any hardware does not block this core/API path.
-- Browser refresh/session expiry requires fresh bootstrap. Future UX may improve this without URL/localStorage secrets.
-- Native multi-question/freeform decision schemas, real-provider version compatibility, install/update rollback and support matrix are future work, not covered by mock acceptance.
+## Failed approaches / known limitations
 
-## Failed approaches worth remembering
-
-- Node fetch normalizes some hostile Host overrides. Host tests use native HTTP to actually send the invalid header.
-- A preexisting 150 ms plugin startup/timeout fixture flaked with parallel HTTP/filesystem tests. It now uses 1000 ms and delivers the first late reply while the second request is still pending; production timeouts were not relaxed.
-- Avoid assembling an entire queue of 64 KiB command payloads into one 1 MiB recovery transaction. Recovery and owner change are bounded per-command transactions; large-queue tests cover it.
-- CodexBar could not authenticate. Do not infer usage from token count or repeatedly repair the quota tool.
+CodexBar authentication fails; desktop actual usage is available. Do not infer quota
+from tokens or spend project time repairing it. Legacy firmware substring parsing
+requires bounded/sanitized lab preview text; full render interoperability unverified.
+PowerShell does not support Bash brace-expansion file paths; use explicit paths.
+Previous Host header tests use native HTTP because fetch normalizes hostile Host.
+Existing plugin timeout fixture uses 1000 ms to avoid 150 ms concurrent-suite flakes.
+Do not collapse queued large payload recovery into one giant transaction.
 
 ## Git state and preservation
 
-Middleware implementation commits are clean and consistent. Only this handoff/RESUME documentation is being updated after d8678d1; commit it as a documentation checkpoint. No stash was created. Verify final git status rather than relying on this paragraph.
+Middleware on codex/local-control-core; implementation is selectively committed,
+then this handoff/RESUME are checkpointed. Verify git status/log/diff. No stash made.
+Sibling E:/developments/projects/Snowball_Control on pilot/codex-app-recon at d5eabaf
+has extensive PREEXISTING dirty/untracked host/hardware/docs. Only new MK20 plugin
+files were committed. Source HANDOFF's top pointer is refreshed uncommitted, preserving
+its older content and user changes. Never reset/stash/bulk commit that repository.
 
-Sibling E:/developments/projects/Snowball_Control remains on pilot/codex-app-recon at c4513bb with extensive preexisting dirty/untracked host/hardware/docs. Do not reset, bulk commit or discard that work. Only its top handoff pointer is refreshed to this checkpoint; historical paragraphs there are not current instructions. Reference export remains unchanged.
-
-## Useful commands (run in Snowball_Middleware)
+## Commands
 
     npm ci --ignore-scripts
     npm test
-    npm run test:reference
+    node --test tests/harness-discovery.test.mjs tests/harness-probes.test.mjs
     node docs/middleware/validate-plan.mjs --next
-    node docs/middleware/validate-plan.mjs --affected R-LOCAL
     node docs/middleware/validate-plan.mjs --write-tree
+    node docs/middleware/validate-plan.mjs --affected R-LOCAL
     git status --short
     git log -10 --oneline
     git diff
 
-No permission/planner-model confirmation is pending. The previous model's journal contract questions were resolved in ADR-002 and implemented; do not pause again for an Astra-only review.
+Source-only: `npm test --prefix plugins/device-mk20` in Snowball_Control.
+Model identity has no product behavior role. Astra, Antigravity or another LLM should
+resume the same task IDs, evidence and dependency tree without redesigning by default.
