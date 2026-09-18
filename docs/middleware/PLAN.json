@@ -5,7 +5,7 @@
   "scope": "Local control first. Plugin, identity, durable commands, authenticated API and optional device registry foundation implemented. Physical discovery, harnesses, UI and packaging remain.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
   "targetRepository": "E:/developments/projects/Snowball_Middleware",
-  "resumeTaskId": "MW.04.02.01.01",
+  "resumeTaskId": "MW.04.02.01.02",
   "requirements": [
     {
       "id": "R-LOCAL",
@@ -1499,7 +1499,7 @@
       "kind": "task",
       "title": "Opt-in LAN 탐색과 수동 주소 fallback",
       "requirements": [],
-      "status": "todo",
+      "status": "done",
       "dependsOn": [
         "MW.04.01.01.01"
       ],
@@ -1521,13 +1521,22 @@
         "D10"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "사용자가 활성화한 local interface에만 지원 discovery를 연다.",
+        "owner": "Codex / 2026-09-18",
+        "baseCommit": "f9bcc0f",
+        "changedFiles": [
+          "packages/device-lan",
+          "scripts/build.mjs",
+          "package-lock.json",
+          "tests/lan-discovery.test.mjs"
+        ],
+        "completedSteps": [
+          "사용자가 활성화한 local interface에만 지원 discovery를 연다.",
+          "multicast 차단/VPN/다중 NIC에 manual host/port 진단 경로를 둔다.",
+          "후보 정보만 수집하고 unpaired 장치에 제어 권한을 주지 않는다."
+        ],
+        "nextAction": "Inspect MK20 firmware/protocol and extract lab adapter; do not claim authenticated pairing without firmware evidence.",
         "blockers": [],
-        "updatedAt": null
+        "updatedAt": "2026-09-18T13:28:20.514Z"
       },
       "priority": {
         "designDemand": 4,
@@ -1541,8 +1550,16 @@
       "kind": "acceptance",
       "title": "network-off에서 listener/discovery가 없고 enable/disable 후 즉시 반영된다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-18",
+          "environment": "Windows x64 / Node 20.19.6; fixtures + real loopback UDP",
+          "procedure": "npm test",
+          "result": "67/67 pass; explicit network-off/on/cancel, bounded mDNS followups, manual endpoint scope and late result rejection verified.",
+          "reference": "docs/middleware/evidence/MW.04.02.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.04.02.01.01.A2",
@@ -1551,8 +1568,16 @@
       "kind": "acceptance",
       "title": "차단된 mDNS/주소 변화/수동 잘못된 endpoint가 명확한 결과를 내며 subnet sweep을 하지 않는다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-18",
+          "environment": "Windows x64 / Node 20.19.6; fixtures + real loopback UDP",
+          "procedure": "npm test",
+          "result": "67/67 pass; explicit network-off/on/cancel, bounded mDNS followups, manual endpoint scope and late result rejection verified.",
+          "reference": "docs/middleware/evidence/MW.04.02.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.04.02.01.02",

@@ -6,7 +6,7 @@ Depth: L0 product → L1 outcome → L2 journey → L3 work package → L4 task 
 
 All implementation checks are pending unless their evidence says otherwise.
 
-- **MW** 하드웨어 독립 로컬 harness 제어 — 7/28 tasks done
+- **MW** 하드웨어 독립 로컬 harness 제어 — 8/28 tasks done
   - **MW.01** 분리 저장소와 계약 — 3/3 tasks done
     - **MW.01.01** 기존 작업을 보존하며 추출 — 2/2 tasks done
       - **MW.01.01.01** 소스 export와 재현 기반 — 2/2 tasks done
@@ -55,7 +55,7 @@ All implementation checks are pending unless their evidence says otherwise.
         - **MW.03.02.01.03** Harness 재연결·변경·disable/remove — todo
           - **MW.03.02.01.03.A1** 재설치/계정 교체와 owner PID 변화가 기존 세션/초안을 잘못 합치지 않는다. — pending
           - **MW.03.02.01.03.A2** remove/disable/reconnect가 외부 앱 종료나 unknown 명령 replay를 일으키지 않는다. — pending
-  - **MW.04** Device discovery — 1/5 tasks done
+  - **MW.04** Device discovery — 2/5 tasks done
     - **MW.04.01** 장치 없이 시작하고 USB 연결 — 1/2 tasks done
       - **MW.04.01.01** HID와 identity — 1/2 tasks done
         - **MW.04.01.01.01** Device registry와 hardware-free 기본 경로 — done
@@ -64,11 +64,11 @@ All implementation checks are pending unless their evidence says otherwise.
         - **MW.04.01.01.02** HID enumeration/권한/물리 식별과 안전 테스트 — blocked
           - **MW.04.01.01.02.A1** Windows/macOS 해당 실제 모델에서 권한 거부/재검사/hotplug/안전 입력 test를 증거로 남긴다. — blocked
           - **MW.04.01.01.02.A2** 동일 모델 두 장치·serial 없음·USB port 변경에서 오결합이 없고 일반 키보드 타이핑을 탈취하지 않는다. — blocked
-    - **MW.04.02** LAN 장치 연결 — 0/2 tasks done
-      - **MW.04.02.01** pairing와 transport — 0/2 tasks done
-        - **MW.04.02.01.01** Opt-in LAN 탐색과 수동 주소 fallback — todo
-          - **MW.04.02.01.01.A1** network-off에서 listener/discovery가 없고 enable/disable 후 즉시 반영된다. — pending
-          - **MW.04.02.01.01.A2** 차단된 mDNS/주소 변화/수동 잘못된 endpoint가 명확한 결과를 내며 subnet sweep을 하지 않는다. — pending
+    - **MW.04.02** LAN 장치 연결 — 1/2 tasks done
+      - **MW.04.02.01** pairing와 transport — 1/2 tasks done
+        - **MW.04.02.01.01** Opt-in LAN 탐색과 수동 주소 fallback — done
+          - **MW.04.02.01.01.A1** network-off에서 listener/discovery가 없고 enable/disable 후 즉시 반영된다. — pass
+          - **MW.04.02.01.01.A2** 차단된 mDNS/주소 변화/수동 잘못된 endpoint가 명확한 결과를 내며 subnet sweep을 하지 않는다. — pass
         - **MW.04.02.01.02** MK20 plugin 추출과 인증 pairing 계약 — todo
           - **MW.04.02.01.02.A1** 실제 MK20에서 물리 pairing 성공/취소/만료/잘못된 identity/replay를 검증한다; firmware 미지원이면 blocked다. — pending
           - **MW.04.02.01.02.A2** 인증 없는 legacy 장치가 production ready가 되지 않고 USB+LAN identity는 검증된 경우에만 합친다. — pending
