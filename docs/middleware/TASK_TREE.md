@@ -61,9 +61,9 @@ All implementation checks are pending unless their evidence says otherwise.
         - **MW.04.01.01.01** Device registry와 hardware-free 기본 경로 — done
           - **MW.04.01.01.01.A1** 장치 0개에서 API/Web 작업 경로가 사용 가능하고 hardware probing 실패가 core를 막지 않는다. — pass
           - **MW.04.01.01.01.A2** virtual 두 장치 입력이 서로의 선택 상태/출력으로 섞이지 않는다. — pass
-        - **MW.04.01.01.02** HID enumeration/권한/물리 식별과 안전 테스트 — todo
-          - **MW.04.01.01.02.A1** Windows/macOS 해당 실제 모델에서 권한 거부/재검사/hotplug/안전 입력 test를 증거로 남긴다. — pending
-          - **MW.04.01.01.02.A2** 동일 모델 두 장치·serial 없음·USB port 변경에서 오결합이 없고 일반 키보드 타이핑을 탈취하지 않는다. — pending
+        - **MW.04.01.01.02** HID enumeration/권한/물리 식별과 안전 테스트 — blocked
+          - **MW.04.01.01.02.A1** Windows/macOS 해당 실제 모델에서 권한 거부/재검사/hotplug/안전 입력 test를 증거로 남긴다. — blocked
+          - **MW.04.01.01.02.A2** 동일 모델 두 장치·serial 없음·USB port 변경에서 오결합이 없고 일반 키보드 타이핑을 탈취하지 않는다. — blocked
     - **MW.04.02** LAN 장치 연결 — 0/2 tasks done
       - **MW.04.02.01** pairing와 transport — 0/2 tasks done
         - **MW.04.02.01.01** Opt-in LAN 탐색과 수동 주소 fallback — todo
