@@ -41,7 +41,7 @@ All implementation checks are pending unless their evidence says otherwise.
         - **MW.03.01.01.01** 제한된 harness 후보 수집과 deduplication — done
           - **MW.03.01.01.01.A1** Windows/macOS fixture에서 empty·다중 설치·GUI PATH 누락·수동 경로가 정확히 표시된다. — pass
           - **MW.03.01.01.01.A2** cancel/timeout/연속 scan의 늦은 응답이 새 결과를 덮어쓰지 않고 전체 디스크/포트를 스캔하지 않는다. — pass
-        - **MW.03.01.01.02** 읽기 probe와 진실한 capability 상태 — todo
+        - **MW.03.01.01.02** 읽기 probe와 진실한 capability 상태 — in_progress
           - **MW.03.01.01.02.A1** 401은 needs_auth, 미실행은 not_running, 기록만 있으면 readonly로 분류된다. — pending
           - **MW.03.01.01.02.A2** 잘못된 서비스/redirect/version/permission failure가 차단되며 discovery가 server 시작 또는 command send를 하지 않는다. — pending
     - **MW.03.02** 연결하고 계속 사용 — 0/3 tasks done

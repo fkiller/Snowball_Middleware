@@ -56,3 +56,4 @@ export { JournalFault, recoverAbandonedJournalLock } from './durable-log.js';
 export type { CommandInput, CommandRecord, CommandStatus, DecisionInput, DecisionRecord, DecisionStatus, SessionRecord, Json } from './journal-model.js';
 export { DeviceRegistry, type DeviceSource, type DeviceTransport, type DeviceObservation, type DeviceCandidate, type DeviceBinding, type DeviceInput } from './devices.js';
 export { HarnessDiscovery, localDiscoveryIO, type DiscoveryProvider, type DiscoveryIO, type FileFact, type HarnessCandidate, type DiscoverySnapshot } from './discovery.js';
+export { assessProbe, type ProbeObservation, type ProbeAssessment, type ProbeReason } from './probes.js';

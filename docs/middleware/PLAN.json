@@ -1080,7 +1080,7 @@
       "kind": "task",
       "title": "읽기 probe와 진실한 capability 상태",
       "requirements": [],
-      "status": "todo",
+      "status": "in_progress",
       "dependsOn": [
         "MW.03.01.01.01"
       ],
@@ -1107,13 +1107,22 @@
         "H10"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "호환성/auth/permission/presence/control 상태를 분리한다.",
+        "owner": "Codex",
+        "baseCommit": "15d9f84",
+        "changedFiles": [
+          "packages/core/src/probes.ts",
+          "packages/core/src/index.ts",
+          "tests/harness-probes.test.mjs",
+          "docs/ADR-005-harness-probe-boundary.md",
+          "docs/middleware/evidence/MW.03.01.01.02/verification.md"
+        ],
+        "completedSteps": [
+          "Step 1: validated orthogonal presence/compatibility/auth/permission/connectivity observations and reason projection; no probe fact grants enrollment or control.",
+          "ADR-005 records exact read-only HTTP/binary execution boundaries and remaining transport tests."
+        ],
+        "nextAction": "Implement bounded literal-loopback GET health/schema driver per ADR-005, test real fixture servers, then reviewed binary probes through isolated plugin host. Classifier alone does not pass acceptance.",
         "blockers": [],
-        "updatedAt": null
+        "updatedAt": "2026-09-18T13:41:28.400Z"
       },
       "priority": {
         "designDemand": 4,
@@ -1470,7 +1479,7 @@
           "Implemented profile-gated Windows/macOS backend contract, isolated worker and bounded physical safe-test engine; 11 synthetic/worker tests pass.",
           "Real Windows native metadata enumeration verified (26 collections, zero handles opened)."
         ],
-        "nextAction": "Obtain selected model and reviewed HID report contract, then run actual OS/physical tests. Continue MW.04.02.01.01 meanwhile.",
+        "nextAction": "Obtain selected model and reviewed HID report contract, then run actual OS/physical tests. Continue MW.04.02.01.01 meanwhile. Current independent resume: MW.03.01.01.02.",
         "blockers": [
           "Selected actual HID model/report contract and physical interaction required; production catalog intentionally empty.",
           "Actual macOS and two-unit/no-serial/port-change acceptance not available in this session."
@@ -1649,7 +1658,7 @@
           "Extracted bounded legacy key/knob decoder, preview renderer and explicitly opted-in lab UDP transport in hardware repository commit d5eabaf.",
           "Documented future authenticated pairing requirements; current firmware always fails production control admission."
         ],
-        "nextAction": "Implement and physically validate authenticated firmware pairing before enabling a production MK20 plugin; meanwhile resume MW.03.01.01.01.",
+        "nextAction": "Implement and physically validate authenticated firmware pairing before enabling a production MK20 plugin; meanwhile resume MW.03.01.01.01. Current independent resume: MW.03.01.01.02.",
         "blockers": [
           "Current MK20 firmware has no authenticated pairing protocol. Real-device success/cancel/expiry/identity/replay verification is unavailable."
         ],
