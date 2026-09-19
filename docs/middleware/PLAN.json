@@ -1867,9 +1867,9 @@
         "baseCommit": null,
         "changedFiles": [],
         "completedSteps": [],
-        "nextAction": "harness가 노출한 projects와 사용자 등록 root를 구분한다.",
+        "nextAction": "Read core identity.ts and api workspaces.ts; distinguish harness project candidates from explicitly registered roots, then implement canonical workspace/worktree lifecycle and boundary tests for J02/J06.",
         "blockers": [],
-        "updatedAt": null
+        "updatedAt": "2026-09-19T00:25:33.995Z"
       },
       "priority": {
         "designDemand": 4,

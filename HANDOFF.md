@@ -1,10 +1,11 @@
-# Local middleware — resumable checkpoint, 2026-09-18
+# Local middleware — resumable checkpoint, 2026-09-19 UTC
 
-Handoff state: READY. This is a partial MVP checkpoint, not a completed product.
-Read fresh quota before implementation. CodexBar still reports Authentication
-required; actual desktop usage reached 14% five-hour remaining (86% used), weekly
-28% remaining: AGENTS PREPARE HANDOFF threshold. No large new implementation was
-started afterward. No reset credit consumed. Recheck actual quota on resume.
+Handoff state: READY — MANDATORY QUOTA HANDOFF. Final actual desktop usage is
+5% five-hour remaining (95% used), weekly 12% remaining. Implementation ended during
+the 13% preparation phase; only handoff preservation followed. No new implementation
+may start in this usage window. CodexBar authentication fails; desktop actual usage
+supplied these figures. No reset credit used. Check fresh usage or continue with
+another agent. This is not a finished MVP or production Codex support claim.
 
 ## Objective and authority
 
@@ -15,28 +16,38 @@ harnesses, devices and projects. Current packages are foundations, not an instal
 tray/service/Supervisor or completed local alpha.
 
 Authoritative repo E:/developments/projects/Snowball_Middleware, branch
-codex/local-control-core. PLAN.json revision 8 is the only task ledger: 132 L0–L5
-nodes, 28 tasks, 56 checks, 40 discovery scenarios. 9/28 tasks done, 19/56 checks pass.
+codex/local-control-core. PLAN.json revision 9 is the only task ledger: 132 L0–L5
+nodes, 28 tasks, 56 checks, 40 discovery scenarios. 10/28 tasks done, 21/56 checks pass.
 Task tree is generated. Prioritize dependency-ready designDemand, then difficulty,
 then stable ID. Source Snowball_Control has a redirect, not a competing ledger.
 
 ## Exact next action and current task
 
-Run `node docs/middleware/validate-plan.mjs --next`; resume MW.03.01.01.02 under
-MW > MW.03 > MW.03.01 > MW.03.01.01. Read ADR-005 and packages/core/src/probes.ts.
-Implement bounded read-only literal-loopback GET health/schema probing, with real
-fixture servers for 401, wrong service, redirect, malformed/oversize response,
-unsupported version, refusal, cancellation and timeout. Then implement explicitly
-selected/reviewed binary probes through isolated plugin-host approval. Never execute
-arbitrary discovered files or turn on a shell for .cmd shims. Do not start servers,
-authenticate automatically or send commands during discovery. A1/A2 are pending;
-classifier tests alone do not satisfy either. No planner/model approval is required.
+Run the plan validator with --next. Resume **MW.05.01.01.01** under
+MW > MW.05 > MW.05.01 > MW.05.01.01: local workspace registry/project associations.
+Read packages/core/src/identity.ts, packages/api/src/workspaces.ts and task inputs
+under reference/legacy-host before adding a new registry. Distinguish provider-reported
+project candidates from user-registered read roots. Implement explicit registration,
+canonical identity, relocation/permission/empty states and worktree boundaries without
+automatic project merging or lowercasing case-sensitive roots. Acceptance requires
+no escape via symlink/sibling/worktree and truthful moved/deleted/denied states.
+This task has not been implemented; checkpoint.nextAction names the first step.
 
-Current task step 1 is implemented: assessProbe validates separate presence,
-compatibility, auth, permission, connectivity and advertised-control facts. Reason
-projection distinguishes needs_auth, not_running, readonly_history, wrong_service,
-unsupported, etc. Even compatible stays unregistered/control-unverified. Drivers,
-provider version/schema facts and transport evidence are not implemented yet.
+MW.03.01.01.02 generic probes are DONE (91d84bd). MW.03.02.01.01 Codex reference
+plugin is implemented experimentally but BLOCKED at real acceptance. Before actual
+logged-in native create/send/events/decision/cancel verification, resolve the pending
+user choice of credential environment: default current-PC Codex CLI login or separate
+test account home. The asynchronous question has no answer yet. Do not copy tokens,
+automatically sign in, or use existing Desktop threads as test targets. If an answer
+arrives, record/use that selection; do not repeat a redundant permission question.
+
+Codex actual verification used ONLY a fresh empty temporary CODEX_HOME, not the
+user's logged-in home. It proved selected binary version, native initialization,
+needs_auth, empty thread list, isolated worker startup without autospawn, native
+child exit and temporary-folder removal. It sent no model turn. Native exact-answer
+decision proof remains unresolved; serverRequest/resolved can mean cleared, so
+submitted decisions intentionally remain unknown. macOS/Desktop-race evidence is
+also missing. Continue independent workspace work while these gates are unresolved.
 
 ## Completed work and commits
 
@@ -44,7 +55,7 @@ Prior foundation: 93a56e9 separate repo/SDK/isolated plugins; 09ff529 identity/c
 f17a769 durable journal; f8e1e07 loopback API/SDK; d8678d1 device registry; fe9eec0
 previous handoff. Reference/legacy-host remains a hash-preserved 346-file export.
 
-This session:
+Earlier discovery session:
 - f9bcc0f: HID backend and isolated worker, reviewed-profile-only enumeration and
   safe identify gesture tests. Optional node-hid 3.4.0. Empty production profile
   catalog means NO actual model is enabled. Native metadata inventory saw 26 Windows
@@ -65,8 +76,21 @@ This session:
   rejects and USB/LAN cannot merge. Four tests including real loopback. Current
   firmware lacks authenticated pairing, so MW.04.02.01.02 A1/task BLOCKED. A2 passes
   the fail-closed adapter boundary. PAIRING-CONTRACT.md is a requirement, not firmware.
-- e164bb5: probe classifier/ADR/evidence checkpoint. No production probe transport
-  has been implemented.
+- e164bb5: earlier probe classifier checkpoint; transport was implemented later in 91d84bd.
+
+Latest implementation session:
+- **91d84bd**: literal-loopback GET health/schema probes and approved fixed-argv
+  binary checks, separate generation/timeout/auth/version/permission states. 92/92
+  tests at that milestone. Probe generic task done; no provider support inferred.
+- **fc0b203**: packages/harness-codex isolated worker/manifest and selected 0.153.4
+  native stdio adapter, owner/session/turn/decision pinning, no historical takeover,
+  journal integration, authentic Windows empty-home connection/cleanup evidence.
+  See ADR-006 and package support matrix. Task remains blocked at native control gates.
+- PluginHost normal stop now sends stdin EOF before force kill to allow owned-child
+  cleanup. Native Codex waits for closed stdio on normal exit. Binary probe size bound
+  is 512 MiB (actual selected executable is 295,408,944 bytes), still streamed/bounded.
+- Full test file concurrency capped at four after parallel startup fixture starvation.
+  Production timeout limits were not relaxed. Final full build/test: **101/101 pass**.
 
 ## Architecture and constraints
 
@@ -106,28 +130,47 @@ No firmware or existing daemon changed, no real device contacted this session.
 
 ## Tests and verification
 
-- Full `npm test`: 75/75 after discovery (build included).
-- After final endpoint redaction: build and discovery 8/8 pass.
-- Probe classifier: build and 2/2 pass. Final full `npm test`: 77/77 pass.
-- Source `npm test --prefix plugins/device-mk20`: 4/4 pass.
-- Plan validator valid: 132 nodes, 40/40 scenarios, 9 tasks/19 checks pass.
-- Historical reference suite 44/44 from prior session; reference unchanged, not rerun.
-- Not run: optional speech, actual macOS, physical HID/MK20, authenticated pairing,
-  real-provider control, installed tray/Supervisor, signing/installer/update gates.
-- No test listener/plugin process left running; existing hardware/daemon preserved.
+- Final npm test (build + four-file test concurrency): **101/101 pass**.
+- Includes eight HTTP probe tests, seven binary probe tests, six Codex adapter tests
+  (one real durable journal integration), three real Node stdio transport tests.
+- Native script: node scripts/verify-codex-local.mjs <selected-executable> <sha256>.
+  Codex 0.153.4 Windows x64, SHA-256
+  444a3f0008050605cae73cd9b7a2dcac61294062dfaab56dd20430fd6498518b.
+  Final exit 0, connected/needs_auth/empty list, nativeChildExited=true and temp home
+  removed. No user credentials or actual inference used. Official docs and locally
+  generated 0.153.4 schema consulted; schema lives ignored under .state.
+- Plan: valid 132 nodes / 40 scenarios / 10 tasks done / 21 checks pass.
+- Native fixture and final git diff whitespace checks passed.
+- Source MK20 4/4 and reference 44/44 are historical results, not rerun this session.
+- Not run: real logged-in Codex create/send/events/decision/cancel, actual Desktop race,
+  macOS, physical HID/MK20, signed installers/tray/UI/update, optional speech.
+- No owned plugin/native listener intentionally left running. Only preexisting user
+  Codex native process remained in the final process-name inventory; it was untouched.
 
 ## Remaining work and external inputs
 
-1. Finish MW.03.01.01.02 probe drivers/acceptance above.
-2. Follow --next; actual provider integration and owner proof before command control.
-3. HID blocked: user has been asked which model and physical/macOS test environment
-   is available. No answer received. Do not silently choose one of 26 collections.
-4. MK20 blocked: implement reviewed authenticated firmware protocol and physically
-   validate approval/cancel/expiry/identity/replay. No claim that legacy UDP is secure.
-5. Device lifecycle, workspace onboarding, Supervisor, tray/runtime wiring, signed
-   packaging/install/update and complete product integrity gates remain unfinished.
+1. Implement MW.05.01.01.01 workspace registry as above; do not restart generic probes.
+2. Codex logged-in environment choice pending; actual control and decision evidence
+   remain blocked. Unsupported Desktop/private routes stay unsupported on both OSes.
+3. HID selected model/report and physical Windows/macOS verification pending; reviewed
+   profile catalog stays empty. Never open typing collections to guess a model.
+4. MK20 authenticated firmware/physical pairing remains blocked; legacy lab adapter
+   cannot gain control or merge transports from an IP/name/serial claim.
+5. Follow --next for workspace onboarding, audio separation, runtime lifecycle,
+   Supervisor, tray/Settings, packaging/install/update and remaining integrity gates.
 
 ## Failed approaches / known limitations
+
+Current-session resolved failures (full details in Codex evidence):
+- Initial direct native kill produced EBUSY removing the temporary home after PID
+  exit. Native stdin EOF/closed-stdio wait and bounded rm retries passed on rerun.
+- Journal test cleanup ran before lock close (ENOTEMPTY); cleanup ordering fixed.
+- A 96/98 full run had two existing plugin startup timeouts under parallel native
+  load; four-file test concurrency gave final 101/101, without production changes.
+- Initial 256 MiB native probe bound was too small for installed Codex; finite 512 MiB
+  streaming bound passed actual native version verification.
+- Exact answer acceptance cannot be inferred from resolution/clearing notifications.
+  This remains a limitation, not a resolved failure or successful delivery.
 
 CodexBar authentication fails; desktop actual usage is available. Do not infer quota
 from tokens or spend project time repairing it. Legacy firmware substring parsing
@@ -150,7 +193,7 @@ its older content and user changes. Never reset/stash/bulk commit that repositor
 
     npm ci --ignore-scripts
     npm test
-    node --test tests/harness-discovery.test.mjs tests/harness-probes.test.mjs
+    node --test tests/http-probes.test.mjs tests/binary-probes.test.mjs tests/codex-adapter.test.mjs tests/codex-rpc.test.mjs
     node docs/middleware/validate-plan.mjs --next
     node docs/middleware/validate-plan.mjs --write-tree
     node docs/middleware/validate-plan.mjs --affected R-LOCAL
