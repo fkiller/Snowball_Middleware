@@ -33,6 +33,16 @@ async function login(api) { const grant = api.issueBootstrap(); const res = awai
 const input = (journal, commandId, extra = {}) => ({ commandId, sessionKey, ownerId, expectedRevision: journal.session(sessionKey).revision, operation: 'sessions.send', payload: { text: 'private-payload' }, ...extra });
 const matches = (status, code) => error => error.status === status && (!code || error.code === code);
 
+test('SDK default fetch retains the browser global receiver', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = function () {
+    assert.equal(this, globalThis);
+    return Promise.resolve(new Response(JSON.stringify({ cursor: 'test' })));
+  };
+  try { assert.equal((await new LocalClient('http://127.0.0.1:12345').snapshot()).cursor, 'test'); }
+  finally { globalThis.fetch = original; }
+});
+
 test('loopback listener denies foreign Host/Origin, missing authentication and query credentials', async t => {
   const { api } = await setup(t); assert.equal(api.server.address().address, '127.0.0.1');
   assert.equal((await request(api, '/v1/snapshot')).status, 401);
@@ -171,7 +181,8 @@ test('malformed, compressed and oversized bodies cannot admit work', async t => 
 test('published OpenAPI routes and SDK operations describe the implemented v1 surface', () => {
   const spec = JSON.parse(fs.readFileSync(new URL('../packages/api/openapi.v1.json', import.meta.url)));
   assert.equal(spec.openapi, '3.1.0');
-  assert.equal(Object.keys(spec.paths).length, 9);
+  assert.equal(Object.keys(spec.paths).length, 11);
+  assert.equal(spec.paths['/v1/harness/scan'].post.operationId, 'scanHarness');
   assert.equal(spec.paths['/v1/workspaces/{workspaceId}/recheck'].post.operationId, 'recheckWorkspace');
   assert.deepEqual(spec.paths['/v1/bootstrap'].post.security, []);
   assert.ok(spec.paths['/v1/commands'].post.responses['202']);
@@ -238,4 +249,55 @@ test('workspace recheck has a deadline, retains hung-work slot and rechecks sess
   while (!release) await new Promise(resolve => setImmediate(resolve));
   api.revokeController(auth.controllerId); release();
   assert.equal((await next).status, 401);
+});
+
+test('onboarding shows reviewed harness candidates; snapshot never scans and claims no control', async t => {
+  const empty = { generation: 0, status: 'complete', stale: false, candidates: [], issues: [] };
+  const candidate = { id: 'c1', providerId: 'test.codex', kind: 'file', locator: 'C:\\tools\\codex.exe', sources: ['known'], aliases: [], stamp: null, version: null, connection: 'unprobed', controllable: false };
+  let describes = 0; let rescans = 0; let current = empty;
+  const surveyor = { describe: () => { describes++; return current; }, rescan: async () => { rescans++; current = { ...empty, generation: 1, candidates: [candidate] }; return current; } };
+  const { api } = await setup(t, { harness: surveyor });
+  const client = new LocalClient(api.origin); await client.bootstrap(api.issueBootstrap().code);
+  assert.deepEqual((await client.snapshot()).harness.candidates, []);
+  assert.equal(describes, 1); assert.equal(rescans, 0);
+  assert.equal((await client.scanHarness()).candidates.length, 1);
+  assert.equal(rescans, 1);
+  const after = await client.snapshot();
+  assert.equal(after.harness.candidates.length, 1);
+  assert.equal(after.harness.candidates[0].controllable, false);
+  assert.equal(after.harness.candidates[0].version, null);
+  assert.equal(after.harness.candidates[0].connection, 'unprobed');
+  const auth = await login(api); const route = '/v1/harness/scan';
+  assert.equal((await request(api, route, { method: 'POST', body: {} })).status, 401);
+  assert.equal((await request(api, route, { method: 'POST', body: {}, auth, headers: { 'X-Snowball-CSRF': 'wrong' } })).status, 403);
+  assert.equal((await request(api, route, { method: 'POST', body: { provider: 'x' }, auth })).status, 400);
+});
+
+test('absent harness surveyor reports null; busy, failed and revoked scans stay safe', async t => {
+  const { api } = await setup(t);
+  const client = new LocalClient(api.origin); await client.bootstrap(api.issueBootstrap().code);
+  assert.equal((await client.snapshot()).harness, null);
+  await assert.rejects(client.scanHarness(), matches(404, 'harness_unavailable'));
+  const empty = { generation: 0, status: 'complete', stale: false, candidates: [], issues: [] };
+  let release; let calls = 0;
+  const hung = { describe: () => empty, rescan: () => { calls++; return new Promise(resolve => { release = () => resolve(empty); }); } };
+  const second = await setup(t, { harness: hung });
+  const auth = await login(second.api); const route = '/v1/harness/scan';
+  const pending = request(second.api, route, { method: 'POST', body: {}, auth });
+  while (!release) await new Promise(resolve => setImmediate(resolve));
+  assert.equal((await request(second.api, route, { method: 'POST', body: {}, auth })).status, 429);
+  release(); assert.equal((await pending).status, 200); assert.equal(calls, 1);
+  const failing = await setup(t, { harness: { describe: () => empty, rescan: async () => { throw new Error('surveyor failed'); } } });
+  const failingAuth = await login(failing.api);
+  assert.equal((await request(failing.api, route, { method: 'POST', body: {}, auth: failingAuth })).status, 503);
+});
+
+test('served supervisor assets reference no remote origin; Internet-off keeps local onboarding usable', async () => {
+  const supervisor = await loadSupervisorAssets(process.cwd());
+  const client = fs.readFileSync(new URL('../packages/client-sdk/dist/index.js', import.meta.url), 'utf8');
+  for (const [name, text] of [['index.html', supervisor.html], ['app.js', supervisor.script], ['style.css', supervisor.style], ['client.js', client]]) {
+    assert.ok(!text.includes('https://'), name);
+    assert.ok(!/http:\/\/(?!127\.0\.0\.1)/.test(text), name);
+    assert.ok(!text.includes('wss://'), name);
+  }
 });

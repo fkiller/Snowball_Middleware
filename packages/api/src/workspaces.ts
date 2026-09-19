@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { constants } from 'node:fs';
-import { WorkspaceRegistry, type RegisteredWorkspace, type WorkspaceStatus } from '@snowball/core';
+import { WorkspaceRegistry, type WorkspaceAccess, type RegisteredWorkspace, type WorkspaceStatus } from '@snowball/core';
 
 export interface WorkspaceSummary { workspaceId: string; projectId: string; displayName: string; status: WorkspaceStatus }
 const summarize = (entry: RegisteredWorkspace): WorkspaceSummary => ({ workspaceId: entry.workspaceId,
@@ -9,8 +9,8 @@ const summarize = (entry: RegisteredWorkspace): WorkspaceSummary => ({ workspace
 
 /** Explicitly registered local roots only. No client-supplied root registration. */
 export class WorkspaceFiles {
-  private constructor(private readonly registry: WorkspaceRegistry) {}
-  static fromRegistry(registry: WorkspaceRegistry): WorkspaceFiles { return new WorkspaceFiles(registry); }
+  private constructor(private readonly registry: WorkspaceAccess) {}
+  static fromRegistry(registry: WorkspaceAccess): WorkspaceFiles { return new WorkspaceFiles(registry); }
   static async create(entries: readonly { workspaceId: string; root: string }[]): Promise<WorkspaceFiles> {
     const registry = new WorkspaceRegistry();
     for (const entry of entries) {

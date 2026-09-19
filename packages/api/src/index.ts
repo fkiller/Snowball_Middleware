@@ -1,6 +1,6 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomBytes, createHash } from 'node:crypto';
-import { CommandJournal, createControllerId, JournalFault, type CommandInput, type DeviceRegistry } from '@snowball/core';
+import { CommandJournal, createControllerId, JournalFault, type CommandInput, type DeviceRegistry, type DiscoverySnapshot, type WorkspaceStore } from '@snowball/core';
 import { WorkspaceFiles } from './workspaces.js';
 import type { SupervisorAssets } from './supervisor.js';
 export { loadSupervisorAssets, type SupervisorAssets } from './supervisor.js';
@@ -15,9 +15,23 @@ interface Session { controllerId: string; csrfHash: string; expiresAt: number; r
 interface Stream { response: ServerResponse; session: Session }
 interface Event { cursor: string; data: string }
 export interface LocalApiOptions {
-  journal: CommandJournal; workspaces?: WorkspaceFiles; devices?: DeviceRegistry; port?: number;
+  journal: CommandJournal; workspaces?: WorkspaceFiles; devices?: DeviceRegistry; harness?: HarnessSurvey; port?: number;
   sessionTtlMs?: number; eventCapacity?: number; now?: () => number;
   supervisor?: SupervisorAssets;
+  workspaceStore?: WorkspaceStore;
+  /** Trusted native picker. The HTTP request never supplies a path or display name. */
+  chooseWorkspace?: (signal: AbortSignal) => Promise<{ root: string; displayName: string } | null>;
+}
+/**
+ * Reviewed harness candidate survey supplied by the trusted runtime.
+ * describe() returns the last reviewed scan without touching the filesystem;
+ * rescan() reruns bounded metadata collection on explicit user action.
+ * Neither grants enrollment nor runs probes: provider policies and probe
+ * approvals belong to provider/runtime tasks, never to a browser action.
+ */
+export interface HarnessSurvey {
+  describe(): DiscoverySnapshot;
+  rescan(): Promise<DiscoverySnapshot>;
 }
 
 /** Constructed by the local runtime. Construction does not start any harness or device. */
@@ -37,12 +51,18 @@ export class LocalApi {
   private readonly unsubscribeDevices?: () => void;
   private readonly unsubscribeWorkspaces?: () => void;
   private readonly workspaceChecks = new Set<string>();
+  private harnessScanning = false;
+  private selection?: { controllerId: string; abort: AbortController };
   private heartbeat?: ReturnType<typeof setInterval>;
   private attempts = 0;
   private attemptWindow = 0;
   private closed = false;
   private starting = false;
   constructor(private readonly options: LocalApiOptions) {
+    if (options.workspaceStore) {
+      if (options.workspaces) throw new Error('Supply workspaceStore or workspaces, not both');
+      this.options = { ...options, workspaces: WorkspaceFiles.fromRegistry(options.workspaceStore) };
+    }
     this.now = options.now ?? Date.now;
     this.ttl = options.sessionTtlMs ?? 8 * 60 * 60 * 1000;
     this.eventCapacity = options.eventCapacity ?? 256;
@@ -56,7 +76,7 @@ export class LocalApi {
     this.server.on('clientError', (_, socket) => { socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); });
     this.unsubscribe = options.journal.subscribe(() => this.changed());
     this.unsubscribeDevices = options.devices?.subscribe(() => this.changed());
-    this.unsubscribeWorkspaces = options.workspaces?.subscribe(() => this.changed());
+    this.unsubscribeWorkspaces = this.options.workspaces?.subscribe(() => this.changed());
   }
   get origin(): string { if (!this.originValue) throw new Error('API not listening'); return this.originValue; }
   get cursor(): string { return `${this.epoch}:${this.sequence}`; }
@@ -85,6 +105,7 @@ export class LocalApi {
     this.grants.set(digest(code), expiresAt); return { code, expiresAt };
   }
   revokeController(controllerId: string): void {
+    if (this.selection?.controllerId === controllerId) this.selection.abort.abort();
     for (const [hash, session] of this.sessions) if (session.controllerId === controllerId) this.sessions.delete(hash);
     for (const stream of this.streams) if (stream.session.controllerId === controllerId) { stream.response.end(); this.streams.delete(stream); }
   }
@@ -166,9 +187,11 @@ export class LocalApi {
       decisions: this.options.journal.listDecisions().map(d => ({ decisionId: d.decisionId, sessionKey: d.sessionKey, ownerId: d.ownerId, status: d.status, revision: d.revision, ...(d.expiresAt !== undefined ? { expiresAt: d.expiresAt } : {}) })),
       workspaces: this.options.workspaces?.list() ?? [],
       workspaceDetails: this.options.workspaces?.describe() ?? [],
+      workspaceSelectionAvailable: !!(this.options.workspaceStore && this.options.chooseWorkspace),
       devices: this.options.devices?.list() ?? [],
       deviceSources: this.options.devices?.sourceStates() ?? [],
       deviceCandidates: this.options.devices?.listCandidates() ?? [],
+      harness: this.options.harness?.describe() ?? null,
     };
   }
   private async route(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -203,6 +226,37 @@ export class LocalApi {
       this.send(res, 201, { token, csrfToken, controllerId: session.controllerId, expiresAt: session.expiresAt }); return;
     }
     const session = this.authenticate(req);
+    if (url.pathname === '/v1/workspaces/select' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).length) fail(400, 'invalid_request');
+      if (!this.options.workspaceStore || !this.options.chooseWorkspace) fail(503, 'workspace_selection_unavailable');
+      if (this.selection) fail(429, 'workspace_selection_busy');
+      const selection = { controllerId: session.controllerId, abort: new AbortController() };
+      this.selection = selection;
+      const cancelled = () => selection.abort.abort();
+      res.once('close', cancelled);
+      const timer = setTimeout(cancelled, 120_000);
+      const operation = (async () => {
+        const picked = await this.options.chooseWorkspace!(selection.abort.signal);
+        this.stillAuthorized(req, session);
+        if (selection.abort.signal.aborted) fail(409, 'workspace_selection_cancelled');
+        if (!picked) return { selected: false as const };
+        // The store checks cancellation again after filesystem inspection, before fsync/publication.
+        const workspace = await this.options.workspaceStore!.registerSelected(picked.root, picked.displayName, selection.abort.signal, () => this.stillAuthorized(req, session));
+        return { selected: true as const, workspaceId: workspace.workspaceId };
+      })();
+      // Hold the slot even if the picker ignores abort. No late result may grant a root.
+      void operation.then(() => { if (this.selection === selection) this.selection = undefined; }, () => { if (this.selection === selection) this.selection = undefined; });
+      let onAbort: () => void = () => {};
+      try {
+        const result = await Promise.race([operation, new Promise<never>((_, reject) => {
+          onAbort = () => reject(new ApiFault(409, 'workspace_selection_cancelled'));
+          selection.abort.signal.addEventListener('abort', onAbort, { once: true });
+          if (selection.abort.signal.aborted) onAbort();
+        })]);
+        this.stillAuthorized(req, session); this.send(res, 200, result); return;
+      } finally { clearTimeout(timer); res.off('close', cancelled); selection.abort.signal.removeEventListener('abort', onAbort); }
+    }
     const workspaceRecheck = /^\/v1\/workspaces\/(ws_[a-f0-9]{16})\/recheck$/.exec(url.pathname);
     if (workspaceRecheck && req.method === 'POST') {
       const body = await this.body(req); this.stillAuthorized(req, session);
@@ -226,6 +280,22 @@ export class LocalApi {
         this.stillAuthorized(req, session);
         this.send(res, 200, result); return;
       } finally { if (timer) clearTimeout(timer); }
+    }
+    if (url.pathname === '/v1/harness/scan' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).length) fail(400, 'invalid_request');
+      if (!this.options.harness) fail(404, 'harness_unavailable');
+      if (this.harnessScanning) fail(429, 'harness_scan_busy');
+      this.harnessScanning = true;
+      const pending = this.options.harness.rescan();
+      // A hung surveyor retains the slot until settlement so retries cannot
+      // multiply filesystem work. The surveyor itself stays bounded by core.
+      void pending.then(() => { this.harnessScanning = false; }, () => { this.harnessScanning = false; });
+      let result: DiscoverySnapshot;
+      try { result = await pending; }
+      catch (error) { if (error instanceof ApiFault) throw error; fail(503, 'harness_scan_failed'); }
+      this.stillAuthorized(req, session);
+      this.send(res, 200, result); return;
     }
     if (url.pathname === '/v1/snapshot' && req.method === 'GET') { this.send(res, 200, this.snapshot()); return; }
     if (url.pathname === '/v1/commands' && req.method === 'POST') {
@@ -276,6 +346,7 @@ export class LocalApi {
   }
   async close(): Promise<void> {
     if (this.closed) return; this.closed = true;
+    this.selection?.abort.abort();
     this.unsubscribe(); this.unsubscribeDevices?.(); this.unsubscribeWorkspaces?.(); if (this.heartbeat) clearInterval(this.heartbeat);
     for (const stream of this.streams) stream.response.destroy(); this.streams.clear();
     this.grants.clear(); this.sessions.clear();

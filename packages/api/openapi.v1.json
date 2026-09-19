@@ -360,6 +360,57 @@
         ]
       }
     },
+    "/v1/harness/scan": {
+      "post": {
+        "operationId": "scanHarness",
+        "description": "Rerun bounded harness candidate metadata collection on explicit user action. Returns the reviewed survey; never probes, installs, starts, logs in or sends commands. One scan at a time; a hung surveyor retains its slot until settlement.",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact listener origin, e.g. http://127.0.0.1:43123. No remote, null, or alias origin."
+          },
+          {
+            "name": "X-Snowball-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reviewed candidate survey. Empty is valid; unprobed candidates never imply control.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HarnessSurvey"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/v1/workspaces/{workspaceId}/recheck": {
       "post": {
         "operationId": "recheckWorkspace",
@@ -410,6 +461,87 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/WorkspaceSummary"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/v1/workspaces/select": {
+      "post": {
+        "operationId": "selectWorkspace",
+        "description": "Ask the trusted native picker to choose a directory. Empty body only: the browser cannot supply a root. Auth/CSRF and authorization before durable commit; one selection at a time, cancel on disconnect/revocation, 120-second budget. Cancelled or late native results do not register. Store fsync precedes successful response.",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact listener origin, e.g. http://127.0.0.1:43123. No remote, null, or alias origin."
+          },
+          {
+            "name": "X-Snowball-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Selected and durably registered, or native dialog cancelled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "selected"
+                      ],
+                      "properties": {
+                        "selected": {
+                          "const": false
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "selected",
+                        "workspaceId"
+                      ],
+                      "properties": {
+                        "selected": {
+                          "const": true
+                        },
+                        "workspaceId": {
+                          "type": "string",
+                          "pattern": "^ws_[a-f0-9]{16}$"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
                 }
               }
             }
@@ -1080,6 +1212,20 @@
             "items": {
               "$ref": "#/components/schemas/WorkspaceSummary"
             }
+          },
+          "harness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HarnessSurvey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Reviewed harness candidate survey, or null when the runtime supplies no surveyor. Never control evidence."
+          },
+          "workspaceSelectionAvailable": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -1091,7 +1237,137 @@
           "devices",
           "deviceCandidates",
           "deviceSources",
-          "workspaceDetails"
+          "workspaceDetails",
+          "harness",
+          "workspaceSelectionAvailable"
+        ],
+        "additionalProperties": false
+      },
+      "HarnessSurvey": {
+        "type": "object",
+        "properties": {
+          "generation": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "complete",
+              "cancelled",
+              "partial"
+            ]
+          },
+          "stale": {
+            "type": "boolean"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "file",
+                    "endpoint"
+                  ]
+                },
+                "locator": {
+                  "type": "string"
+                },
+                "sources": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "override",
+                      "known",
+                      "path",
+                      "registered"
+                    ]
+                  }
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "stamp": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "version": {
+                  "type": "null"
+                },
+                "connection": {
+                  "type": "string",
+                  "enum": [
+                    "unprobed"
+                  ]
+                },
+                "controllable": {
+                  "type": "boolean",
+                  "enum": [
+                    false
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "providerId",
+                "kind",
+                "locator",
+                "sources",
+                "aliases",
+                "stamp",
+                "version",
+                "connection",
+                "controllable"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "providerId": {
+                  "type": "string"
+                },
+                "locator": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "providerId",
+                "locator",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "generation",
+          "status",
+          "stale",
+          "candidates",
+          "issues"
         ],
         "additionalProperties": false
       },

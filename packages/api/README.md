@@ -6,6 +6,9 @@ on the journal and run dispatch; HTTP admission alone never starts a harness.
 `issueBootstrap()` belongs to the tray/CLI, not an HTTP handler. Close the API before
 closing the journal. `WorkspaceFiles.create()` registers roots from trusted local
 configuration; HTTP may only read bounded relative text files under those roots.
+An optional `harness` surveyor exposes the runtime's reviewed candidate metadata
+in snapshots plus one explicit `POST /v1/harness/scan` rescan; it never probes,
+approves, enrolls or grants control.
 
 See [ADR 003](../../docs/ADR-003-LOCAL-API.md) and
 [OpenAPI v1](openapi.v1.json). No installed tray/browser UI is delivered by this

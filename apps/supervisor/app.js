@@ -41,7 +41,7 @@ function render() {
   $('title').textContent = ['내 작업을 한곳에서', '사용하는 Harness 연결', '작업 공간 확인', '원하는 방식으로 조작', '이 컴퓨터의 작업'][step];
   $('description').textContent = [
     '로컬 실행기에서 받은 일회용 코드를 입력하세요. Snowball 클라우드 계정은 필요하지 않습니다.',
-    'Harness 연결은 선택 사항입니다. 현재 화면의 연결 설정 기능은 준비 중이며, 설치 여부나 제어 가능 상태를 추정하지 않습니다.',
+    'Harness 연결은 선택 사항입니다. 검토된 후보 목록만 표시하며, 버전·제어 가능 상태를 추정하지 않습니다.',
     '로컬에서 명시적으로 등록한 폴더만 표시합니다. Harness가 알려 준 경로는 자동 등록하지 않습니다.',
     '장치는 선택 사항입니다. 현재 등록 상태를 확인하거나 하드웨어 없이 계속하세요.',
     '로컬 서비스가 보고한 작업과 연결 상태입니다. 새로 고침으로 최신 상태를 확인할 수 있습니다.',
@@ -57,10 +57,20 @@ function render() {
     }));
     return;
   }
-  if (step === 1) card('연결 설정 준비 중', '자동 설치·로그인·프로세스 시작 없이 건너뛸 수 있습니다. 기존 소유자의 작업 제어는 별도 검증이 필요합니다.');
+  if (step === 1) {
+    const survey = snapshot?.harness ?? null;
+    if (!survey) card('Harness survey 미연결', '로컬 실행기가 후보 목록을 제공하지 않았습니다. 자동 설치·로그인·프로세스 시작 없이 건너뛸 수 있습니다.');
+    else {
+      if (survey.status === 'partial' || survey.stale) card('이전 Harness 결과', '최신 검사가 아닙니다. 다시 찾기로 갱신할 수 있으며, 늦은 결과는 무시됩니다.');
+      if (!survey.candidates.length) card('설치된 Harness 후보 없음', '로컬 실행기에 Harness를 설치·등록한 뒤 다시 찾기. 자동 설치·실행은 하지 않습니다.');
+      for (const candidate of survey.candidates) card(`${candidate.providerId} · ${candidate.kind === 'file' ? '설치 파일' : '로컬 등록 주소'}`, `${candidate.locator} — 버전 미확인 · 연결 검사 전. 제어 가능으로 표시하지 않습니다.`);
+      $('actions').append(button('Harness 다시 찾기', () => void run(async signal => { await client.scanHarness(signal); return client.snapshot(signal); }), true));
+    }
+  }
   if (step === 2 || step === 4) {
     const workspaces = snapshot?.workspaceDetails ?? [];
-    if (!workspaces.length) card('등록된 작업 공간 없음', '폴더 선택 및 등록 UI는 다음 구현 단계입니다. 등록 없이도 계속할 수 있습니다.');
+    if (!workspaces.length) card('등록된 작업 공간 없음', snapshot?.workspaceSelectionAvailable ? '이 컴퓨터의 폴더를 직접 선택하거나 등록 없이 계속하세요.' : '현재 실행기에서는 폴더 선택을 사용할 수 없습니다. 등록 없이도 계속할 수 있습니다.');
+    if (snapshot?.workspaceSelectionAvailable) $('actions').append(button('폴더 선택', () => void run(async signal => { await client.selectWorkspace(signal); return client.snapshot(signal); })));
     for (const workspace of workspaces) card(workspace.displayName, names[workspace.status] ?? '알 수 없는 상태', button('다시 확인', () => void run(async signal => { await client.recheckWorkspace(workspace.workspaceId, signal); return client.snapshot(signal); }), true));
   }
   if (step === 3) {

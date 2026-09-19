@@ -59,3 +59,4 @@ export { HarnessDiscovery, localDiscoveryIO, type DiscoveryProvider, type Discov
 export { assessProbe, type ProbeObservation, type ProbeAssessment, type ProbeReason } from './probes.js';
 export { HttpHarnessProbe, type HttpProbePolicy, type HttpProbeResult, type HttpProbeFailure } from './http-probe.js';
 export { WorkspaceRegistry, localWorkspaceIO, type DirectoryIdentity, type WorkspaceFact, type WorkspaceIO, type WorkspaceStatus, type RegisteredWorkspace, type ProjectCandidate } from './workspaces.js';
+export { WorkspaceStore, type WorkspaceAccess, type WorkspaceStoreOptions } from './workspace-store.js';

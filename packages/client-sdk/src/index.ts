@@ -1,4 +1,4 @@
-import type { CommandInput, CommandRecord, DecisionRecord, SessionRecord, DeviceRegistry, DeviceCandidate } from '@snowball/core';
+import type { CommandInput, CommandRecord, DecisionRecord, SessionRecord, DeviceRegistry, DeviceCandidate, DiscoverySnapshot } from '@snowball/core';
 import type { WorkspaceStatus } from '@snowball/core';
 export interface WorkspaceSummary { workspaceId: string; projectId: string; displayName: string; status: WorkspaceStatus }
 
@@ -9,9 +9,12 @@ export interface Snapshot {
   decisions: Pick<DecisionRecord, 'decisionId' | 'sessionKey' | 'ownerId' | 'status' | 'revision' | 'expiresAt'>[];
   workspaces: { workspaceId: string }[];
   workspaceDetails: WorkspaceSummary[];
+  workspaceSelectionAvailable: boolean;
   devices: ReturnType<DeviceRegistry['list']>;
   deviceSources: ReturnType<DeviceRegistry['sourceStates']>;
   deviceCandidates: DeviceCandidate[];
+  /** Reviewed candidate survey, or null when the runtime supplies no surveyor. Never control evidence. */
+  harness: DiscoverySnapshot | null;
 }
 export class ClientFault extends Error {
   constructor(readonly status: number, readonly code: string) { super(code); }
@@ -19,7 +22,9 @@ export class ClientFault extends Error {
 /** Memory-only credentials. Never automatically retry a mutation after a network failure. */
 export class LocalClient {
   private credentials?: Credentials;
-  constructor(readonly origin: string, private readonly transport: typeof fetch = fetch) {
+  // Browser fetch requires its Window receiver; Node accepts the unbound call and
+  // would otherwise hide this failure until real browser onboarding.
+  constructor(readonly origin: string, private readonly transport: typeof fetch = globalThis.fetch.bind(globalThis)) {
     const url = new URL(origin);
     if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.origin !== origin || !url.port) throw new Error('Exact loopback origin required');
   }
@@ -37,7 +42,10 @@ export class LocalClient {
     return { controllerId: this.credentials.controllerId, expiresAt: this.credentials.expiresAt };
   }
   snapshot(signal?: AbortSignal): Promise<Snapshot> { return this.request('/v1/snapshot', undefined, signal); }
+  /** Explicit user-triggered metadata rescan. Runs no probes and grants nothing. */
+  scanHarness(signal?: AbortSignal): Promise<DiscoverySnapshot> { return this.request('/v1/harness/scan', {}, signal); }
   recheckWorkspace(workspaceId: string, signal?: AbortSignal): Promise<WorkspaceSummary> { return this.request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/recheck`, {}, signal); }
+  selectWorkspace(signal?: AbortSignal): Promise<{ selected: false } | { selected: true; workspaceId: string }> { return this.request('/v1/workspaces/select', {}, signal); }
   submit(command: Omit<CommandInput, 'actorId'>, signal?: AbortSignal): Promise<{ command: CommandRecord; replayed: boolean }> { return this.request('/v1/commands', command, signal); }
   command(commandId: string, signal?: AbortSignal): Promise<CommandRecord> { return this.request(`/v1/commands/${encodeURIComponent(commandId)}`, undefined, signal); }
   decision(decisionId: string, signal?: AbortSignal): Promise<DecisionRecord> { return this.request(`/v1/decisions/${encodeURIComponent(decisionId)}`, undefined, signal); }
