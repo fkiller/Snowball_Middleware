@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "planRevision": 9,
+  "planRevision": 10,
   "updatedAt": "2026-09-19",
   "scope": "Local control first. Plugin, identity, durable commands, authenticated API and optional device registry foundation implemented. Physical discovery, harnesses, UI and packaging remain.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
   "targetRepository": "E:/developments/projects/Snowball_Middleware",
-  "resumeTaskId": "MW.05.01.01.01",
+  "resumeTaskId": "MW.06.01.01.01",
   "requirements": [
     {
       "id": "R-LOCAL",
@@ -1839,7 +1839,7 @@
       "kind": "task",
       "title": "로컬 workspace 등록과 프로젝트 연결",
       "requirements": [],
-      "status": "todo",
+      "status": "done",
       "dependsOn": [
         "MW.02.01.01.01",
         "MW.03.01.01.02"
@@ -1863,13 +1863,26 @@
         "J06"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "Read core identity.ts and api workspaces.ts; distinguish harness project candidates from explicitly registered roots, then implement canonical workspace/worktree lifecycle and boundary tests for J02/J06.",
+        "owner": "Codex",
+        "baseCommit": "8a96a11",
+        "changedFiles": [
+          "packages/core/src/workspaces.ts",
+          "packages/core/src/index.ts",
+          "packages/api/src/workspaces.ts",
+          "tests/workspaces.test.mjs",
+          "tests/plugin-host.test.mjs",
+          "package.json",
+          "docs/ADR-007-workspace-registration.md",
+          "docs/middleware/evidence/MW.05.01.01.01/verification.md"
+        ],
+        "completedSteps": [
+          "Separated metadata-only harness project candidates from explicit filesystem root registration.",
+          "Implemented physical/canonical identity, empty/missing/permission/replacement states, explicit same-directory relocation and bounded restore codec.",
+          "Explicit provider associations and logical project links preserve separate IDs and read scopes; API reads revalidate identities."
+        ],
+        "nextAction": "Complete. Continue MW.06.01.01.01 local onboarding; runtime must wire current-user protected persistence and trusted folder selection without turning provider candidates into grants.",
         "blockers": [],
-        "updatedAt": "2026-09-19T00:25:33.995Z"
+        "updatedAt": "2026-09-19T05:17:24.647Z"
       },
       "priority": {
         "designDemand": 4,
@@ -1883,8 +1896,16 @@
       "kind": "acceptance",
       "title": "빈 목록/이동/삭제/권한 거부와 case-sensitive root에서 잘못된 project 병합이 없다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-19",
+          "environment": "Windows x64 Node 20.19.6; real temporary directories/junctions plus case-sensitive and permission fixtures",
+          "procedure": "npm run build; node --test tests/workspaces.test.mjs tests/local-api.test.mjs; node --test --test-concurrency=1 tests",
+          "result": "Focused 17/17; final full 108/108 pass. Seven workspace tests. Native macOS/ACL and installed runtime/UI not tested; see recorded parallel startup failures.",
+          "reference": "docs/middleware/evidence/MW.05.01.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.05.01.01.01.A2",
@@ -1893,8 +1914,16 @@
       "kind": "acceptance",
       "title": "symlink/비슷한 sibling 경로/다른 worktree로 등록된 읽기 경계를 벗어나지 않는다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-19",
+          "environment": "Windows x64 Node 20.19.6; real temporary directories/junctions plus case-sensitive and permission fixtures",
+          "procedure": "npm run build; node --test tests/workspaces.test.mjs tests/local-api.test.mjs; node --test --test-concurrency=1 tests",
+          "result": "Focused 17/17; final full 108/108 pass. Seven workspace tests. Native macOS/ACL and installed runtime/UI not tested; see recorded parallel startup failures.",
+          "reference": "docs/middleware/evidence/MW.05.01.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.05.02.01.01",
@@ -2004,9 +2033,9 @@
         "baseCommit": null,
         "changedFiles": [],
         "completedSteps": [],
-        "nextAction": "local 상태→harness→workspace→optional device 순으로 같은 registry API를 사용한다.",
+        "nextAction": "Read local API/SDK and registry public contracts, then implement same-origin local onboarding and Connections with explicit trusted registration, truthful empty/partial/auth/permission states and skip/cancel/retry. First resolve missing registry API/runtime wiring; never enable control from discovery.",
         "blockers": [],
-        "updatedAt": null
+        "updatedAt": "2026-09-19T05:17:24.648Z"
       },
       "priority": {
         "designDemand": 4,

@@ -58,3 +58,4 @@ export { DeviceRegistry, type DeviceSource, type DeviceTransport, type DeviceObs
 export { HarnessDiscovery, localDiscoveryIO, type DiscoveryProvider, type DiscoveryIO, type FileFact, type HarnessCandidate, type DiscoverySnapshot } from './discovery.js';
 export { assessProbe, type ProbeObservation, type ProbeAssessment, type ProbeReason } from './probes.js';
 export { HttpHarnessProbe, type HttpProbePolicy, type HttpProbeResult, type HttpProbeFailure } from './http-probe.js';
+export { WorkspaceRegistry, localWorkspaceIO, type DirectoryIdentity, type WorkspaceFact, type WorkspaceIO, type WorkspaceStatus, type RegisteredWorkspace, type ProjectCandidate } from './workspaces.js';

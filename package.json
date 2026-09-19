@@ -8,7 +8,7 @@
   "workspaces": ["packages/*"],
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "npm run build && node --test --test-concurrency=4 tests",
+    "test": "npm run build && node --test --test-concurrency=1 tests",
     "test:reference": "node scripts/test-reference.mjs",
     "test:reference:speech": "node scripts/test-reference.mjs --speech",
     "plan": "node docs/middleware/validate-plan.mjs --next"

@@ -6,7 +6,7 @@ Depth: L0 product → L1 outcome → L2 journey → L3 work package → L4 task 
 
 All implementation checks are pending unless their evidence says otherwise.
 
-- **MW** 하드웨어 독립 로컬 harness 제어 — 10/28 tasks done
+- **MW** 하드웨어 독립 로컬 harness 제어 — 11/28 tasks done
   - **MW.01** 분리 저장소와 계약 — 3/3 tasks done
     - **MW.01.01** 기존 작업을 보존하며 추출 — 2/2 tasks done
       - **MW.01.01.01** 소스 export와 재현 기반 — 2/2 tasks done
@@ -77,12 +77,12 @@ All implementation checks are pending unless their evidence says otherwise.
         - **MW.04.03.01.01** 장치 재접속·plugin 장애·제거 — todo
           - **MW.04.03.01.01.A1** unplug/reset/crash 뒤 안전 복구하고 오래된 button event/unknown 명령을 replay하지 않는다. — pending
           - **MW.04.03.01.01.A2** 두 장치+Web 동시 조작과 revoke가 타 controller 또는 실행 중 harness task를 종료시키지 않는다. — pending
-  - **MW.05** Project와 Session — 0/2 tasks done
-    - **MW.05.01** 작업 공간 선택 — 0/1 tasks done
-      - **MW.05.01.01** workspace registry — 0/1 tasks done
-        - **MW.05.01.01.01** 로컬 workspace 등록과 프로젝트 연결 — todo
-          - **MW.05.01.01.01.A1** 빈 목록/이동/삭제/권한 거부와 case-sensitive root에서 잘못된 project 병합이 없다. — pending
-          - **MW.05.01.01.01.A2** symlink/비슷한 sibling 경로/다른 worktree로 등록된 읽기 경계를 벗어나지 않는다. — pending
+  - **MW.05** Project와 Session — 1/2 tasks done
+    - **MW.05.01** 작업 공간 선택 — 1/1 tasks done
+      - **MW.05.01.01** workspace registry — 1/1 tasks done
+        - **MW.05.01.01.01** 로컬 workspace 등록과 프로젝트 연결 — done
+          - **MW.05.01.01.01.A1** 빈 목록/이동/삭제/권한 거부와 case-sensitive root에서 잘못된 project 병합이 없다. — pass
+          - **MW.05.01.01.01.A2** symlink/비슷한 sibling 경로/다른 worktree로 등록된 읽기 경계를 벗어나지 않는다. — pass
     - **MW.05.02** 기존/새 작업 제어 — 0/1 tasks done
       - **MW.05.02.01** session owner — 0/1 tasks done
         - **MW.05.02.01.01** 기존 작업 attach와 새 task 전체 왕복 — todo

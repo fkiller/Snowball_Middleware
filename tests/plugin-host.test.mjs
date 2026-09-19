@@ -20,7 +20,9 @@ async function fixture(t, body, options = {}) {
   const script = handshake.replace('BODY', body);
   await fs.writeFile(path.join(directory, 'worker.mjs'), script);
   const m = manifest(hash(script));
-  const host = new PluginHost({ directory, manifest: m, approvedDigests: new Map([[m.id, m.integrity.entrySha256]]), timeoutMs: 500, restartBackoffMs: 1000, ...options });
+  // Non-timing tests must tolerate process startup under the full suite's load.
+  // Deadline behavior is tested separately with an explicit timeout override.
+  const host = new PluginHost({ directory, manifest: m, approvedDigests: new Map([[m.id, m.integrity.entrySha256]]), timeoutMs: 2000, restartBackoffMs: 1000, ...options });
   t.after(async () => { await host.stop(); await fs.rm(directory, { recursive: true, force: true }); });
   return { host, directory, manifest: m };
 }
