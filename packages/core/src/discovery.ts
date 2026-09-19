@@ -130,3 +130,48 @@ export class HarnessDiscovery {
     return this.snapshot();
   }
 }
+
+/** Default discovery providers for zero-config harness discovery on Windows and macOS. */
+export function defaultDiscoveryProviders(platform: 'win32' | 'darwin' = (process.platform === 'win32' ? 'win32' : 'darwin')): DiscoveryProvider[] {
+  const isWin = platform === 'win32';
+  const localAppData = process.env.LOCALAPPDATA || '';
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const providers: DiscoveryProvider[] = [];
+
+  // Codex
+  const codexKnown: string[] = [];
+  if (isWin && /^[A-Za-z]:[\\/]/.test(localAppData)) {
+    codexKnown.push(path.win32.join(localAppData, 'Programs', 'Codex', 'codex.exe'));
+  } else if (!isWin) {
+    codexKnown.push('/Applications/Codex.app/Contents/MacOS/Codex');
+  }
+  providers.push({
+    id: 'snowball.codex',
+    commandNames: isWin ? ['codex.exe', 'codex.cmd', 'codex'] : ['codex'],
+    knownPaths: codexKnown,
+  });
+
+  // OpenCode
+  providers.push({
+    id: 'snowball.opencode',
+    commandNames: isWin ? ['opencode.cmd', 'opencode.exe', 'opencode'] : ['opencode'],
+    knownPaths: [],
+    endpoints: ['http://127.0.0.1:4096'],
+  });
+
+  // Antigravity
+  const agyKnown: string[] = [];
+  if (isWin && /^[A-Za-z]:[\\/]/.test(localAppData)) {
+    agyKnown.push(path.win32.join(localAppData, 'agy', 'bin', 'agy.exe'));
+  } else if (!isWin) {
+    if (home && path.posix.isAbsolute(home)) agyKnown.push(path.posix.join(home, '.agy', 'bin', 'agy'));
+    agyKnown.push('/usr/local/bin/agy');
+  }
+  providers.push({
+    id: 'snowball.antigravity',
+    commandNames: isWin ? ['agy.exe', 'agy.cmd', 'agy'] : ['agy'],
+    knownPaths: agyKnown,
+  });
+
+  return providers;
+}

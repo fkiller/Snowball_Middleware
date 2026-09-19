@@ -2,6 +2,15 @@ import type { CommandInput, CommandRecord, DecisionRecord, SessionRecord, Device
 import type { WorkspaceStatus } from '@snowball/core';
 export interface WorkspaceSummary { workspaceId: string; projectId: string; displayName: string; status: WorkspaceStatus }
 
+export interface LocalSettings {
+  revision: number;
+  autostart: boolean;
+  language: 'ko' | 'en';
+  controlPaused: boolean;
+  notifications: boolean;
+  updatedAt: string;
+}
+
 export interface Credentials { token: string; csrfToken: string; controllerId: string; expiresAt: number }
 export interface Snapshot {
   cursor: string; sessions: SessionRecord[];
@@ -15,6 +24,7 @@ export interface Snapshot {
   deviceCandidates: DeviceCandidate[];
   /** Reviewed candidate survey, or null when the runtime supplies no surveyor. Never control evidence. */
   harness: DiscoverySnapshot | null;
+  settings?: LocalSettings;
 }
 export class ClientFault extends Error {
   constructor(readonly status: number, readonly code: string) { super(code); }
@@ -46,6 +56,22 @@ export class LocalClient {
   scanHarness(signal?: AbortSignal): Promise<DiscoverySnapshot> { return this.request('/v1/harness/scan', {}, signal); }
   recheckWorkspace(workspaceId: string, signal?: AbortSignal): Promise<WorkspaceSummary> { return this.request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/recheck`, {}, signal); }
   selectWorkspace(signal?: AbortSignal): Promise<{ selected: false } | { selected: true; workspaceId: string }> { return this.request('/v1/workspaces/select', {}, signal); }
+  settings(signal?: AbortSignal): Promise<{ settings: LocalSettings }> { return this.request('/v1/settings', undefined, signal); }
+  async updateSettings(expectedRevision: number, patch: Partial<LocalSettings>, signal?: AbortSignal): Promise<{ settings: LocalSettings }> {
+    const response = await this.transport(this.origin + '/v1/settings', {
+      method: 'PATCH',
+      headers: this.headers(true),
+      body: JSON.stringify({ expectedRevision, patch }),
+      signal,
+      credentials: 'omit',
+      cache: 'no-store',
+      redirect: 'error',
+      referrerPolicy: 'no-referrer',
+    });
+    const result = await response.json() as { settings: LocalSettings; error?: string };
+    if (!response.ok) throw new ClientFault(response.status, result.error ?? 'request_failed');
+    return result;
+  }
   submit(command: Omit<CommandInput, 'actorId'>, signal?: AbortSignal): Promise<{ command: CommandRecord; replayed: boolean }> { return this.request('/v1/commands', command, signal); }
   command(commandId: string, signal?: AbortSignal): Promise<CommandRecord> { return this.request(`/v1/commands/${encodeURIComponent(commandId)}`, undefined, signal); }
   decision(decisionId: string, signal?: AbortSignal): Promise<DecisionRecord> { return this.request(`/v1/decisions/${encodeURIComponent(decisionId)}`, undefined, signal); }

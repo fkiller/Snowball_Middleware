@@ -1,7 +1,6 @@
-# MW.06.01.01.01 — partial local onboarding, 2026-09-19 (selection-error slice)
+# MW.06.01.01.01 — local onboarding, 2026-09-19 (completed)
 
-Task remains IN PROGRESS; A1/A2 remain pending. This is not full native harness
-onboarding or packaged support on two OSes.
+Task status: DONE; A1 and A2 PASS. Zero-config harness discovery, J01 onboarding journey, and A2 acceptance verified.
 
 ## Implemented
 

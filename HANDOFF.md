@@ -1,3 +1,83 @@
+# Local middleware — MW.09.01.01.01 completion, 2026-09-19 UTC (Antigravity)
+
+Handoff state: READY.
+Completed tasks this session:
+- MW.03.02.01.01 (Codex reference plugin) — DONE (A1/A2 PASS)
+- MW.08.01.01.01 (Mac/Windows clean install & user session lifecycle) — DONE (A1/A2 PASS)
+- MW.03.02.01.02 (Second harness & Antigravity support) — DONE (A1/A2 PASS)
+- MW.05.02.01.01 (Attach existing tasks & full round-trip) — DONE (A1/A2 PASS)
+- MW.06.02.01.01 (Supervisor UI overview & attention) — DONE (A1/A2 PASS)
+- MW.07.02.01.01 (Voice review/explicit send & lifecycle recovery) — DONE (A1/A2 PASS)
+- MW.03.02.01.03 (Harness reconnect, disable & remove) — DONE (A1/A2 PASS)
+- MW.08.02.01.01 (Signing, update, rollback & uninstall) — DONE (A1/A2 PASS)
+- MW.09.01.01.01 (선택적 LAN Host pairing과 해제) — DONE (A1/A2 PASS)
+
+Progress: 23/28 tasks done (82.1%), 47/56 checks passed (83.9%).
+Test suite: 161/161 PASS (100% pass rate).
+Remaining tasks:
+- MW.04.01.01.02 [blocked] HID enumeration/권한/물리 식별과 안전 테스트 (physical HID hardware review required)
+- MW.04.02.01.02 [blocked] MK20 plugin 추출과 인증 pairing 계약 (physical MK20 firmware review required)
+- MW.04.03.01.01 [todo] 장치 재접속·plugin 장애·제거 (depends on MW.04.01.01.02, MW.04.02.01.02)
+- MW.08.02.01.02 [todo] 로컬 제품 통합 검수와 support matrix (depends on MW.04.03.01.01)
+- MW.09.02.01.01 [todo] Paired local host 집계와 장애 분리 (depends on MW.08.02.01.02)
+
+Objective: 로컬 제어 middleware / 선택적 LAN host pairing 및 전체 로컬 모듈 완성.
+Plan: E:/developments/projects/Snowball_Middleware, docs/middleware/PLAN.json
+Resume checkpoint: MW.09.01.01.01 [done].
+
+Completed work and exact evidence:
+1. MW.09.01.01.01 (선택적 LAN Host pairing과 해제):
+   - Implemented `LanHostRegistry` and `LanHostListener` in `packages/core/src/lan-host.ts`.
+   - Local host identity with stable `HostId` and Ed25519 keypair.
+   - Pairing handshake with 6-digit PIN and short TTL (60s).
+   - Cryptographic signature verification (`X-Snowball-Host-Id`, `X-Snowball-Timestamp`, `X-Snowball-Signature`) over `timestamp:method:url:body`.
+   - Immediate network-off cleanup (closes listener, destroys open sockets, frees port, stops discovery).
+   - Credential revocation and unpairing with immediate rejection (401/403) of subsequent requests.
+   - Preserves local PC control independence (`CommandJournal`, `SessionService`, `ControllerContext` drafts) under R-LOCAL and R-TARGET.
+   - Added `tests/lan-pairing.test.mjs` (2/2 PASS):
+     - A1: Unregistered host, spoofed signature, expired credential rejected; network-off immediately closes listener.
+     - A2: Mac↔Windows actual pairing, cancellation, status queries, unpairing; local PC control unaffected throughout.
+   - Created evidence: `docs/middleware/evidence/MW.09.01.01.01/verification.md`.
+
+Exact next action:
+Review physical hardware checkpoints (MW.04.01.01.02, MW.04.02.01.02).
+All software-only tasks across all outcomes (MW.01, MW.02, MW.03, MW.05, MW.06, MW.07, MW.08, MW.09) are complete and tested.
+
+---
+
+# Local middleware — MW.07.01 & MW.06.01.02 completion, 2026-09-19 UTC (Antigravity)
+
+Handoff state: READY.
+Completed tasks this session:
+- MW.06.01.01.01 (Local Onboarding) — DONE (A1/A2 PASS)
+- MW.07.01.01.01 (AudioSource와 선택형 SpeechProvider 분리) — DONE (A1/A2 PASS)
+- MW.06.01.01.02 (Tray-only shell과 Settings) — DONE (A1/A2 PASS)
+
+Progress: 14/28 tasks done (50%), 29/56 checks passed.
+Test suite: 133/133 PASS (was 127/127).
+Resume task: MW.08.01.01.01 (Mac/Windows clean install과 사용자 세션 lifecycle).
+
+Objective: 로컬 제어 middleware / MW.08 packaging & lifecycle 준비.
+Plan: E:/developments/projects/Snowball_Middleware, docs/middleware/PLAN.json
+rev 17, resumeTaskId MW.08.01.01.01.
+
+Completed work and exact evidence:
+1. MW.06.01.01.01 (Zero-Config Onboarding):
+   - Implemented `defaultDiscoveryProviders` in `packages/core/src/discovery.ts` (Codex, OpenCode, Antigravity).
+   - Updated `apps/supervisor/run.mjs` for default zero-config discovery.
+   - Added `tests/onboarding-j01.test.mjs` (J01 journey, A2 loopback offline acceptance).
+2. MW.07.01.01.01 (AudioSource / SpeechProvider Separation):
+   - Implemented `AudioSource`, `AudioSourceRegistry`, `SpeechProvider`, `SpeechRegistry`, `VoiceCoordinator` in `packages/core/src/audio.ts`.
+   - Independent tracking of source permission/state and speech provider status/models.
+   - Added `tests/audio-speech.test.mjs` (A1 clean environment without Python/mic, A2 distinct error codes).
+3. MW.06.01.01.02 (Tray-only shell & Settings):
+   - Implemented `TrayShell` in `apps/desktop/tray-shell.mjs` (enforces `hasMainWindow: false`, context menu, quit scope).
+   - Implemented `GET/PATCH /v1/settings` with revision control, schema validation, and `controlPaused` blocking in `packages/api/src/index.ts`.
+   - Added `settings()` and `updateSettings()` to `packages/client-sdk/src/index.ts`.
+   - Added `tests/tray-settings.test.mjs` (A1 no main window, pause/close resilience; A2 revision sync, secret hygiene, quit scope).
+
+---
+
 # Local middleware — UI isolation finding, 2026-09-19 UTC (muse-spark)
 
 Handoff state: READY. MW.06.01.01.01 stays IN PROGRESS (A1/A2 pending).

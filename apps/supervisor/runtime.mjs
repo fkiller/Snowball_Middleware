@@ -45,6 +45,7 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
     return {
       origin: api.origin,
       issueBootstrap: () => api.issueBootstrap(),
+      journal,
       async close() {
         if (closed) return; closed = true; discovery.cancel();
         try { await api.close(); } finally { try { store.close(); } finally { journal.close(); } }

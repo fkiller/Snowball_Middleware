@@ -22,6 +22,15 @@ const SELECTION_STATUS: Record<string, number> = {
   workspace_selection_unavailable: 503,
   workspace_storage_unavailable: 503,
 };
+export interface LocalSettings {
+  revision: number;
+  autostart: boolean;
+  language: 'ko' | 'en';
+  controlPaused: boolean;
+  notifications: boolean;
+  updatedAt: string;
+}
+
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 interface Session { controllerId: string; csrfHash: string; expiresAt: number; requests: number; window: number }
 interface Stream { response: ServerResponse; session: Session }
@@ -54,6 +63,7 @@ export class LocalApi {
   private readonly streams = new Set<Stream>();
   private readonly events: Event[] = [];
   private readonly epoch = randomBytes(16).toString('hex');
+  private readonly settings: LocalSettings;
   private sequence = 0;
   private originValue = '';
   private readonly now: () => number;
@@ -71,6 +81,15 @@ export class LocalApi {
   private closed = false;
   private starting = false;
   constructor(private readonly options: LocalApiOptions) {
+    this.now = options.now ?? Date.now;
+    this.settings = {
+      revision: 1,
+      autostart: false,
+      language: 'ko',
+      controlPaused: false,
+      notifications: true,
+      updatedAt: new Date(this.now()).toISOString(),
+    };
     if (options.workspaceStore) {
       if (options.workspaces) throw new Error('Supply workspaceStore or workspaces, not both');
       this.options = { ...options, workspaces: WorkspaceFiles.fromRegistry(options.workspaceStore) };
@@ -162,8 +181,8 @@ export class LocalApi {
     if (req.headers.host !== this.origin.slice(7)) fail(403, 'host_denied');
     if (req.headers.origin !== undefined && req.headers.origin !== this.origin) fail(403, 'origin_denied');
     if (req.headers['sec-fetch-site'] !== undefined && !['same-origin', 'none'].includes(String(req.headers['sec-fetch-site']))) fail(403, 'origin_denied');
-    if (!['GET', 'POST'].includes(req.method ?? '')) fail(405, 'method_denied');
-    if (req.method === 'POST' && req.headers.origin !== this.origin) fail(403, 'origin_required');
+    if (!['GET', 'POST', 'PATCH'].includes(req.method ?? '')) fail(405, 'method_denied');
+    if (['POST', 'PATCH'].includes(req.method ?? '') && req.headers.origin !== this.origin) fail(403, 'origin_required');
     if (!req.url?.startsWith('/') || req.url.startsWith('//') || req.url.length > 2048 || req.url.includes('#')) fail(400, 'invalid_url');
   }
   private authenticate(req: IncomingMessage): Session {
@@ -171,7 +190,7 @@ export class LocalApi {
     if (!auth || !/^Bearer [A-Za-z0-9_-]{43}$/.test(auth)) fail(401, 'unauthorized');
     const session = this.sessions.get(digest(auth.slice(7)));
     if (!session || session.expiresAt <= this.now()) fail(401, 'unauthorized');
-    if (req.method === 'POST' && (typeof req.headers['x-snowball-csrf'] !== 'string' || digest(req.headers['x-snowball-csrf']) !== session.csrfHash)) fail(403, 'csrf_denied');
+    if (['POST', 'PATCH'].includes(req.method ?? '') && (typeof req.headers['x-snowball-csrf'] !== 'string' || digest(req.headers['x-snowball-csrf']) !== session.csrfHash)) fail(403, 'csrf_denied');
     if (this.now() - session.window >= 60_000) { session.window = this.now(); session.requests = 0; }
     if (++session.requests > 600) fail(429, 'rate_limited');
     return session;
@@ -199,6 +218,7 @@ export class LocalApi {
   private snapshot(): unknown {
     return {
       cursor: this.cursor,
+      settings: structuredClone(this.settings),
       sessions: this.options.journal.listSessions(),
       commands: this.options.journal.listCommands().map(c => ({ commandId: c.input.commandId, actorId: c.input.actorId, sessionKey: c.input.sessionKey, ownerId: c.input.ownerId, operation: c.input.operation, status: c.status, revision: c.revision, order: c.order, updatedAt: c.updatedAt })),
       decisions: this.options.journal.listDecisions().map(d => ({ decisionId: d.decisionId, sessionKey: d.sessionKey, ownerId: d.ownerId, status: d.status, revision: d.revision, ...(d.expiresAt !== undefined ? { expiresAt: d.expiresAt } : {}) })),
@@ -315,9 +335,33 @@ export class LocalApi {
       this.send(res, 200, result); return;
     }
     if (url.pathname === '/v1/snapshot' && req.method === 'GET') { this.send(res, 200, this.snapshot()); return; }
+    if (url.pathname === '/v1/settings' && req.method === 'GET') {
+      this.send(res, 200, { settings: structuredClone(this.settings) }); return;
+    }
+    if (url.pathname === '/v1/settings' && req.method === 'PATCH') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (!record(body) || typeof body.expectedRevision !== 'number' || !record(body.patch)) fail(400, 'invalid_request');
+      if (body.expectedRevision !== this.settings.revision) fail(409, 'stale_revision');
+      const patch = body.patch;
+      const allowedKeys = ['autostart', 'language', 'controlPaused', 'notifications'];
+      for (const key of Object.keys(patch)) {
+        if (!allowedKeys.includes(key)) fail(400, 'invalid_setting_key');
+      }
+      if ('autostart' in patch && typeof patch.autostart !== 'boolean') fail(400, 'invalid_setting_value');
+      if ('controlPaused' in patch && typeof patch.controlPaused !== 'boolean') fail(400, 'invalid_setting_value');
+      if ('notifications' in patch && typeof patch.notifications !== 'boolean') fail(400, 'invalid_setting_value');
+      if ('language' in patch && !['ko', 'en'].includes(String(patch.language))) fail(400, 'invalid_setting_value');
+
+      Object.assign(this.settings, patch);
+      this.settings.revision++;
+      this.settings.updatedAt = new Date(this.now()).toISOString();
+      this.changed();
+      this.send(res, 200, { settings: structuredClone(this.settings) }); return;
+    }
     if (url.pathname === '/v1/commands' && req.method === 'POST') {
       const body = await this.body(req);
       this.stillAuthorized(req, session);
+      if (this.settings.controlPaused) fail(409, 'control_paused');
       if ('actorId' in body) fail(400, 'actor_is_authenticated');
       if (typeof body.commandId === 'string') {
         const prior = this.options.journal.command(body.commandId);

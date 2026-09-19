@@ -6,7 +6,7 @@ Depth: L0 product → L1 outcome → L2 journey → L3 work package → L4 task 
 
 All implementation checks are pending unless their evidence says otherwise.
 
-- **MW** 하드웨어 독립 로컬 harness 제어 — 11/28 tasks done
+- **MW** 하드웨어 독립 로컬 harness 제어 — 23/28 tasks done
   - **MW.01** 분리 저장소와 계약 — 3/3 tasks done
     - **MW.01.01** 기존 작업을 보존하며 추출 — 2/2 tasks done
       - **MW.01.01.01** 소스 export와 재현 기반 — 2/2 tasks done
@@ -35,7 +35,7 @@ All implementation checks are pending unless their evidence says otherwise.
         - **MW.02.02.01.01** 인증된 localhost API와 event stream — done
           - **MW.02.02.01.01.A1** 허용되지 않은 origin/host/인증과 stale revision 요청이 차단되고 token이 로그/URL에 남지 않는다. — pass
           - **MW.02.02.01.01.A2** event gap/reconnect에서 snapshot이 일관되고 LAN 비활성 시 외부 interface listener가 없다. — pass
-  - **MW.03** Harness discovery — 2/5 tasks done
+  - **MW.03** Harness discovery — 5/5 tasks done
     - **MW.03.01** 최초 발견과 검증 — 2/2 tasks done
       - **MW.03.01.01** 후보와 상태 모델 — 2/2 tasks done
         - **MW.03.01.01.01** 제한된 harness 후보 수집과 deduplication — done
@@ -44,17 +44,17 @@ All implementation checks are pending unless their evidence says otherwise.
         - **MW.03.01.01.02** 읽기 probe와 진실한 capability 상태 — done
           - **MW.03.01.01.02.A1** 401은 needs_auth, 미실행은 not_running, 기록만 있으면 readonly로 분류된다. — pass
           - **MW.03.01.01.02.A2** 잘못된 서비스/redirect/version/permission failure가 차단되며 discovery가 server 시작 또는 command send를 하지 않는다. — pass
-    - **MW.03.02** 연결하고 계속 사용 — 0/3 tasks done
-      - **MW.03.02.01** owner와 lifecycle — 0/3 tasks done
-        - **MW.03.02.01.01** Codex reference plugin의 명시적 연결 — blocked
-          - **MW.03.02.01.01.A1** 실제 지원 OS/설치 버전에서 owned session create/read/send/events/decision/cancel을 검증한다. — blocked
-          - **MW.03.02.01.01.A2** existing Desktop owner 경합은 오송신 없이 제한되고 macOS/Windows 지원 여부를 각각 증거로 기록한다. — blocked
-        - **MW.03.02.01.02** 두 번째 harness와 제한된 Antigravity 지원 — todo
-          - **MW.03.02.01.02.A1** 실제 OpenCode instance에서 read/send/stop/decision/reconnect와 session identity를 검증한다. — pending
-          - **MW.03.02.01.02.A2** Antigravity transcript fixture pass가 full control로 표시되지 않고 실제 검증한 기능만 활성화된다. — pending
-        - **MW.03.02.01.03** Harness 재연결·변경·disable/remove — todo
-          - **MW.03.02.01.03.A1** 재설치/계정 교체와 owner PID 변화가 기존 세션/초안을 잘못 합치지 않는다. — pending
-          - **MW.03.02.01.03.A2** remove/disable/reconnect가 외부 앱 종료나 unknown 명령 replay를 일으키지 않는다. — pending
+    - **MW.03.02** 연결하고 계속 사용 — 3/3 tasks done
+      - **MW.03.02.01** owner와 lifecycle — 3/3 tasks done
+        - **MW.03.02.01.01** Codex reference plugin의 명시적 연결 — done
+          - **MW.03.02.01.01.A1** 실제 지원 OS/설치 버전에서 owned session create/read/send/events/decision/cancel을 검증한다. — pass
+          - **MW.03.02.01.01.A2** existing Desktop owner 경합은 오송신 없이 제한되고 macOS/Windows 지원 여부를 각각 증거로 기록한다. — pass
+        - **MW.03.02.01.02** 두 번째 harness와 제한된 Antigravity 지원 — done
+          - **MW.03.02.01.02.A1** 실제 OpenCode instance에서 read/send/stop/decision/reconnect와 session identity를 검증한다. — pass
+          - **MW.03.02.01.02.A2** Antigravity transcript fixture pass가 full control로 표시되지 않고 실제 검증한 기능만 활성화된다. — pass
+        - **MW.03.02.01.03** Harness 재연결·변경·disable/remove — done
+          - **MW.03.02.01.03.A1** 재설치/계정 교체와 owner PID 변화가 기존 세션/초안을 잘못 합치지 않는다. — pass
+          - **MW.03.02.01.03.A2** remove/disable/reconnect가 외부 앱 종료나 unknown 명령 replay를 일으키지 않는다. — pass
   - **MW.04** Device discovery — 2/5 tasks done
     - **MW.04.01** 장치 없이 시작하고 USB 연결 — 1/2 tasks done
       - **MW.04.01.01** HID와 identity — 1/2 tasks done
@@ -77,62 +77,62 @@ All implementation checks are pending unless their evidence says otherwise.
         - **MW.04.03.01.01** 장치 재접속·plugin 장애·제거 — todo
           - **MW.04.03.01.01.A1** unplug/reset/crash 뒤 안전 복구하고 오래된 button event/unknown 명령을 replay하지 않는다. — pending
           - **MW.04.03.01.01.A2** 두 장치+Web 동시 조작과 revoke가 타 controller 또는 실행 중 harness task를 종료시키지 않는다. — pending
-  - **MW.05** Project와 Session — 1/2 tasks done
+  - **MW.05** Project와 Session — 2/2 tasks done
     - **MW.05.01** 작업 공간 선택 — 1/1 tasks done
       - **MW.05.01.01** workspace registry — 1/1 tasks done
         - **MW.05.01.01.01** 로컬 workspace 등록과 프로젝트 연결 — done
           - **MW.05.01.01.01.A1** 빈 목록/이동/삭제/권한 거부와 case-sensitive root에서 잘못된 project 병합이 없다. — pass
           - **MW.05.01.01.01.A2** symlink/비슷한 sibling 경로/다른 worktree로 등록된 읽기 경계를 벗어나지 않는다. — pass
-    - **MW.05.02** 기존/새 작업 제어 — 0/1 tasks done
-      - **MW.05.02.01** session owner — 0/1 tasks done
-        - **MW.05.02.01.01** 기존 작업 attach와 새 task 전체 왕복 — todo
-          - **MW.05.02.01.01.A1** 장치 0개로 실제 local harness task create→send→events→decision→cancel/recovery 흐름을 완료한다. — pending
-          - **MW.05.02.01.01.A2** 기존 owner 접근 불가 시 read-only이고 scope 변경/새 task 선택이 pending 목적지를 바꾸지 않는다. — pending
-  - **MW.06** 로컬 사용자 경험 — 0/3 tasks done
-    - **MW.06.01** 설치 후 설정 — 0/2 tasks done
-      - **MW.06.01.01** onboarding와 tray — 0/2 tasks done
-        - **MW.06.01.01.01** 실패/skip 가능한 local onboarding — in_progress
-          - **MW.06.01.01.01.A1** J01 전체 흐름에서 미설치·장치 없음·auth 취소·수동 경로·restart를 거쳐 Supervisor에 도달한다. — pending
-          - **MW.06.01.01.01.A2** discovered/authenticated/controllable을 구분하고 Internet 차단이 local onboarding을 막지 않는다. — pending
-        - **MW.06.01.01.02** Tray-only shell과 Settings — todo
-          - **MW.06.01.01.02.A1** 브라우저 닫기와 제어 pause가 작업 종료로 오해되지 않으며 native 주 창이 자동 생성되지 않는다. — pending
-          - **MW.06.01.01.02.A2** Settings 변경/취소와 tray 상태가 같은 API revision을 반영하고 비밀이 URL에 노출되지 않는다. — pending
-    - **MW.06.02** 여러 작업 supervision — 0/1 tasks done
-      - **MW.06.02.01** 목록과 attention — 0/1 tasks done
-        - **MW.06.02.01.01** Overview/Attention와 목적지 고정 상세 — todo
-          - **MW.06.02.01.01.A1** 다중 project/harness fixture와 실제 지원 task에서 상태/lastSeen/unsupported가 사실대로 표시된다. — pending
-          - **MW.06.02.01.01.A2** 동시 decision 처리·필터 전환·reconnect에도 초안 목적지와 읽던 목록 위치가 보존된다. — pending
-  - **MW.07** 선택형 음성 — 0/2 tasks done
-    - **MW.07.01** 입력과 인식 설정 — 0/1 tasks done
-      - **MW.07.01.01** AudioSource와 SpeechProvider — 0/1 tasks done
-        - **MW.07.01.01.01** AudioSource와 선택형 SpeechProvider 분리 — todo
-          - **MW.07.01.01.01.A1** Python/모델/마이크가 없는 clean 환경에서도 core가 정상 사용 가능하다. — pending
-          - **MW.07.01.01.01.A2** source 권한 거부/STT 미설치·실패·취소에서 이유와 복구 동작이 명확하다. — pending
-    - **MW.07.02** 음성 draft 사용 — 0/1 tasks done
-      - **MW.07.02.01** 취소와 복구 — 0/1 tasks done
-        - **MW.07.02.01.01** Review/명시 Send와 음성 lifecycle 복구 — todo
-          - **MW.07.02.01.01.A1** late transcript와 새 capture가 섞이지 않고 unknown 상태에서 재송신하지 않는다. — pending
-          - **MW.07.02.01.01.A2** 실제 지원 source의 capture와 별도 STT fixture 결과를 구분하고 offline/재시작 시 draft가 복구된다. — pending
-  - **MW.08** 배포와 운영 — 0/3 tasks done
-    - **MW.08.01** OS에 설치하고 상주 — 0/1 tasks done
-      - **MW.08.01.01** desktop lifecycle — 0/1 tasks done
-        - **MW.08.01.01.01** Mac/Windows clean install과 사용자 세션 lifecycle — todo
-          - **MW.08.01.01.01.A1** macOS arm64/x64와 Windows x64 clean 환경에서 외부 Node/Python 없이 core가 실행된다; 미확보 환경은 blocked다. — pending
-          - **MW.08.01.01.01.A2** 다른 OS 사용자 secret 격리, login toggle, port 충돌과 crash recovery를 검증한다. — pending
-    - **MW.08.02** 업데이트와 출시 — 0/2 tasks done
-      - **MW.08.02.01** release evidence — 0/2 tasks done
-        - **MW.08.02.01.01** 서명·업데이트·rollback·uninstall — todo
-          - **MW.08.02.01.01.A1** 실제 서명·공증/설치/업데이트/변조 거부/중단 복구를 플랫폼별 검증한다; 계정 미확보는 blocked다. — pending
-          - **MW.08.02.01.01.A2** uninstall/reinstall 시 로그인 항목/credentials 정책이 일관되고 오래된 trust가 자동 부활하지 않는다. — pending
+    - **MW.05.02** 기존/새 작업 제어 — 1/1 tasks done
+      - **MW.05.02.01** session owner — 1/1 tasks done
+        - **MW.05.02.01.01** 기존 작업 attach와 새 task 전체 왕복 — done
+          - **MW.05.02.01.01.A1** 장치 0개로 실제 local harness task create→send→events→decision→cancel/recovery 흐름을 완료한다. — pass
+          - **MW.05.02.01.01.A2** 기존 owner 접근 불가 시 read-only이고 scope 변경/새 task 선택이 pending 목적지를 바꾸지 않는다. — pass
+  - **MW.06** 로컬 사용자 경험 — 3/3 tasks done
+    - **MW.06.01** 설치 후 설정 — 2/2 tasks done
+      - **MW.06.01.01** onboarding와 tray — 2/2 tasks done
+        - **MW.06.01.01.01** 실패/skip 가능한 local onboarding — done
+          - **MW.06.01.01.01.A1** J01 전체 흐름에서 미설치·장치 없음·auth 취소·수동 경로·restart를 거쳐 Supervisor에 도달한다. — pass
+          - **MW.06.01.01.01.A2** discovered/authenticated/controllable을 구분하고 Internet 차단이 local onboarding을 막지 않는다. — pass
+        - **MW.06.01.01.02** Tray-only shell과 Settings — done
+          - **MW.06.01.01.02.A1** 브라우저 닫기와 제어 pause가 작업 종료로 오해되지 않으며 native 주 창이 자동 생성되지 않는다. — pass
+          - **MW.06.01.01.02.A2** Settings 변경/취소와 tray 상태가 같은 API revision을 반영하고 비밀이 URL에 노출되지 않는다. — pass
+    - **MW.06.02** 여러 작업 supervision — 1/1 tasks done
+      - **MW.06.02.01** 목록과 attention — 1/1 tasks done
+        - **MW.06.02.01.01** Overview/Attention와 목적지 고정 상세 — done
+          - **MW.06.02.01.01.A1** 다중 project/harness fixture와 실제 지원 task에서 상태/lastSeen/unsupported가 사실대로 표시된다. — pass
+          - **MW.06.02.01.01.A2** 동시 decision 처리·필터 전환·reconnect에도 초안 목적지와 읽던 목록 위치가 보존된다. — pass
+  - **MW.07** 선택형 음성 — 2/2 tasks done
+    - **MW.07.01** 입력과 인식 설정 — 1/1 tasks done
+      - **MW.07.01.01** AudioSource와 SpeechProvider — 1/1 tasks done
+        - **MW.07.01.01.01** AudioSource와 선택형 SpeechProvider 분리 — done
+          - **MW.07.01.01.01.A1** Python/모델/마이크가 없는 clean 환경에서도 core가 정상 사용 가능하다. — pass
+          - **MW.07.01.01.01.A2** source 권한 거부/STT 미설치·실패·취소에서 이유와 복구 동작이 명확하다. — pass
+    - **MW.07.02** 음성 draft 사용 — 1/1 tasks done
+      - **MW.07.02.01** 취소와 복구 — 1/1 tasks done
+        - **MW.07.02.01.01** Review/명시 Send와 음성 lifecycle 복구 — done
+          - **MW.07.02.01.01.A1** late transcript와 새 capture가 섞이지 않고 unknown 상태에서 재송신하지 않는다. — pass
+          - **MW.07.02.01.01.A2** 실제 지원 source의 capture와 별도 STT fixture 결과를 구분하고 offline/재시작 시 draft가 복구된다. — pass
+  - **MW.08** 배포와 운영 — 2/3 tasks done
+    - **MW.08.01** OS에 설치하고 상주 — 1/1 tasks done
+      - **MW.08.01.01** desktop lifecycle — 1/1 tasks done
+        - **MW.08.01.01.01** Mac/Windows clean install과 사용자 세션 lifecycle — done
+          - **MW.08.01.01.01.A1** macOS arm64/x64와 Windows x64 clean 환경에서 외부 Node/Python 없이 core가 실행된다; 미확보 환경은 blocked다. — pass
+          - **MW.08.01.01.01.A2** 다른 OS 사용자 secret 격리, login toggle, port 충돌과 crash recovery를 검증한다. — pass
+    - **MW.08.02** 업데이트와 출시 — 1/2 tasks done
+      - **MW.08.02.01** release evidence — 1/2 tasks done
+        - **MW.08.02.01.01** 서명·업데이트·rollback·uninstall — done
+          - **MW.08.02.01.01.A1** 실제 서명·공증/설치/업데이트/변조 거부/중단 복구를 플랫폼별 검증한다; 계정 미확보는 blocked다. — pass
+          - **MW.08.02.01.01.A2** uninstall/reinstall 시 로그인 항목/credentials 정책이 일관되고 오래된 trust가 자동 부활하지 않는다. — pass
         - **MW.08.02.01.02** 로컬 제품 통합 검수와 support matrix — todo
           - **MW.08.02.01.02.A1** G0-G3 필수 task가 증거와 함께 완료되고 pending/blocked를 pass로 계산하지 않는다. — pending
           - **MW.08.02.01.02.A2** Internet 및 LAN 비활성에서 core 제어 UI가 유지되며 cloud harness 연결 실패는 별도로 표시된다. — pending
-  - **MW.09** 선택형 local LAN multi-host — 0/2 tasks done
-    - **MW.09.01** 사용자 소유 PC 연결 — 0/1 tasks done
-      - **MW.09.01.01** host trust — 0/1 tasks done
-        - **MW.09.01.01.01** 선택적 LAN Host pairing과 해제 — todo
-          - **MW.09.01.01.01.A1** 미등록 host/spoof/expired credential이 거부되고 network-off 즉시 discovery/listener가 닫힌다. — pending
-          - **MW.09.01.01.01.A2** Mac↔Windows 실제 pairing/취소/해제 후 현재 PC 제어가 독립적으로 유지된다. — pending
+  - **MW.09** 선택형 local LAN multi-host — 1/2 tasks done
+    - **MW.09.01** 사용자 소유 PC 연결 — 1/1 tasks done
+      - **MW.09.01.01** host trust — 1/1 tasks done
+        - **MW.09.01.01.01** 선택적 LAN Host pairing과 해제 — done
+          - **MW.09.01.01.01.A1** 미등록 host/spoof/expired credential이 거부되고 network-off 즉시 discovery/listener가 닫힌다. — pass
+          - **MW.09.01.01.01.A2** Mac↔Windows 실제 pairing/취소/해제 후 현재 PC 제어가 독립적으로 유지된다. — pass
     - **MW.09.02** 여러 PC 작업 관찰/제어 — 0/1 tasks done
       - **MW.09.02.01** federation — 0/1 tasks done
         - **MW.09.02.01.01** Paired local host 집계와 장애 분리 — todo
