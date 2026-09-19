@@ -37,12 +37,12 @@ async function verify(file: BinaryProbeSpec['executable'], signal: AbortSignal):
   const handle = await open(canonical, 'r');
   try {
     const info = await handle.stat(); checkAbort(signal);
-    if (!info.isFile() || info.size > 256 * 1024 * 1024) throw new Fault('changed');
+    if (!info.isFile() || info.size > 512 * 1024 * 1024) throw new Fault('changed');
     const digest = createHash('sha256'); const chunk = Buffer.alloc(65536); let count = 0;
     for (;;) {
       checkAbort(signal); const { bytesRead } = await handle.read(chunk, 0, chunk.length, null);
       if (!bytesRead) break;
-      count += bytesRead; if (count > 256 * 1024 * 1024) throw new Fault('changed');
+      count += bytesRead; if (count > 512 * 1024 * 1024) throw new Fault('changed');
       digest.update(chunk.subarray(0, bytesRead));
     }
     if (digest.digest('hex') !== file.sha256 || await realpath(file.path) !== canonical) throw new Fault('changed');

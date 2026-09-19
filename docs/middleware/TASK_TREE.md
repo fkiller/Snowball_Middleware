@@ -46,9 +46,9 @@ All implementation checks are pending unless their evidence says otherwise.
           - **MW.03.01.01.02.A2** 잘못된 서비스/redirect/version/permission failure가 차단되며 discovery가 server 시작 또는 command send를 하지 않는다. — pass
     - **MW.03.02** 연결하고 계속 사용 — 0/3 tasks done
       - **MW.03.02.01** owner와 lifecycle — 0/3 tasks done
-        - **MW.03.02.01.01** Codex reference plugin의 명시적 연결 — todo
-          - **MW.03.02.01.01.A1** 실제 지원 OS/설치 버전에서 owned session create/read/send/events/decision/cancel을 검증한다. — pending
-          - **MW.03.02.01.01.A2** existing Desktop owner 경합은 오송신 없이 제한되고 macOS/Windows 지원 여부를 각각 증거로 기록한다. — pending
+        - **MW.03.02.01.01** Codex reference plugin의 명시적 연결 — blocked
+          - **MW.03.02.01.01.A1** 실제 지원 OS/설치 버전에서 owned session create/read/send/events/decision/cancel을 검증한다. — blocked
+          - **MW.03.02.01.01.A2** existing Desktop owner 경합은 오송신 없이 제한되고 macOS/Windows 지원 여부를 각각 증거로 기록한다. — blocked
         - **MW.03.02.01.02** 두 번째 harness와 제한된 Antigravity 지원 — todo
           - **MW.03.02.01.02.A1** 실제 OpenCode instance에서 read/send/stop/decision/reconnect와 session identity를 검증한다. — pending
           - **MW.03.02.01.02.A2** Antigravity transcript fixture pass가 full control로 표시되지 않고 실제 검증한 기능만 활성화된다. — pending

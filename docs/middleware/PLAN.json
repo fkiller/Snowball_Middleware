@@ -5,7 +5,7 @@
   "scope": "Local control first. Plugin, identity, durable commands, authenticated API and optional device registry foundation implemented. Physical discovery, harnesses, UI and packaging remain.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
   "targetRepository": "E:/developments/projects/Snowball_Middleware",
-  "resumeTaskId": "MW.03.02.01.01",
+  "resumeTaskId": "MW.05.01.01.01",
   "requirements": [
     {
       "id": "R-LOCAL",
@@ -1179,7 +1179,7 @@
       "kind": "task",
       "title": "Codex reference plugin의 명시적 연결",
       "requirements": [],
-      "status": "todo",
+      "status": "blocked",
       "dependsOn": [
         "MW.03.01.01.02",
         "MW.02.02.01.01"
@@ -1205,13 +1205,33 @@
         "H09"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "선택 instance만 start/attach하고 owner와 credentials source를 보존한다.",
-        "blockers": [],
-        "updatedAt": null
+        "owner": "Codex",
+        "baseCommit": "91d84bd",
+        "changedFiles": [
+          "packages/harness-codex",
+          "packages/plugin-host/src/index.ts",
+          "packages/plugin-host/src/binary-probe.ts",
+          "packages/plugin-host/PROBES.md",
+          "scripts/build.mjs",
+          "scripts/verify-codex-local.mjs",
+          "tests/codex-adapter.test.mjs",
+          "tests/codex-rpc.test.mjs",
+          "tests/fixtures/codex-rpc.mjs",
+          "docs/ADR-006-codex-owned-runtime.md",
+          "docs/middleware/evidence/MW.03.02.01.01/verification.md"
+        ],
+        "completedSteps": [
+          "Explicit reviewed worker plus selected native 0.153.4 owned-stdio launch; credential-home pinning and normalized journal port.",
+          "No historical/Desktop takeover; request ID namespaces, current turn/decision binding, ownership revocation and unknown delivery preserved.",
+          "Actual isolated Windows native version/initialize/account/read/list and graceful worker/native cleanup verified; 101 full tests pass."
+        ],
+        "nextAction": "Obtain selected logged-in Codex home for real owned create/send/events/decision/cancel acceptance and resolve exact-answer proof. Meanwhile dependency-ready MW.05.01.01.01 workspace registry.",
+        "blockers": [
+          "Actual authenticated control/decision/cancel not executed; user choice of login environment pending.",
+          "serverRequest/resolved is not exact-answer acceptance proof; decision delivery deliberately remains unknown.",
+          "macOS and actual existing Desktop owner-race acceptance not executed; private routes unsupported."
+        ],
+        "updatedAt": "2026-09-19T00:23:26.722Z"
       },
       "priority": {
         "designDemand": 4,
@@ -1225,8 +1245,16 @@
       "kind": "acceptance",
       "title": "실제 지원 OS/설치 버전에서 owned session create/read/send/events/decision/cancel을 검증한다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "blocked",
+      "evidence": [
+        {
+          "date": "2026-09-19",
+          "environment": "Windows x64 Node 20.19.6 Codex 0.153.4; isolated empty CODEX_HOME",
+          "procedure": "npm test; node scripts/verify-codex-local.mjs <selected executable> <reviewed hash>",
+          "result": "101/101 tests pass; native isolated connection/account-read/empty-list/shutdown pass. Authenticated flows, exact decision proof, Desktop race and macOS acceptance remain blocked/unverified.",
+          "reference": "docs/middleware/evidence/MW.03.02.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.03.02.01.01.A2",
@@ -1235,8 +1263,16 @@
       "kind": "acceptance",
       "title": "existing Desktop owner 경합은 오송신 없이 제한되고 macOS/Windows 지원 여부를 각각 증거로 기록한다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "blocked",
+      "evidence": [
+        {
+          "date": "2026-09-19",
+          "environment": "Windows x64 Node 20.19.6 Codex 0.153.4; isolated empty CODEX_HOME",
+          "procedure": "npm test; node scripts/verify-codex-local.mjs <selected executable> <reviewed hash>",
+          "result": "101/101 tests pass; native isolated connection/account-read/empty-list/shutdown pass. Authenticated flows, exact decision proof, Desktop race and macOS acceptance remain blocked/unverified.",
+          "reference": "docs/middleware/evidence/MW.03.02.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.03.02.01.02",
@@ -1502,7 +1538,7 @@
           "Implemented profile-gated Windows/macOS backend contract, isolated worker and bounded physical safe-test engine; 11 synthetic/worker tests pass.",
           "Real Windows native metadata enumeration verified (26 collections, zero handles opened)."
         ],
-        "nextAction": "Obtain selected model and reviewed HID report contract, then run actual OS/physical tests. Independent resume: MW.03.01.01.02.",
+        "nextAction": "Obtain selected model and reviewed HID report contract, then run actual OS/physical tests. Independent resume: MW.05.01.01.01.",
         "blockers": [
           "Selected actual HID model/report contract and physical interaction required; production catalog intentionally empty.",
           "Actual macOS and two-unit/no-serial/port-change acceptance not available in this session."
@@ -1681,7 +1717,7 @@
           "Extracted bounded legacy key/knob decoder, preview renderer and explicitly opted-in lab UDP transport in hardware repository commit d5eabaf.",
           "Documented future authenticated pairing requirements; current firmware always fails production control admission."
         ],
-        "nextAction": "Implement and physically validate authenticated firmware pairing before enabling a production MK20 plugin. Independent resume: MW.03.01.01.02.",
+        "nextAction": "Implement and physically validate authenticated firmware pairing before enabling a production MK20 plugin. Independent resume: MW.05.01.01.01.",
         "blockers": [
           "Current MK20 firmware has no authenticated pairing protocol. Real-device success/cancel/expiry/identity/replay verification is unavailable."
         ],

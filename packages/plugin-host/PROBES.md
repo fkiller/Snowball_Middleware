@@ -19,7 +19,7 @@ native executable or runtime plus script artifacts instead of enabling a shell.
 No PATH lookup, shell, stdin, inherited provider credentials or NODE_OPTIONS.
 
 Defaults: 3 second deadline including artifact reads, maximum 5 seconds; 64 KiB
-combined stdout/stderr; four active work units. Files are streamed with a 256 MiB
+combined stdout/stderr; four active work units. Files are streamed with a 512 MiB
 limit. Cancel/deadline prevents later launch, terminates the owned direct process,
 and escalates termination after 250 ms. A native filesystem operation cannot always
 be cancelled: its slot stays occupied until it settles, avoiding unbounded work.

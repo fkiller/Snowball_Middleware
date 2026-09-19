@@ -169,7 +169,9 @@ export class PluginHost extends EventEmitter {
       await new Promise<void>(resolve => {
         const timer = setTimeout(() => child.kill('SIGKILL'), 1000);
         child.once('exit', () => { clearTimeout(timer); resolve(); });
-        child.kill();
+        // Give a reviewed worker EOF so it can stop only the native children it owns.
+        // Killing the worker first can orphan its harness process on Windows.
+        child.stdin.end();
       });
     }
     this.state = 'stopped';
