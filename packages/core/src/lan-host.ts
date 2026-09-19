@@ -423,3 +423,127 @@ export class LanHostListener {
     }
   }
 }
+
+export interface HostAggregation {
+  hostId: HostId;
+  name: string;
+  platform: 'darwin' | 'win32' | 'linux';
+  status: 'online' | 'degraded' | 'offline' | 'revoked';
+  isLocal: boolean;
+  sessions: any[];
+  lastSeenAt?: number;
+  error?: string;
+}
+
+export interface LanHostFederatorOptions {
+  now?: () => number;
+  requestPeer?: (
+    address: string,
+    port: number,
+    path: string,
+    headers: Record<string, string>
+  ) => Promise<{ status: number; data: any }>;
+}
+
+export interface SessionSource {
+  listSessions(pluginId?: string): Promise<any[]>;
+}
+
+export class LanHostFederator {
+  private readonly now: () => number;
+
+  constructor(
+    readonly registry: LanHostRegistry,
+    readonly sessionSource: SessionSource,
+    private readonly options: LanHostFederatorOptions = {}
+  ) {
+    this.now = options.now ?? Date.now;
+  }
+
+  async aggregate(): Promise<HostAggregation[]> {
+    const localHost = this.registry.getLocalHost();
+    const localSessions = await this.sessionSource.listSessions();
+
+    const result: HostAggregation[] = [
+      {
+        hostId: localHost.hostId,
+        name: localHost.name,
+        platform: localHost.platform,
+        status: 'online',
+        isLocal: true,
+        sessions: localSessions,
+        lastSeenAt: this.now(),
+      },
+    ];
+
+    const paired = this.registry.listPairedHosts();
+    for (const remote of paired) {
+      if (remote.status === 'revoked') {
+        result.push({
+          hostId: remote.hostId,
+          name: remote.name,
+          platform: remote.platform,
+          status: 'revoked',
+          isLocal: false,
+          sessions: [],
+        });
+        continue;
+      }
+
+      try {
+        if (this.options.requestPeer) {
+          const timestamp = this.now();
+          const signature = this.registry.signPayload(`${timestamp}:GET:/peer/status:`);
+          const res = await this.options.requestPeer(remote.address, remote.port, '/peer/status', {
+            'x-snowball-host-id': localHost.hostId,
+            'x-snowball-timestamp': timestamp.toString(),
+            'x-snowball-signature': signature,
+          });
+
+          if (res.status === 200) {
+            result.push({
+              hostId: remote.hostId,
+              name: remote.name,
+              platform: remote.platform,
+              status: 'online',
+              isLocal: false,
+              sessions: Array.isArray(res.data?.sessions) ? res.data.sessions : [],
+              lastSeenAt: this.now(),
+            });
+          } else {
+            result.push({
+              hostId: remote.hostId,
+              name: remote.name,
+              platform: remote.platform,
+              status: 'degraded',
+              isLocal: false,
+              sessions: [],
+              error: `HTTP ${res.status}`,
+            });
+          }
+        } else {
+          result.push({
+            hostId: remote.hostId,
+            name: remote.name,
+            platform: remote.platform,
+            status: 'offline',
+            isLocal: false,
+            sessions: [],
+          });
+        }
+      } catch (err: any) {
+        result.push({
+          hostId: remote.hostId,
+          name: remote.name,
+          platform: remote.platform,
+          status: 'degraded',
+          isLocal: false,
+          sessions: [],
+          error: err?.message || 'peer_unreachable',
+        });
+      }
+    }
+
+    return result;
+  }
+}

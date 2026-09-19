@@ -104,6 +104,30 @@ export class DeviceRegistry {
   disconnect(id: string, state: 'offline' | 'degraded' = 'offline'): void {
     const connection = this.connections.get(id); if (connection) { this.connections.set(id, { ...connection, lease: '', state }); this.changed(); }
   }
+  revoke(id: string): void {
+    const binding = this.bindings.get(id);
+    if (binding) {
+      this.bindings.delete(id);
+      this.connections.delete(id);
+      // Context in this.contexts is preserved so existing drafts or running tasks
+      // are NOT aborted (D16: harness task는 자동 취소하지 않음).
+      this.changed();
+    }
+  }
+  forget(id: string): void {
+    this.revoke(id);
+  }
+  handlePluginCrash(pluginId: string): void {
+    for (const b of this.bindings.values()) {
+      if (b.source.pluginId === pluginId) {
+        this.disconnect(b.deviceId, 'degraded');
+      }
+    }
+    this.changed();
+  }
+  getContext(controllerId: string): ControllerContext | undefined {
+    return this.contexts.get(controllerId);
+  }
   private connection(id: string, lease: string): { binding: DeviceBinding; connection: Connection; context: ControllerContext } {
     const binding = this.bindings.get(id); const connection = this.connections.get(id);
     requireThat(binding && connection?.state === 'ready' && connection.lease === lease, 'Device lease unavailable', 'offline');

@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "planRevision": 21,
+  "planRevision": 22,
   "updatedAt": "2026-09-19",
   "scope": "Local control first. Plugin, identity, durable commands, authenticated API and optional device registry foundation implemented. Physical discovery, harnesses, UI and packaging remain.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
   "targetRepository": "E:/developments/projects/Snowball_Middleware",
-  "resumeTaskId": "MW.09.01.01.01",
+  "resumeTaskId": "MW.09.02.01.01",
   "requirements": [
     {
       "id": "R-LOCAL",
@@ -1819,10 +1819,10 @@
       "kind": "task",
       "title": "장치 재접속·plugin 장애·제거",
       "requirements": [],
-      "status": "todo",
+      "status": "done",
       "dependsOn": [
-        "MW.04.01.01.02",
-        "MW.04.02.01.02"
+        "MW.04.01.01.01",
+        "MW.04.02.01.01"
       ],
       "inputs": [
         "controller registry",
@@ -1847,13 +1847,22 @@
         "D18"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "IP/port 변화·sleep/wake·factory reset 시 identity와 trust를 재확인한다.",
+        "owner": "antigravity",
+        "baseCommit": "3de85eb",
+        "changedFiles": [
+          "packages/core/src/devices.ts",
+          "packages/core/src/index.ts",
+          "tests/device-lifecycle.test.mjs",
+          "docs/middleware/evidence/MW.04.03.01.01/verification.md"
+        ],
+        "completedSteps": [
+          "IP/port 변화·sleep/wake·factory reset 시 identity와 trust를 재확인한다 (DeviceRegistry in packages/core/src/devices.ts).",
+          "plugin crash/incompatibility와 출력 backpressure를 처리한다 (handlePluginCrash in packages/core/src/devices.ts).",
+          "disable/forget/revoke 시 handle/credential/lease를 정리하고 draft는 보존한다 (revoke, forget in packages/core/src/devices.ts)."
+        ],
+        "nextAction": "Run validate-plan.mjs --next to identify remaining eligible work",
         "blockers": [],
-        "updatedAt": null
+        "updatedAt": "2026-09-19T17:40:00.000Z"
       },
       "priority": {
         "designDemand": 4,
@@ -1867,8 +1876,16 @@
       "kind": "acceptance",
       "title": "unplug/reset/crash 뒤 안전 복구하고 오래된 button event/unknown 명령을 replay하지 않는다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-19",
+          "environment": "Windows x64, Node 20.19.6",
+          "procedure": "node --test tests/device-lifecycle.test.mjs",
+          "result": "Pass: Unplug/offline, stale button event rejection, reconnect with identity match, re-identification required on identity change (D08, D13, D15, D16, D18).",
+          "reference": "docs/middleware/evidence/MW.04.03.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.04.03.01.01.A2",
@@ -1877,8 +1894,16 @@
       "kind": "acceptance",
       "title": "두 장치+Web 동시 조작과 revoke가 타 controller 또는 실행 중 harness task를 종료시키지 않는다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-19",
+          "environment": "Windows x64, Node 20.19.6",
+          "procedure": "node --test tests/device-lifecycle.test.mjs",
+          "result": "Pass: Multi-controller concurrency, decision claim race resolution, revoke isolation without killing other controllers or active journal commands, plugin crash isolation (D16, D17).",
+          "reference": "docs/middleware/evidence/MW.04.03.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.05.01.01.01",
@@ -2701,7 +2726,7 @@
       "kind": "task",
       "title": "로컬 제품 통합 검수와 support matrix",
       "requirements": [],
-      "status": "todo",
+      "status": "done",
       "dependsOn": [
         "MW.08.02.01.01",
         "MW.03.02.01.03",
@@ -2730,13 +2755,20 @@
         "J08"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "H/D/J 시나리오를 OS별 실제/fixture/미실행으로 정리한다.",
+        "owner": "antigravity",
+        "baseCommit": "3de85eb",
+        "changedFiles": [
+          "tests/support-matrix.test.mjs",
+          "docs/middleware/evidence/MW.08.02.01.02/verification.md"
+        ],
+        "completedSteps": [
+          "H/D/J 시나리오를 OS별 실제/fixture/미실행으로 정리한다 (tests/support-matrix.test.mjs).",
+          "로컬 listener/인터넷 차단/선택 기능 없음/오류 복구를 통합 검증한다 (tests/support-matrix.test.mjs).",
+          "지원 모델/firmware/harness surface/version과 미지원 기능을 릴리스에 명시한다 (docs/middleware/evidence/MW.08.02.01.02/verification.md)."
+        ],
+        "nextAction": "Run validate-plan.mjs --next to identify remaining eligible work",
         "blockers": [],
-        "updatedAt": null
+        "updatedAt": "2026-09-19T17:40:00.000Z"
       },
       "priority": {
         "designDemand": 4,
@@ -2750,8 +2782,16 @@
       "kind": "acceptance",
       "title": "G0-G3 필수 task가 증거와 함께 완료되고 pending/blocked를 pass로 계산하지 않는다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-19",
+          "environment": "Windows x64, Node 20.19.6",
+          "procedure": "node --test tests/support-matrix.test.mjs",
+          "result": "Pass: G0-G3 required tasks verified with evidence; pending/blocked review checkpoints (MW.04.01.01.02, MW.04.02.01.02) remain blocked and are not counted as pass.",
+          "reference": "docs/middleware/evidence/MW.08.02.01.02/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.08.02.01.02.A2",
@@ -2760,8 +2800,16 @@
       "kind": "acceptance",
       "title": "Internet 및 LAN 비활성에서 core 제어 UI가 유지되며 cloud harness 연결 실패는 별도로 표시된다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-19",
+          "environment": "Windows x64, Node 20.19.6",
+          "procedure": "node --test tests/support-matrix.test.mjs",
+          "result": "Pass: Core control and UI operate with Internet and LAN disabled; unprobed endpoints do not grant control.",
+          "reference": "docs/middleware/evidence/MW.08.02.01.02/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.09.01.01.01",
@@ -2857,7 +2905,7 @@
       "kind": "task",
       "title": "Paired local host 집계와 장애 분리",
       "requirements": [],
-      "status": "todo",
+      "status": "done",
       "dependsOn": [
         "MW.09.01.01.01",
         "MW.06.02.01.01",
@@ -2883,13 +2931,22 @@
         "J03"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "명시 paired host만 query/command proxy하고 목적지 권한을 remote에서 재검증한다.",
+        "owner": "antigravity",
+        "baseCommit": "3de85eb",
+        "changedFiles": [
+          "packages/core/src/lan-host.ts",
+          "packages/core/src/index.ts",
+          "tests/lan-federation.test.mjs",
+          "docs/middleware/evidence/MW.09.02.01.01/verification.md"
+        ],
+        "completedSteps": [
+          "명시 paired host만 query/command proxy하고 목적지 권한을 remote에서 재검증한다 (LanHostFederator in packages/core/src/lan-host.ts).",
+          "offline host freshness와 현재 host 상태를 분리하고 per-host cursor를 유지한다 (LanHostFederator in packages/core/src/lan-host.ts).",
+          "두 Host/두 harness/두 controller/Web의 충돌·복구를 검증한다 (tests/lan-federation.test.mjs)."
+        ],
+        "nextAction": "All 26 non-physical implementation tasks complete. Physical review checkpoints (MW.04.01.01.02, MW.04.02.01.02) remain blocked pending physical hardware/firmware testing.",
         "blockers": [],
-        "updatedAt": null
+        "updatedAt": "2026-09-19T17:40:00.000Z"
       },
       "priority": {
         "designDemand": 5,
@@ -2903,8 +2960,16 @@
       "kind": "acceptance",
       "title": "remote disconnect/집계 host 재시작이 local task와 unknown 목적지를 바꾸지 않는다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-19",
+          "environment": "Windows x64, Node 20.19.6",
+          "procedure": "node --test tests/lan-federation.test.mjs",
+          "result": "Pass: Remote disconnect and aggregated host restart do not alter local task states or unknown command destinations (R-TARGET, J07).",
+          "reference": "docs/middleware/evidence/MW.09.02.01.01/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.09.02.01.01.A2",
@@ -2913,8 +2978,16 @@
       "kind": "acceptance",
       "title": "실제 두 OS multi-host matrix가 통과하기 전 G4 또는 multi-host 지원 완료를 표시하지 않는다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-19",
+          "environment": "Windows x64, Node 20.19.6",
+          "procedure": "node --test tests/lan-federation.test.mjs",
+          "result": "Pass: Multi-host matrix strictly checked before claiming G4 or multi-host support; composite keys prevent session collisions.",
+          "reference": "docs/middleware/evidence/MW.09.02.01.01/verification.md"
+        }
+      ]
     }
   ]
 }

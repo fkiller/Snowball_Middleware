@@ -97,8 +97,11 @@ export {
   LanHostRegistry,
   LanHostListener,
   LanHostFault,
+  LanHostFederator,
   type LocalHostConfig,
   type PairedHost,
   type PairingSession,
   type LanHostListenerOptions,
+  type HostAggregation,
+  type LanHostFederatorOptions,
 } from './lan-host.js';

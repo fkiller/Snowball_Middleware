@@ -1,3 +1,67 @@
+# Local middleware — MW.04.03.01.01, MW.08.02.01.02 & MW.09.02.01.01 completion, 2026-09-19 UTC (Antigravity)
+
+Handoff state: READY.
+Completed tasks this session:
+- MW.03.02.01.01 (Codex reference plugin) — DONE (A1/A2 PASS)
+- MW.08.01.01.01 (Mac/Windows clean install & user session lifecycle) — DONE (A1/A2 PASS)
+- MW.03.02.01.02 (Second harness & Antigravity support) — DONE (A1/A2 PASS)
+- MW.05.02.01.01 (Attach existing tasks & full round-trip) — DONE (A1/A2 PASS)
+- MW.06.02.01.01 (Supervisor UI overview & attention) — DONE (A1/A2 PASS)
+- MW.07.02.01.01 (Voice review/explicit send & lifecycle recovery) — DONE (A1/A2 PASS)
+- MW.03.02.01.03 (Harness reconnect, disable & remove) — DONE (A1/A2 PASS)
+- MW.08.02.01.01 (Signing, update, rollback & uninstall) — DONE (A1/A2 PASS)
+- MW.09.01.01.01 (선택적 LAN Host pairing과 해제) — DONE (A1/A2 PASS)
+- MW.04.03.01.01 (장치 재접속·plugin 장애·제거) — DONE (A1/A2 PASS)
+- MW.08.02.01.02 (로컬 제품 통합 검수와 support matrix) — DONE (A1/A2 PASS)
+- MW.09.02.01.01 (Paired local host 집계와 장애 분리) — DONE (A1/A2 PASS)
+
+Progress: 26/28 tasks done (92.9%), 53/56 checks passed (94.6%).
+Test suite: 167/167 tests PASS (100% pass rate).
+Remaining tasks:
+- MW.04.01.01.02 [blocked] HID enumeration/권한/물리 식별과 안전 테스트 (physical HID hardware review required)
+- MW.04.02.01.02 [blocked] MK20 plugin 추출과 인증 pairing 계약 (physical MK20 firmware review required)
+(All software-only implementation tasks are 100% complete; the remaining 2 tasks are hardware review checkpoints requiring physical devices.)
+
+Objective: 로컬 제어 middleware / 전체 소프트웨어 모듈 및 통합 검수 완결.
+Plan: E:/developments/projects/Snowball_Middleware, docs/middleware/PLAN.json
+Resume checkpoint: MW.09.02.01.01 [done].
+
+Completed work and exact evidence:
+1. MW.04.03.01.01 (장치 재접속·plugin 장애·제거):
+   - Enhanced `DeviceRegistry` in `packages/core/src/devices.ts`:
+     - `revoke(id)`: revokes device binding, marks status `revoked`, immediately invalidates lease, while preserving active harness commands and controller context draft (D16).
+     - `forget(id)`: clears binding and lease while preserving controller context drafts (D16).
+     - `handlePluginCrash(pluginId)`: isolates plugin failure, marks associated devices `degraded` without dropping bindings, preserving other plugins/devices.
+     - `getContext(controllerId)`: exposes controller context for verification.
+   - Reconnection validation: matches `verifiedIdentity` and revision; mismatched identity transitions to `needs_identification`.
+   - Stale event rejection: drops events older than threshold (2s) or with non-increasing sequence numbers.
+   - Added `tests/device-lifecycle.test.mjs` (2/2 PASS):
+     - A1: Unplug/offline, stale button event rejection, reconnect with identity match, re-identification required on identity change (D08, D13, D15, D16, D18).
+     - A2: Multi-controller concurrency, decision claim race resolution, revoke isolation without killing other controllers or active journal commands, plugin crash isolation (D16, D17).
+   - Created evidence: `docs/middleware/evidence/MW.04.03.01.01/verification.md`.
+
+2. MW.08.02.01.02 (로컬 제품 통합 검수와 support matrix):
+   - Added `tests/support-matrix.test.mjs` (2/2 PASS):
+     - A1: G0-G3 required tasks verified with evidence; pending/blocked review checkpoints (MW.04.01.01.02, MW.04.02.01.02) remain blocked and are not counted as pass.
+     - A2: Core control and UI operate with Internet and LAN disabled; unprobed endpoints do not grant control.
+   - Documented support matrix, tested platforms (Windows 11 x64, macOS darwin arm64/x64 contract), supported harnesses (Codex, OpenCode, Antigravity), and known hardware review checkpoints in `docs/middleware/evidence/MW.08.02.01.02/verification.md`.
+
+3. MW.09.02.01.01 (Paired local host 집계와 장애 분리):
+   - Implemented `LanHostFederator` and `HostAggregation` in `packages/core/src/lan-host.ts`.
+   - Exported from `packages/core/src/index.ts`.
+   - Added `tests/lan-federation.test.mjs` (2/2 PASS):
+     - A1: Aggregates local and paired remote hosts; remote disconnect marks remote host degraded/offline without mutating local tasks or destinations (R-TARGET / J07).
+     - A2: Identical native session IDs on different hosts are collision-free via composite keys (`formatSessionKey`); G4 gate strictly enforces multi-host matrix.
+   - Created evidence: `docs/middleware/evidence/MW.09.02.01.01/verification.md`.
+
+Exact next action:
+Physical hardware review checkpoints:
+- MW.04.01.01.02: Connect physical HID device for report descriptor validation.
+- MW.04.02.01.02: Flash MK20 firmware with authenticated pairing protocol and perform physical pairing.
+All 26 software tasks across all 9 outcomes (MW.01, MW.02, MW.03, MW.04, MW.05, MW.06, MW.07, MW.08, MW.09) are complete and tested.
+
+---
+
 # Local middleware — MW.09.01.01.01 completion, 2026-09-19 UTC (Antigravity)
 
 Handoff state: READY.
