@@ -70,9 +70,14 @@ in_progress와 checkpoint가 오래됐으면 Git diff/파일/실제 프로세스
 
 ## 6. 현재 checkpoint
 
-- PLAN revision 12, MW.06.01.01.01 in_progress; 11/28 tasks done, 23/56 checks pass.
-- 4eccedc: incoming harness survey preserved; durable trusted workspace selection, private state/runtime, browser fetch fix.
-- Full 124/124 before SDK fix; final API 17/17 after fix. Actual browser registration/skip/Overview/restart/recheck/logout passed with temporary native-picker fixture.
-- Native Windows/macOS dialog, real auth/probe journey, actual Internet-off and full Connections remain pending. A1/A2 not passed.
-- Latest actual quota: five-hour 5% remaining -> mandatory handoff; weekly 85%. No reset credit used. Check fresh usage first.
+- PLAN revision 13, MW.06.01.01.01 in_progress; 11/28 tasks done, 23/56 checks pass.
+- f22db9f: actionable selection/storage error codes (WorkspaceFault, picker codes,
+  API 409/429/400/503, Supervisor notices, abort/permission/missing/invalid tests).
+- Full 127/127; focused selection/store/API/runtime 27/27. Previous 124/124 and
+  API 17/17 overlap the suite. Actual browser registration/skip/Overview/restart/
+  recheck/logout passed earlier with temporary native-picker fixture.
+- Interactive native Windows/macOS dialog, real auth/probe journey, actual
+  Internet-off and full Connections remain pending. A1/A2 not passed.
+- codexbar returns Authentication required; no percentage invented. Check fresh
+  usage before large work.
 - No owned preview left running. Read HANDOFF top and task evidence for exact next action and constraints.

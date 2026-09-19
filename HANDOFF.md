@@ -1,3 +1,53 @@
+# Local middleware — selection-error slice, 2026-09-19 UTC (muse-spark)
+
+Handoff state: READY. MW.06.01.01.01 stays IN PROGRESS (A1/A2 pending, no
+acceptance claimed). Actionable selection/storage error codes implemented;
+interactive native dialog, harness auth/probe wiring, Internet-off and
+authenticated recovery journeys remain.
+
+Objective: 로컬 제어 middleware / MW.06 hardware-free supervision onboarding.
+Plan: E:/developments/projects/Snowball_Middleware, docs/middleware/PLAN.json
+rev 13, resumeTaskId MW.06.01.01.01 (unchanged).
+Active task ID / ancestor path: MW.06.01.01.01 under MW > MW.06 > MW.06.01.
+Actual Git branch / HEAD / dirty and untracked files: branch
+codex/local-control-core, HEAD f22db9f plus uncommitted HANDOFF/RESUME docs.
+No stash. Build outputs git-ignored.
+Completed work and exact evidence: coded `WorkspaceFault` in
+packages/core workspace-store (busy/cancelled/invalid/limit/missing/
+permission/storage/unavailable), coded native-picker failures, API 409/429/
+400/503 mapping without paths or raw exceptions, Supervisor per-code Korean
+notices, aborted-picker cancellation test plus permission/missing/invalid/
+closed-store actionable-code tests with no path leak. `npm run build` pass;
+`npm test` 127/127 pass; focused selection/store/API/runtime 27/27 pass.
+Validator: 132 nodes, 40/40 scenarios mapped, 11/28 tasks done, 23/56 checks.
+Current incomplete work / changed files: HANDOFF.md and RESUME.md docs only;
+no source edits pending. Evidence in
+docs/middleware/evidence/MW.06.01.01.01/verification.md.
+Exact next action: interactively verify native folder-dialog
+behavior/cancellation on Windows/macOS; connect reviewed harness setup/auth/
+probe actions without HTTP-issued executable approval. Verify actual
+Internet-off and authenticated recovery journeys; A1/A2 still pending. Reuse
+runtime/store rather than recreating persistence.
+Tests run / not run / failures: npm run build pass; npm test 127/127 pass;
+focused 27/27 pass; test:reference not rerun (reference/ untouched); optional
+speech, macOS, physical HID/MK20, pairing, real-provider control,
+tray/installer not run.
+Processes or device state to preserve: none started; no listener, login,
+probe execution, or device access from this slice. Hardware/daemon preserved.
+Decisions / constraints / failed approaches: browser never triggers probes —
+provider policies live in MW.03.02.01.01 and PROBES.md forbids HTTP-issued
+binary approvals; UI states this. One existing capacity test initially failed
+because the new generic storage message hid the word capacity; fixed by
+keeping a distinct limit code/message with capacity wording and 429 mapping.
+No paths, secrets or raw exceptions in error responses.
+Blocker and alternative ready task: HID/MK20/owner-proof blockers unchanged
+(external inputs). Only other ready task: MW.07.01.01.01.
+Quota source / actual status: codexbar usage --provider codex returns
+Authentication required; per AGENTS quota-tool-failure rule, no percentage is
+invented and normal contained work continued. Recheck before large work.
+
+---
+
 # Local middleware — 2026-09-19 final checkpoint
 
 Handoff state: READY — mandatory quota handoff. Actual desktop usage: 5% five-hour
