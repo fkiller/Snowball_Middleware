@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "planRevision": 13,
+  "planRevision": 14,
   "updatedAt": "2026-09-19",
   "scope": "Local control first. Plugin, identity, durable commands, authenticated API and optional device registry foundation implemented. Physical discovery, harnesses, UI and packaging remain.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
@@ -2030,14 +2030,8 @@
       ],
       "checkpoint": {
         "owner": "muse-spark",
-        "baseCommit": "d1a8de9",
+        "baseCommit": "c6b8eaf",
         "changedFiles": [
-          "packages/core/src/workspace-store.ts",
-          "packages/core/src/index.ts",
-          "packages/api/src/index.ts",
-          "apps/supervisor/native-picker.mjs",
-          "apps/supervisor/app.js",
-          "tests/workspace-selection.test.mjs",
           "docs/middleware/evidence/MW.06.01.01.01/verification.md"
         ],
         "completedSteps": [
@@ -2046,11 +2040,12 @@
           "Partial: read-only harness survey in snapshot plus explicit POST /v1/harness/scan rescan (auth/CSRF/busy slot); SDK scanHarness; onboarding candidate list with empty/partial/null states and no control claim; served assets carry no remote origin (Internet-off static check).",
           "Durable trusted workspace selection/API and current-user state privacy; composed local development runtime.",
           "Windows browser fixture flow reaches Overview, restores workspace after runtime restart, rechecks and logs out. Fixed browser fetch receiver issue.",
-          "Actionable selection/storage errors: coded WorkspaceFault, native-picker codes, API 409/429/400/503 mapping without paths, Supervisor per-code notices; aborted-picker and permission/missing/invalid/closed-store tests."
+          "Actionable selection/storage errors: coded WorkspaceFault, native-picker codes, API 409/429/400/503 mapping without paths, Supervisor per-code notices; aborted-picker and permission/missing/invalid/closed-store tests.",
+          "Live demo to user browser: bootstrap, Harness survey-null and Workspace-empty screens user-confirmed. Folder-select stuck as predicted by agent-context UI isolation (Session 1 non-interactive desktop, notepad handle 0); speculative TopMost fix reverted unverified."
         ],
-        "nextAction": "Continue MW.06.01.01.01: interactively verify native folder-dialog behavior/cancellation on Windows/macOS; connect reviewed harness setup/auth/probe actions without HTTP-issued executable approval. Verify actual Internet-off and authenticated recovery journeys; A1/A2 still pending. Reuse runtime/store rather than recreating persistence.",
+        "nextAction": "Continue MW.06.01.01.01: decide the interactive-session validation vehicle for native folder-dialog clicks (user runs no scripts); connect reviewed harness setup/auth/probe actions without HTTP-issued executable approval. Verify actual Internet-off and authenticated recovery journeys; A1/A2 still pending. Reuse runtime/store rather than recreating persistence.",
         "blockers": [],
-        "updatedAt": "2026-09-19T15:20:57.616Z"
+        "updatedAt": "2026-09-19T16:08:30.921Z"
       },
       "priority": {
         "designDemand": 4,

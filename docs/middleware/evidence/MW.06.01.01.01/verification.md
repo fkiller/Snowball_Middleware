@@ -66,8 +66,34 @@ Windows x64, Node 20.19.6. Real temporary files, WAL/restart and loopback API:
   ignored under .state; no development fixture endpoint exists in the product API.
 - Native folder dialog implementations (Windows Forms/macOS JXA) exist but were
   **not interactively validated**; browser used a trusted fixture picker, and
-  the new abort test only covers pre-cancelled signal handling without opening
+  the abort test only covers pre-cancelled signal handling without opening
   a dialog. No claim of macOS support or interactive native cancel verification.
+
+## Agent-context UI isolation finding, 2026-09-19 (mechanically verified)
+
+- Live demo runtime (disposable state, native picker on, no providers) served
+  the real Supervisor to the local user's browser. The user confirmed with
+  their own eyes: bootstrap with a one-use code, Harness step showing
+  "Harness survey 미연결" (correct with no providers), Workspace step showing
+  "등록된 작업 공간 없음" (correct when empty).
+- Clicking 폴더 선택 stuck the browser on "이 컴퓨터에서 확인 중…": the picker
+  powershell was alive server-side (process observed waiting), but no dialog
+  was visible anywhere. A TopMost-owner hardening was applied and retried;
+  identical result. That change was then **reverted** — it addressed the wrong
+  hypothesis and could not be validated here.
+- Root cause, verified without any user clicks: agent processes run in Session
+  1 on a non-interactive desktop. `notepad` started from the agent context
+  reports `MainWindowHandle = 0` (explorer itself is Session 1, so this is
+  station/desktop isolation, not a session mismatch). Any UI spawned by an
+  agent-launched runtime — including the trusted native picker — opens on an
+  invisible desktop and can never receive input. The dialog waits until the
+  120-second selection budget aborts it (409 cancelled) or the picker is
+  killed (503 unavailable); no grant is ever published either way.
+- Consequence: native dialog click/cancel verification is **blocked on an
+  interactive-session validation vehicle** (runtime launched from the user's
+  own terminal, tray app, or equivalent). It cannot be completed by the agent
+  alone in this environment. The user does not run scripts (durable working
+  preference), so the vehicle must not require them to type commands.
 - Internet-off is currently only static no-remote-asset evidence plus all-local
   runtime tests. No OS network disconnect was performed. Real auth cancellation,
   reviewed-provider connect/probe, diagnostics and complete Connections UI remain.
