@@ -1,7 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { constants } from 'node:fs';
-import { WorkspaceRegistry } from '@snowball/core';
+import { WorkspaceRegistry, type RegisteredWorkspace, type WorkspaceStatus } from '@snowball/core';
+
+export interface WorkspaceSummary { workspaceId: string; projectId: string; displayName: string; status: WorkspaceStatus }
+const summarize = (entry: RegisteredWorkspace): WorkspaceSummary => ({ workspaceId: entry.workspaceId,
+  projectId: entry.project.projectId, displayName: entry.displayName, status: entry.status });
 
 /** Explicitly registered local roots only. No client-supplied root registration. */
 export class WorkspaceFiles {
@@ -15,6 +19,9 @@ export class WorkspaceFiles {
     return new WorkspaceFiles(registry);
   }
   list(): { workspaceId: string }[] { return this.registry.list().map(({ workspaceId }) => ({ workspaceId })); }
+  describe(): WorkspaceSummary[] { return this.registry.list().map(summarize); }
+  subscribe(listener: () => void): () => void { return this.registry.subscribe(listener); }
+  async recheck(workspaceId: string): Promise<WorkspaceSummary> { return summarize(await this.registry.refresh(workspaceId)); }
   async read(workspaceId: string, relative: string): Promise<{ text: string }> {
     const registration = await this.registry.assertReadable(workspaceId);
     const root = registration.canonical;

@@ -6,7 +6,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { once } from 'node:events';
 import { CommandJournal, formatSessionKey } from '../packages/core/dist/index.js';
-import { LocalApi, WorkspaceFiles } from '../packages/api/dist/index.js';
+import { LocalApi, WorkspaceFiles, loadSupervisorAssets } from '../packages/api/dist/index.js';
 import { LocalClient } from '../packages/client-sdk/dist/index.js';
 
 const hostId = `host_${'a'.repeat(32)}`;
@@ -171,7 +171,8 @@ test('malformed, compressed and oversized bodies cannot admit work', async t => 
 test('published OpenAPI routes and SDK operations describe the implemented v1 surface', () => {
   const spec = JSON.parse(fs.readFileSync(new URL('../packages/api/openapi.v1.json', import.meta.url)));
   assert.equal(spec.openapi, '3.1.0');
-  assert.equal(Object.keys(spec.paths).length, 8);
+  assert.equal(Object.keys(spec.paths).length, 9);
+  assert.equal(spec.paths['/v1/workspaces/{workspaceId}/recheck'].post.operationId, 'recheckWorkspace');
   assert.deepEqual(spec.paths['/v1/bootstrap'].post.security, []);
   assert.ok(spec.paths['/v1/commands'].post.responses['202']);
   assert.equal(spec.components.schemas.CommandInput.properties.actorId, undefined);
@@ -180,4 +181,61 @@ test('published OpenAPI routes and SDK operations describe the implemented v1 su
     if (value.$ref) assert.ok(value.$ref.split('/').slice(1).reduce((node, key) => node?.[key], spec), value.$ref);
     for (const child of Object.values(value)) visit(child);
   }; visit(spec);
+});
+
+test('workspace onboarding exposes repair state and rechecks only existing grants with CSRF', async t => {
+  const { api, root, directory } = await setup(t);
+  const client = new LocalClient(api.origin); await client.bootstrap(api.issueBootstrap().code);
+  const initial = await client.snapshot();
+  assert.equal(initial.workspaceDetails[0].status, 'ready');
+  assert.equal(initial.workspaceDetails[0].workspaceId, workspaceId);
+  assert.equal(initial.workspaceDetails[0].root, undefined);
+  fs.renameSync(root, path.join(directory, 'moved'));
+  assert.equal((await client.snapshot()).workspaceDetails[0].status, 'ready'); // snapshot does not scan
+  assert.equal((await client.recheckWorkspace(workspaceId)).status, 'missing');
+  const after = await client.snapshot(); assert.notEqual(after.cursor, initial.cursor);
+  assert.equal(after.workspaceDetails[0].status, 'missing');
+  const auth = await login(api);
+  const route = `/v1/workspaces/${workspaceId}/recheck`;
+  assert.equal((await request(api, route, { method: 'POST', body: {} })).status, 401);
+  assert.equal((await request(api, route, { method: 'POST', body: {}, auth, headers: { 'X-Snowball-CSRF': 'wrong' } })).status, 403);
+  assert.equal((await request(api, route, { method: 'POST', body: { root: directory }, auth })).status, 400);
+  await assert.rejects(client.recheckWorkspace(`ws_${'e'.repeat(16)}`), matches(404, 'workspace_unavailable'));
+  fs.renameSync(path.join(directory, 'moved'), root);
+  assert.equal((await client.recheckWorkspace(workspaceId)).status, 'ready');
+  const stable = (await client.snapshot()).cursor;
+  await client.recheckWorkspace(workspaceId);
+  assert.equal((await client.snapshot()).cursor, stable); // no notification storm for unchanged status
+});
+
+test('optional Supervisor serves only reviewed same-origin assets; data still requires authentication', async t => {
+  const supervisor = await loadSupervisorAssets(process.cwd());
+  const { api } = await setup(t, { supervisor });
+  const page = await fetch(api.origin);
+  assert.equal(page.status, 200); assert.match(page.headers.get('content-security-policy'), /script-src 'self'/);
+  assert.match(await page.text(), /id="content"/);
+  const script = await fetch(api.origin + '/supervisor/app.js');
+  assert.equal(script.status, 200); assert.match(await script.text(), /LocalClient/);
+  assert.equal((await request(api, '/v1/snapshot')).status, 401);
+  assert.equal((await request(api, '/supervisor/unknown.js')).status, 401);
+  assert.equal((await request(api, '/supervisor/app.js?token=bad')).status, 400);
+  assert.equal((await request(api, '/', { headers: { Origin: 'https://example.test' } })).status, 403);
+});
+
+test('workspace recheck has a deadline, retains hung-work slot and rechecks session revocation', async t => {
+  let release;
+  const workspaces = { list: () => [], describe: () => [], subscribe: () => () => {},
+    recheck: () => new Promise(resolve => { release = () => resolve({ workspaceId, projectId: `prj_${'f'.repeat(16)}`, displayName: 'Test', status: 'empty' }); }) };
+  const { api } = await setup(t, { workspaces });
+  const auth = await login(api); const route = `/v1/workspaces/${workspaceId}/recheck`;
+  const pending = request(api, route, { method: 'POST', body: {}, auth });
+  while (!release) await new Promise(resolve => setImmediate(resolve));
+  assert.equal((await request(api, route, { method: 'POST', body: {}, auth })).status, 429);
+  assert.equal((await pending).status, 504);
+  assert.equal((await request(api, route, { method: 'POST', body: {}, auth })).status, 429);
+  release(); await new Promise(resolve => setImmediate(resolve)); release = undefined;
+  const next = request(api, route, { method: 'POST', body: {}, auth });
+  while (!release) await new Promise(resolve => setImmediate(resolve));
+  api.revokeController(auth.controllerId); release();
+  assert.equal((await next).status, 401);
 });

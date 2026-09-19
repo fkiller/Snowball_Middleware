@@ -91,7 +91,7 @@ All implementation checks are pending unless their evidence says otherwise.
   - **MW.06** 로컬 사용자 경험 — 0/3 tasks done
     - **MW.06.01** 설치 후 설정 — 0/2 tasks done
       - **MW.06.01.01** onboarding와 tray — 0/2 tasks done
-        - **MW.06.01.01.01** 실패/skip 가능한 local onboarding — todo
+        - **MW.06.01.01.01** 실패/skip 가능한 local onboarding — in_progress
           - **MW.06.01.01.01.A1** J01 전체 흐름에서 미설치·장치 없음·auth 취소·수동 경로·restart를 거쳐 Supervisor에 도달한다. — pending
           - **MW.06.01.01.01.A2** discovered/authenticated/controllable을 구분하고 Internet 차단이 local onboarding을 막지 않는다. — pending
         - **MW.06.01.01.02** Tray-only shell과 Settings — todo

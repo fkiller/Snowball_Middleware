@@ -2,7 +2,9 @@ import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomBytes, createHash } from 'node:crypto';
 import { CommandJournal, createControllerId, JournalFault, type CommandInput, type DeviceRegistry } from '@snowball/core';
 import { WorkspaceFiles } from './workspaces.js';
-export { WorkspaceFiles } from './workspaces.js';
+import type { SupervisorAssets } from './supervisor.js';
+export { loadSupervisorAssets, type SupervisorAssets } from './supervisor.js';
+export { WorkspaceFiles, type WorkspaceSummary } from './workspaces.js';
 
 const secret = () => randomBytes(32).toString('base64url');
 const digest = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -15,6 +17,7 @@ interface Event { cursor: string; data: string }
 export interface LocalApiOptions {
   journal: CommandJournal; workspaces?: WorkspaceFiles; devices?: DeviceRegistry; port?: number;
   sessionTtlMs?: number; eventCapacity?: number; now?: () => number;
+  supervisor?: SupervisorAssets;
 }
 
 /** Constructed by the local runtime. Construction does not start any harness or device. */
@@ -32,6 +35,8 @@ export class LocalApi {
   private readonly eventCapacity: number;
   private readonly unsubscribe: () => void;
   private readonly unsubscribeDevices?: () => void;
+  private readonly unsubscribeWorkspaces?: () => void;
+  private readonly workspaceChecks = new Set<string>();
   private heartbeat?: ReturnType<typeof setInterval>;
   private attempts = 0;
   private attemptWindow = 0;
@@ -51,6 +56,7 @@ export class LocalApi {
     this.server.on('clientError', (_, socket) => { socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); });
     this.unsubscribe = options.journal.subscribe(() => this.changed());
     this.unsubscribeDevices = options.devices?.subscribe(() => this.changed());
+    this.unsubscribeWorkspaces = options.workspaces?.subscribe(() => this.changed());
   }
   get origin(): string { if (!this.originValue) throw new Error('API not listening'); return this.originValue; }
   get cursor(): string { return `${this.epoch}:${this.sequence}`; }
@@ -159,6 +165,7 @@ export class LocalApi {
       commands: this.options.journal.listCommands().map(c => ({ commandId: c.input.commandId, actorId: c.input.actorId, sessionKey: c.input.sessionKey, ownerId: c.input.ownerId, operation: c.input.operation, status: c.status, revision: c.revision, order: c.order, updatedAt: c.updatedAt })),
       decisions: this.options.journal.listDecisions().map(d => ({ decisionId: d.decisionId, sessionKey: d.sessionKey, ownerId: d.ownerId, status: d.status, revision: d.revision, ...(d.expiresAt !== undefined ? { expiresAt: d.expiresAt } : {}) })),
       workspaces: this.options.workspaces?.list() ?? [],
+      workspaceDetails: this.options.workspaces?.describe() ?? [],
       devices: this.options.devices?.list() ?? [],
       deviceSources: this.options.devices?.sourceStates() ?? [],
       deviceCandidates: this.options.devices?.listCandidates() ?? [],
@@ -169,6 +176,18 @@ export class LocalApi {
     const url = new URL(req.url!, this.origin);
     const workspaceMatch = /^\/v1\/workspaces\/(ws_[a-f0-9]{16})\/file$/.exec(url.pathname);
     if (url.search && (!workspaceMatch || [...url.searchParams.keys()].some(k => k !== 'path') || url.searchParams.getAll('path').length !== 1)) fail(400, 'query_denied');
+    if (this.options.supervisor && req.method === 'GET') {
+      const assets = this.options.supervisor;
+      const asset = new Map<string, [string, string]>([
+        ['/', ['text/html', assets.html]], ['/supervisor/app.js', ['text/javascript', assets.script]],
+        ['/supervisor/style.css', ['text/css', assets.style]], ['/supervisor/client.js', ['text/javascript', assets.client]],
+      ]).get(url.pathname);
+      if (asset) {
+        if (Buffer.byteLength(asset[1]) > 1024 * 1024) fail(503, 'asset_capacity');
+        res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+        res.writeHead(200, { 'Content-Type': `${asset[0]}; charset=utf-8` }); res.end(asset[1]); return;
+      }
+    }
     if (url.pathname === '/v1/bootstrap' && req.method === 'POST') {
       if (this.now() - this.attemptWindow >= 60_000) { this.attemptWindow = this.now(); this.attempts = 0; }
       if (++this.attempts > 30) fail(429, 'rate_limited');
@@ -184,6 +203,30 @@ export class LocalApi {
       this.send(res, 201, { token, csrfToken, controllerId: session.controllerId, expiresAt: session.expiresAt }); return;
     }
     const session = this.authenticate(req);
+    const workspaceRecheck = /^\/v1\/workspaces\/(ws_[a-f0-9]{16})\/recheck$/.exec(url.pathname);
+    if (workspaceRecheck && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).length) fail(400, 'invalid_request');
+      if (!this.options.workspaces) fail(404, 'workspace_unavailable');
+      const id = workspaceRecheck[1]!;
+      if (this.workspaceChecks.has(id) || this.workspaceChecks.size >= 4) fail(429, 'workspace_check_busy');
+      this.workspaceChecks.add(id);
+      const pending = this.options.workspaces.recheck(id);
+      // A timeout ends the HTTP wait, not the native filesystem operation. Retain
+      // its slot until settlement so repeated retries cannot multiply hung work.
+      void pending.then(() => this.workspaceChecks.delete(id), () => this.workspaceChecks.delete(id));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        let result;
+        try {
+          result = await Promise.race([pending, new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new ApiFault(504, 'workspace_check_timeout')), 3000);
+          })]);
+        } catch (error) { if (error instanceof ApiFault) throw error; fail(404, 'workspace_unavailable'); }
+        this.stillAuthorized(req, session);
+        this.send(res, 200, result); return;
+      } finally { if (timer) clearTimeout(timer); }
+    }
     if (url.pathname === '/v1/snapshot' && req.method === 'GET') { this.send(res, 200, this.snapshot()); return; }
     if (url.pathname === '/v1/commands' && req.method === 'POST') {
       const body = await this.body(req);
@@ -233,7 +276,7 @@ export class LocalApi {
   }
   async close(): Promise<void> {
     if (this.closed) return; this.closed = true;
-    this.unsubscribe(); this.unsubscribeDevices?.(); if (this.heartbeat) clearInterval(this.heartbeat);
+    this.unsubscribe(); this.unsubscribeDevices?.(); this.unsubscribeWorkspaces?.(); if (this.heartbeat) clearInterval(this.heartbeat);
     for (const stream of this.streams) stream.response.destroy(); this.streams.clear();
     this.grants.clear(); this.sessions.clear();
     if (this.server.listening) await new Promise<void>((resolve, reject) => { this.server.close(error => error ? reject(error) : resolve()); this.server.closeAllConnections(); });

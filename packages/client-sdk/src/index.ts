@@ -1,4 +1,6 @@
 import type { CommandInput, CommandRecord, DecisionRecord, SessionRecord, DeviceRegistry, DeviceCandidate } from '@snowball/core';
+import type { WorkspaceStatus } from '@snowball/core';
+export interface WorkspaceSummary { workspaceId: string; projectId: string; displayName: string; status: WorkspaceStatus }
 
 export interface Credentials { token: string; csrfToken: string; controllerId: string; expiresAt: number }
 export interface Snapshot {
@@ -6,6 +8,7 @@ export interface Snapshot {
   commands: { commandId: string; actorId: string; sessionKey: string; ownerId: string; operation: string; status: CommandRecord['status']; revision: number; order: number; updatedAt: number }[];
   decisions: Pick<DecisionRecord, 'decisionId' | 'sessionKey' | 'ownerId' | 'status' | 'revision' | 'expiresAt'>[];
   workspaces: { workspaceId: string }[];
+  workspaceDetails: WorkspaceSummary[];
   devices: ReturnType<DeviceRegistry['list']>;
   deviceSources: ReturnType<DeviceRegistry['sourceStates']>;
   deviceCandidates: DeviceCandidate[];
@@ -34,6 +37,7 @@ export class LocalClient {
     return { controllerId: this.credentials.controllerId, expiresAt: this.credentials.expiresAt };
   }
   snapshot(signal?: AbortSignal): Promise<Snapshot> { return this.request('/v1/snapshot', undefined, signal); }
+  recheckWorkspace(workspaceId: string, signal?: AbortSignal): Promise<WorkspaceSummary> { return this.request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/recheck`, {}, signal); }
   submit(command: Omit<CommandInput, 'actorId'>, signal?: AbortSignal): Promise<{ command: CommandRecord; replayed: boolean }> { return this.request('/v1/commands', command, signal); }
   command(commandId: string, signal?: AbortSignal): Promise<CommandRecord> { return this.request(`/v1/commands/${encodeURIComponent(commandId)}`, undefined, signal); }
   decision(decisionId: string, signal?: AbortSignal): Promise<DecisionRecord> { return this.request(`/v1/decisions/${encodeURIComponent(decisionId)}`, undefined, signal); }

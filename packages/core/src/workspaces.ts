@@ -51,11 +51,14 @@ export const localWorkspaceIO: WorkspaceIO = {
 
 /** Per-current-user, trusted local service. Registration is not a provider or browser capability. */
 export class WorkspaceRegistry {
+  private readonly listeners = new Set<() => void>();
   private readonly entries = new Map<string, RegisteredWorkspace>();
   private candidates: ProjectCandidate[] = [];
   private readonly associations = new Map<string, string>();
   private readonly links = new Set<string>();
   constructor(private readonly io: WorkspaceIO = localWorkspaceIO) {}
+  subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  private changed(): void { for (const listener of this.listeners) { try { listener(); } catch { /* Observers cannot undo a grant/revocation. */ } } }
 
   list(): RegisteredWorkspace[] { return copy([...this.entries.values()]); }
   listCandidates(): ProjectCandidate[] { return copy(this.candidates); }
@@ -109,6 +112,7 @@ export class WorkspaceRegistry {
       if (JSON.stringify(this.candidates.find(c => c.candidateId === id)) !== JSON.stringify(next.find(c => c.candidateId === id))) this.associations.delete(id);
     }
     this.candidates = next;
+    this.changed();
   }
 
   async register(root: string, displayName: string, workspaceId?: string): Promise<RegisteredWorkspace> {
@@ -126,6 +130,7 @@ export class WorkspaceRegistry {
       status: fact.empty ? 'empty' : 'ready' };
     // No auto-merge, including aliases, case variants and worktrees sharing a git directory.
     this.entries.set(entry.workspaceId, entry);
+    this.changed();
     return copy(entry);
   }
 
@@ -138,7 +143,7 @@ export class WorkspaceRegistry {
         ? 'needs_review' : fact.empty ? 'empty' : 'ready';
     } catch (error) { status = failure(error); }
     if (this.entries.get(workspaceId) !== entry) throw new Error('Workspace registration changed');
-    entry.status = status;
+    if (entry.status !== status) { entry.status = status; this.changed(); }
     return copy(entry);
   }
 
@@ -158,6 +163,7 @@ export class WorkspaceRegistry {
       project: { ...entry.project, root: fact.canonical }, status: fact.empty ? 'empty' as const : 'ready' as const };
     this.entries.set(workspaceId, next);
     this.clearAssociations(workspaceId);
+    this.changed();
     return copy(next);
   }
 
@@ -171,6 +177,7 @@ export class WorkspaceRegistry {
     if (this.entries.get(workspaceId) !== entry || !this.candidates.includes(candidate) ||
         !sameIdentity(fact.identity, entry.identity) || fact.canonical !== entry.canonical) throw new Error('Project root mismatch');
     this.associations.set(candidateId, workspaceId);
+    this.changed();
   }
 
   /** Logical relationship only: both roots, project IDs and command contexts remain distinct. */
@@ -178,12 +185,14 @@ export class WorkspaceRegistry {
     if (first === second || ![first, second].every(id => [...this.entries.values()].some(e => e.project.projectId === id))) throw new Error('Invalid project link');
     if (this.links.size >= 256) throw new Error('Project link limit');
     this.links.add(JSON.stringify([first, second].sort()));
+    this.changed();
   }
-  unlinkProjects(first: string, second: string): void { this.links.delete(JSON.stringify([first, second].sort())); }
+  unlinkProjects(first: string, second: string): void { if (this.links.delete(JSON.stringify([first, second].sort()))) this.changed(); }
   remove(workspaceId: string): void {
     const entry = this.require(workspaceId);
     this.entries.delete(workspaceId); this.clearAssociations(workspaceId);
     for (const key of this.links) if ((JSON.parse(key) as string[]).includes(entry.project.projectId)) this.links.delete(key);
+    this.changed();
   }
   private clearAssociations(workspaceId: string): void {
     for (const [candidateId, id] of this.associations) if (id === workspaceId) this.associations.delete(candidateId);

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "planRevision": 10,
+  "planRevision": 11,
   "updatedAt": "2026-09-19",
   "scope": "Local control first. Plugin, identity, durable commands, authenticated API and optional device registry foundation implemented. Physical discovery, harnesses, UI and packaging remain.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
@@ -1997,7 +1997,7 @@
       "kind": "task",
       "title": "실패/skip 가능한 local onboarding",
       "requirements": [],
-      "status": "todo",
+      "status": "in_progress",
       "dependsOn": [
         "MW.03.01.01.02",
         "MW.04.01.01.01",
@@ -2029,13 +2029,27 @@
         "D10"
       ],
       "checkpoint": {
-        "owner": null,
-        "baseCommit": null,
-        "changedFiles": [],
-        "completedSteps": [],
-        "nextAction": "Read local API/SDK and registry public contracts, then implement same-origin local onboarding and Connections with explicit trusted registration, truthful empty/partial/auth/permission states and skip/cancel/retry. First resolve missing registry API/runtime wiring; never enable control from discovery.",
+        "owner": "Codex",
+        "baseCommit": "2e8a6d3",
+        "changedFiles": [
+          "apps/supervisor/index.html",
+          "apps/supervisor/app.js",
+          "apps/supervisor/style.css",
+          "packages/api/src/supervisor.ts",
+          "packages/api/src/index.ts",
+          "packages/api/src/workspaces.ts",
+          "packages/api/openapi.v1.json",
+          "packages/client-sdk/src/index.ts",
+          "packages/core/src/workspaces.ts",
+          "tests/local-api.test.mjs"
+        ],
+        "completedSteps": [
+          "Partial: authenticated workspace summary/recheck API and SDK, registry SSE invalidations; bounded recheck and revocation.",
+          "Partial: optional same-origin browser assets, memory-only bootstrap, skip/back/refresh/cancel flow and truthful unfinished connections."
+        ],
+        "nextAction": "Continue MW.06.01.01.01: wire reviewed harness discovery/probes and trusted native workspace selection/registration plus protected per-user persistence into onboarding; then browser-test authenticated skip/retry/restart and Internet-off journeys. Existing static shell is not completed onboarding.",
         "blockers": [],
-        "updatedAt": "2026-09-19T05:17:24.648Z"
+        "updatedAt": "2026-09-19T05:49:12.526Z"
       },
       "priority": {
         "designDemand": 4,

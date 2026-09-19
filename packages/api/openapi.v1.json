@@ -359,6 +359,66 @@
           }
         ]
       }
+    },
+    "/v1/workspaces/{workspaceId}/recheck": {
+      "post": {
+        "operationId": "recheckWorkspace",
+        "description": "Reinspect an already registered local root. Never registers, relocates or grants a candidate path. No network discovery. Four concurrent checks maximum, one per workspace; failed/hung filesystem operations retain their occupied slot until settlement. HTTP wait is bounded to 3 seconds (504); native work retains its slot until settlement.",
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Exact listener origin, e.g. http://127.0.0.1:43123. No remote, null, or alias origin."
+          },
+          {
+            "name": "X-Snowball-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "workspaceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^ws_[a-f0-9]{16}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Observed workspace state; empty is valid, missing may mean moved or deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceSummary"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1014,6 +1074,12 @@
               ],
               "additionalProperties": false
             }
+          },
+          "workspaceDetails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceSummary"
+            }
           }
         },
         "required": [
@@ -1024,9 +1090,44 @@
           "workspaces",
           "devices",
           "deviceCandidates",
-          "deviceSources"
+          "deviceSources",
+          "workspaceDetails"
         ],
         "additionalProperties": false
+      },
+      "WorkspaceSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "workspaceId",
+          "projectId",
+          "displayName",
+          "status"
+        ],
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "pattern": "^ws_[a-f0-9]{16}$"
+          },
+          "projectId": {
+            "type": "string",
+            "pattern": "^prj_[a-f0-9]{16}$"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "empty",
+              "missing",
+              "needs_permission",
+              "needs_review",
+              "unavailable"
+            ]
+          }
+        }
       }
     },
     "responses": {
