@@ -1,10 +1,16 @@
-# MW.06.01.01.01 — partial local onboarding, 2026-09-19
+# MW.06.01.01.01 — partial local onboarding, 2026-09-19 (selection-error slice)
 
 Task remains IN PROGRESS; A1/A2 remain pending. This is not full native harness
 onboarding or packaged support on two OSes.
 
 ## Implemented
 
+- Actionable workspace selection/storage errors: coded WorkspaceFault in
+  packages/core workspace-store (busy/cancelled/invalid/limit/missing/
+  permission/storage/unavailable), coded native-picker failures, API
+  status mapping (409/429/400/503) without paths or raw exceptions, and
+  Supervisor Korean notices per code. Aborted picker resolves cancellation
+  without opening a dialog.
 - Preserved/reviewed incoming uncommitted harness-survey slice: explicit metadata
   rescan, no probe approval/execution, snapshot states and browser candidate cards.
 - WorkspaceStore uses the existing bounded, checksummed, single-writer DurableLog
@@ -31,10 +37,13 @@ onboarding or packaged support on two OSes.
 
 Windows x64, Node 20.19.6. Real temporary files, WAL/restart and loopback API:
 
-- Full `npm test`: **124/124 pass** before the final SDK receiver fix.
-- After SDK fix: `node --test tests/local-api.test.mjs`: **17/17 pass**.
-- Focused store/selection/API: 23/23; Windows ACL/private-state: 2/2;
-  composed runtime durable restart: 1/1. Counts overlap the full suite.
+- Full `npm test`: **127/127 pass** after the selection-error slice (was 124/124).
+- Focused `workspace-selection + workspace-store + local-api + local-runtime`:
+  **27/27 pass**, including aborted-picker cancellation and
+  permission/missing/invalid/closed-store actionable codes with no path leak.
+- Previous milestone: full 124/124 before SDK receiver fix; final API 17/17
+  after fix; store/selection/API 23/23; Windows ACL/private-state 2/2;
+  composed runtime durable restart 1/1. Counts overlap the full suite.
 - Actual browser: bootstrap with disposable fixture code -> skip absent harness
   catalog -> empty workspace -> trusted picker fixture returns an empty temporary
   directory -> registered card -> no-device skip -> Overview. Runtime restart on
@@ -56,13 +65,15 @@ Windows x64, Node 20.19.6. Real temporary files, WAL/restart and loopback API:
   Subsequent PTY preview supported restart/stop and exited cleanly. Fixtures are
   ignored under .state; no development fixture endpoint exists in the product API.
 - Native folder dialog implementations (Windows Forms/macOS JXA) exist but were
-  **not interactively validated**; browser used a trusted fixture picker. No claim
-  of macOS support or native dialog cancellation verification.
+  **not interactively validated**; browser used a trusted fixture picker, and
+  the new abort test only covers pre-cancelled signal handling without opening
+  a dialog. No claim of macOS support or interactive native cancel verification.
 - Internet-off is currently only static no-remote-asset evidence plus all-local
   runtime tests. No OS network disconnect was performed. Real auth cancellation,
   reviewed-provider connect/probe, diagnostics and complete Connections UI remain.
-- Current implementation returns safe generic selection failure on storage trouble;
-  improve user-facing reasons without exposing paths, secrets or raw exceptions.
+- Storage/selection failures now return actionable codes (busy 429, cancelled
+  409, invalid 400, missing/permission/storage/unavailable 503, capacity as
+  limit 429) with safe generic messages; no paths, secrets or raw exceptions.
 - Runtime state is bounded full-snapshot WAL; compaction/repair is offline future
   work. Native security checks are not a sandbox against malicious same-user code.
 

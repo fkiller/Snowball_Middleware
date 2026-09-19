@@ -26,8 +26,20 @@ async function run(action) {
   } catch (error) {
     if (current !== generation) return;
     if (error.status === 401) { snapshot = undefined; step = 0; render(); }
-    $('notice').textContent = error.status === 401 ? '연결 코드가 만료되었거나 세션이 종료되었습니다. 로컬 실행기에서 새 코드를 받아 주세요.' : '확인을 완료하지 못했습니다. 로컬 서비스와 접근 권한을 확인한 뒤 다시 시도하세요.';
+    $('notice').textContent = error.status === 401 ? '연결 코드가 만료되었거나 세션이 종료되었습니다. 로컬 실행기에서 새 코드를 받아 주세요.' : selectionNotice(error.code);
   } finally { if (current === generation) operation = undefined; }
+}
+
+function selectionNotice(code) {
+  if (code === 'workspace_selection_cancelled') return '폴더 선택이 취소되었습니다. 마지막으로 받은 상태를 유지합니다.';
+  if (code === 'workspace_selection_busy') return '다른 폴더 선택이 진행 중입니다. 잠시 기다렸다가 다시 시도하세요.';
+  if (code === 'workspace_selection_limit') return '작업 공간 저장 용량이 찼습니다. 사용하지 않는 등록을 정리한 뒤 다시 시도하세요.';
+  if (code === 'workspace_selection_missing') return '선택한 폴더를 찾을 수 없습니다. 이동·삭제 여부를 확인하고 다시 선택해 주세요.';
+  if (code === 'workspace_selection_permission') return '선택한 폴더에 접근할 권한이 없습니다. 폴더 권한을 확인하고 다시 선택해 주세요.';
+  if (code === 'workspace_selection_storage' || code === 'workspace_storage_unavailable') return '로컬 저장소 확인에 실패했습니다. 디스크 여유와 폴더 접근을 확인한 뒤 다시 시도하세요.';
+  if (code === 'workspace_selection_invalid') return '선택 결과가 올바르지 않습니다. 다시 선택해 주세요.';
+  if (code === 'workspace_selection_unavailable') return '폴더 확인을 완료하지 못했습니다. 폴더를 확인한 뒤 다시 시도하세요.';
+  return '확인을 완료하지 못했습니다. 로컬 서비스와 접근 권한을 확인한 뒤 다시 시도하세요.';
 }
 function card(title, detail, action) {
   const card = node('div'); card.className = 'card'; const text = node('div');

@@ -5,12 +5,49 @@ import { parseHostId } from './identity.js';
 import { WorkspaceRegistry, localWorkspaceIO, type RegisteredWorkspace, type WorkspaceIO } from './workspaces.js';
 
 export type WorkspaceAccess = Pick<WorkspaceRegistry, 'list' | 'refresh' | 'assertReadable' | 'subscribe'>;
+/** Coded selection/storage failure. Message stays generic; code guides user action without paths. */
+export class WorkspaceFault extends Error {
+  constructor(
+    readonly code:
+      | 'workspace_storage_unavailable'
+      | 'workspace_selection_busy'
+      | 'workspace_selection_cancelled'
+      | 'workspace_selection_invalid'
+      | 'workspace_selection_limit'
+      | 'workspace_selection_missing'
+      | 'workspace_selection_permission'
+      | 'workspace_selection_storage'
+      | 'workspace_selection_unavailable',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'WorkspaceFault';
+  }
+}
 export interface WorkspaceStoreOptions {
   /** Dedicated directory in the current user's private application data, never supplied by HTTP. */
   directory: string;
   hostId: string;
   io?: WorkspaceIO;
   maxBytes?: number;
+}
+
+/** Map filesystem/validation failures to safe actionable codes; never includes paths. */
+function normalizeSelectionFailure(error: unknown): WorkspaceFault {
+  const code = (error as NodeJS.ErrnoException)?.code;
+  if (code === 'ENOENT' || code === 'ENOTDIR')
+    return new WorkspaceFault('workspace_selection_missing', 'Selected folder is missing; check move/delete and choose again');
+  if (code === 'EACCES' || code === 'EPERM')
+    return new WorkspaceFault('workspace_selection_permission', 'Folder access denied; check permissions and choose again');
+  const message = error instanceof Error ? error.message : '';
+  if (/cancelled/i.test(message)) return new WorkspaceFault('workspace_selection_cancelled', 'Workspace selection cancelled');
+  if (/already in progress/i.test(message))
+    return new WorkspaceFault('workspace_selection_busy', 'Another workspace selection is in progress');
+  if (/limit|Too many|duplicate|capacity|size|exceeds/i.test(message))
+    return new WorkspaceFault('workspace_selection_limit', 'Workspace storage capacity reached; remove an unused workspace and retry');
+  if (/Invalid workspace|Invalid selection|Filesystem identity|changed during|too large/i.test(message))
+    return new WorkspaceFault('workspace_selection_invalid', 'Selected folder cannot be used; choose another folder');
+  return new WorkspaceFault('workspace_selection_unavailable', 'Folder check failed; verify the folder and retry');
 }
 
 /** Write-ahead snapshots: persist and fsync a grant/removal before publishing it. */
@@ -49,7 +86,10 @@ export class WorkspaceStore implements WorkspaceAccess {
       this.observe();
     } catch (error) { this.log.close(); throw error; }
   }
-  private assertOpen(): void { if (this.closed || this.failed) throw new Error('Workspace storage unavailable'); }
+  private assertOpen(): void {
+    if (this.closed || this.failed)
+      throw new WorkspaceFault('workspace_storage_unavailable', 'Workspace storage unavailable; restart the local runtime and retry');
+  }
   private changed(): void { for (const listener of this.listeners) { try { listener(); } catch { /* Committed state cannot be rolled back by an observer. */ } } }
   private observe(): void { this.detach(); this.detach = this.current.subscribe(() => this.changed()); }
   private persist(registry: WorkspaceRegistry): void {
@@ -64,16 +104,33 @@ export class WorkspaceStore implements WorkspaceAccess {
   }
   private async transaction<T>(change: (staged: WorkspaceRegistry) => Promise<T>, signal?: AbortSignal, beforeCommit?: () => void): Promise<T> {
     this.assertOpen();
-    if (this.busy) throw new Error('Workspace change already in progress');
-    if (signal?.aborted) throw new Error('Workspace change cancelled');
+    if (this.busy) throw new WorkspaceFault('workspace_selection_busy', 'Another workspace selection is in progress');
+    if (signal?.aborted) throw new WorkspaceFault('workspace_selection_cancelled', 'Workspace selection cancelled');
     this.busy = true;
     try {
       const staged = WorkspaceRegistry.restore(this.current.serialize(), this.io);
-      const result = await change(staged);
+      let result: T;
+      try {
+        result = await change(staged);
+      } catch (error) {
+        if (error instanceof WorkspaceFault || error instanceof JournalFault) throw error;
+        throw normalizeSelectionFailure(error);
+      }
       this.assertOpen();
-      if (signal?.aborted) throw new Error('Workspace change cancelled');
+      if (signal?.aborted) throw new WorkspaceFault('workspace_selection_cancelled', 'Workspace selection cancelled');
       beforeCommit?.();
-      this.persist(staged);
+      try {
+        this.persist(staged);
+      } catch (error) {
+        if (error instanceof JournalFault) {
+          if (['io', 'unavailable', 'corrupt'].includes(error.code)) this.failed = true;
+          if (error.code === 'capacity')
+            throw new WorkspaceFault('workspace_selection_limit', 'Workspace storage capacity reached; remove an unused workspace and retry');
+          throw new WorkspaceFault('workspace_selection_storage', 'Local workspace storage failed; check disk space and folder access, then retry');
+        }
+        if (error instanceof WorkspaceFault) throw error;
+        throw new WorkspaceFault('workspace_selection_storage', 'Local workspace storage failed; check disk space and folder access, then retry');
+      }
       this.current = staged; this.observe(); this.changed();
       return result;
     } finally { this.busy = false; }

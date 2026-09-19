@@ -10,6 +10,18 @@ const secret = () => randomBytes(32).toString('base64url');
 const digest = (s: string) => createHash('sha256').update(s).digest('hex');
 class ApiFault extends Error { constructor(readonly status: number, readonly code: string) { super(code); } }
 function fail(status: number, code: string): never { throw new ApiFault(status, code); }
+/** Actionable selection/storage failures without paths or raw exceptions. */
+const SELECTION_STATUS: Record<string, number> = {
+  workspace_selection_cancelled: 409,
+  workspace_selection_busy: 429,
+  workspace_selection_invalid: 400,
+  workspace_selection_limit: 429,
+  workspace_selection_missing: 503,
+  workspace_selection_permission: 503,
+  workspace_selection_storage: 503,
+  workspace_selection_unavailable: 503,
+  workspace_storage_unavailable: 503,
+};
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 interface Session { controllerId: string; csrfHash: string; expiresAt: number; requests: number; window: number }
 interface Stream { response: ServerResponse; session: Session }
@@ -135,6 +147,11 @@ export class LocalApi {
     if (error instanceof JournalFault) {
       const status = ['stale_revision', 'stale_decision', 'idempotency_conflict', 'conflict', 'expired'].includes(error.code) ? 409 : error.code === 'capacity' ? 429 : ['unavailable', 'io', 'owner_unavailable'].includes(error.code) ? 503 : 400;
       this.send(res, status, { error: error.code }); return;
+    }
+    const code = (error as { code?: unknown } | null)?.code;
+    if (typeof code === 'string' && SELECTION_STATUS[code] !== undefined) {
+      this.send(res, SELECTION_STATUS[code]!, { error: code });
+      return;
     }
     this.send(res, 400, { error: 'invalid_request' });
   }
