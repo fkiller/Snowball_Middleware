@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "planRevision": 8,
-  "updatedAt": "2026-09-18",
+  "planRevision": 9,
+  "updatedAt": "2026-09-19",
   "scope": "Local control first. Plugin, identity, durable commands, authenticated API and optional device registry foundation implemented. Physical discovery, harnesses, UI and packaging remain.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
   "targetRepository": "E:/developments/projects/Snowball_Middleware",
-  "resumeTaskId": "MW.03.01.01.02",
+  "resumeTaskId": "MW.03.02.01.01",
   "requirements": [
     {
       "id": "R-LOCAL",
@@ -1080,7 +1080,7 @@
       "kind": "task",
       "title": "읽기 probe와 진실한 capability 상태",
       "requirements": [],
-      "status": "in_progress",
+      "status": "done",
       "dependsOn": [
         "MW.03.01.01.01"
       ],
@@ -1108,21 +1108,28 @@
       ],
       "checkpoint": {
         "owner": "Codex",
-        "baseCommit": "15d9f84",
+        "baseCommit": "55f8548",
         "changedFiles": [
           "packages/core/src/probes.ts",
           "packages/core/src/index.ts",
           "tests/harness-probes.test.mjs",
           "docs/ADR-005-harness-probe-boundary.md",
-          "docs/middleware/evidence/MW.03.01.01.02/verification.md"
+          "docs/middleware/evidence/MW.03.01.01.02/verification.md",
+          "packages/core/src/http-probe.ts",
+          "packages/plugin-host/src/binary-probe.ts",
+          "packages/plugin-host/PROBES.md",
+          "tests/http-probes.test.mjs",
+          "tests/binary-probes.test.mjs",
+          "tests/fixtures/binary-probe.mjs"
         ],
         "completedSteps": [
-          "Step 1: validated orthogonal presence/compatibility/auth/permission/connectivity observations and reason projection; no probe fact grants enrollment or control.",
-          "ADR-005 records exact read-only HTTP/binary execution boundaries and remaining transport tests."
+          "Validated orthogonal capability facts and remediation reasons.",
+          "Bounded direct literal-loopback read-only HTTP driver and explicitly approved fixed-argv binary probes under plugin-host trust boundary.",
+          "Real fixture-server 401/403, wrong service/schema/version, redirect, size, refusal, cancel/deadline; real subprocess integrity/output/termination/generation tests."
         ],
-        "nextAction": "Implement bounded literal-loopback GET health/schema driver per ADR-005, test real fixture servers, then reviewed binary probes through isolated plugin host. Classifier alone does not pass acceptance.",
+        "nextAction": "Proceed MW.03.02.01.01. Provider-specific policies/version support and actual owner/control evidence remain separate.",
         "blockers": [],
-        "updatedAt": "2026-09-18T13:41:28.400Z"
+        "updatedAt": "2026-09-19T00:02:42.714Z"
       },
       "priority": {
         "designDemand": 4,
@@ -1136,8 +1143,16 @@
       "kind": "acceptance",
       "title": "401은 needs_auth, 미실행은 not_running, 기록만 있으면 readonly로 분류된다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-19",
+          "environment": "Windows x64 Node 20.19.6; loopback fixture servers and owned Node subprocesses",
+          "procedure": "npm test",
+          "result": "92/92 pass including 8 HTTP, 7 binary and 2 classifier tests. No installed harness launched or actual provider support claimed.",
+          "reference": "docs/middleware/evidence/MW.03.01.01.02/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.03.01.01.02.A2",
@@ -1146,8 +1161,16 @@
       "kind": "acceptance",
       "title": "잘못된 서비스/redirect/version/permission failure가 차단되며 discovery가 server 시작 또는 command send를 하지 않는다.",
       "requirements": [],
-      "status": "pending",
-      "evidence": []
+      "status": "pass",
+      "evidence": [
+        {
+          "date": "2026-09-19",
+          "environment": "Windows x64 Node 20.19.6; loopback fixture servers and owned Node subprocesses",
+          "procedure": "npm test",
+          "result": "92/92 pass including 8 HTTP, 7 binary and 2 classifier tests. No installed harness launched or actual provider support claimed.",
+          "reference": "docs/middleware/evidence/MW.03.01.01.02/verification.md"
+        }
+      ]
     },
     {
       "id": "MW.03.02.01.01",

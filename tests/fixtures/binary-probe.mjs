@@ -1,0 +1,10 @@
+import { writeFileSync } from 'node:fs';
+const [mode, marker] = process.argv.slice(2);
+if (marker) writeFileSync(marker, String(process.pid));
+if (mode === 'version') console.log('fixture 1.0.0');
+else if (mode === 'env') console.log(process.env.NODE_OPTIONS || process.env.SNOWBALL_TEST_SECRET ? 'leaked' : 'clean');
+else if (mode === 'flood') process.stdout.write('x'.repeat(70000));
+else if (mode === 'stderr') process.stderr.write('private'.repeat(20000));
+else if (mode === 'hang') setInterval(() => {}, 100);
+else if (mode === 'fail') process.exitCode = 7;
+else console.log(mode);

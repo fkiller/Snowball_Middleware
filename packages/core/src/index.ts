@@ -57,3 +57,4 @@ export type { CommandInput, CommandRecord, CommandStatus, DecisionInput, Decisio
 export { DeviceRegistry, type DeviceSource, type DeviceTransport, type DeviceObservation, type DeviceCandidate, type DeviceBinding, type DeviceInput } from './devices.js';
 export { HarnessDiscovery, localDiscoveryIO, type DiscoveryProvider, type DiscoveryIO, type FileFact, type HarnessCandidate, type DiscoverySnapshot } from './discovery.js';
 export { assessProbe, type ProbeObservation, type ProbeAssessment, type ProbeReason } from './probes.js';
+export { HttpHarnessProbe, type HttpProbePolicy, type HttpProbeResult, type HttpProbeFailure } from './http-probe.js';

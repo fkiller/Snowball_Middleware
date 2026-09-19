@@ -4,6 +4,7 @@ import { realpath, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { API_VERSION, parseManifest, parseMessage, PluginFault, record, type PluginManifest } from '@snowball/plugin-sdk';
+export { runBinaryProbe, binaryProbeDigest, BinaryHarnessProbe, type BinaryProbeSpec, type BinaryProbeResult } from './binary-probe.js';
 
 export interface HostOptions {
   directory: string; manifest: unknown; approvedDigests: ReadonlyMap<string, string>;
