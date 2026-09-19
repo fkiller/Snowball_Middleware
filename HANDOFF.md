@@ -25,9 +25,13 @@ code changed this turn, so tests were not rerun. Validator: 132 nodes, 40/40
 scenarios, 11/28 tasks, 23/56 checks.
 Current incomplete work / changed files: HANDOFF.md and RESUME.md docs only.
 Exact next action: decide the interactive-session validation vehicle for
-native dialog clicks (user runs no scripts — agent stages everything); then
-harness setup/auth/probe wiring without HTTP approval, Internet-off and
-authenticated recovery journeys; A1/A2 pending. Reuse runtime/store.
+native dialog clicks (user runs no scripts — agent stages everything).
+Concrete pending call (user paused validation as not useful yet): build a
+Desktop double-click launcher (one click, no typed commands, console shows
+URL+code, dialog surfaces normally) on user approval, or defer native dialog
+to tray-app packaging. Then harness setup/auth/probe wiring without HTTP
+approval, Internet-off and authenticated recovery journeys; A1/A2 pending.
+Reuse runtime/store.
 Tests run / not run / failures: probe scripts in TEMP verified listener
 200 + snapshot 401 + mint 200/43-char/60s; mechanical UI probe (notepad
 handle 0) is the load-bearing evidence. Full suite not rerun (no product
