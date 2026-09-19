@@ -70,10 +70,14 @@ in_progress와 checkpoint가 오래됐으면 Git diff/파일/실제 프로세스
 
 ## 6. 현재 checkpoint
 
-- PLAN.json revision 10: 11/28 task 완료, 23/56 acceptance pass. MW.06.01.01.01이 다음 의존성 충족 우선 작업.
+- PLAN.json revision 11: 11/28 task 완료, 23/56 acceptance pass. MW.06.01.01.01이 다음 의존성 충족 우선 작업.
 - 3384d90: 명시 workspace 등록, filesystem identity/복구/경계, 프로젝트 후보 분리와 논리 연결, API 읽기 재검증.
 - 빌드 및 focused 17/17 pass, 최종 전체 serial 108/108 pass. 병렬 실행의 기존 process-start timeout 실패는 evidence에 기록. 제품 timeout 변경 없음.
 - Workspace codec의 현재 사용자 보호 저장소 연결, trusted 폴더 선택과 registry API 연결은 온보딩/runtime에서 이어간다. 새 registry를 중복 구현하지 않는다.
 - Codex 실제 로그인 송신/승인/취소, exact-answer proof/macOS, HID physical/model, MK20 인증 firmware gate는 여전히 blocked. 로그인 환경 선택 질문 대기 중.
 - CodexBar 인증 실패; 앱 actual 최신 5시간 64% remaining, weekly 6% remaining. 이전 5시간 guard는 reset됨. 큰 UI 작업 전 원자적 checkpoint; reset credit 미사용.
 - Source repo dirty 상태 보존, native firmware/daemon 변경 없음. 이 repo의 PLAN.json만 authoritative.
+
+## Latest continuation — 2f701bf
+
+MW.06.01.01.01 in_progress: partial same-origin onboarding + workspace summary/recheck API/SDK and SSE. Full 110/110 then final focused 20/20; browser first screen/empty-code validated. Both acceptance checks pending. Next: trusted folder selection/persistence and harness discovery wiring, then authenticated browser recovery/offline journeys. Weekly 1% remains (actual); no reset credit used. Read latest HANDOFF first.

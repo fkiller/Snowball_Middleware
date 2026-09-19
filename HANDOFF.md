@@ -1,12 +1,34 @@
 # Local middleware — resumable checkpoint, 2026-09-19 UTC
 
-Handoff state: READY — workspace milestone complete. Fresh actual desktop usage:
-64% five-hour remaining, 6% weekly remaining. The earlier five-hour window reset;
-its mandatory stop no longer applies. This is a conservative atomic checkpoint
-before a large UI/runtime work unit with low weekly headroom, not a claimed
-five-hour guard trigger. Check fresh usage before continuing. CodexBar still needs
-authentication; desktop actual usage works. No reset credit used.
-This is not a finished MVP or production Codex support claim.
+Handoff state: READY. User explicitly requested continued work until usage ends.
+Latest actual usage: 32% five-hour remaining, 1% weekly remaining. No reset credit
+used. CodexBar authentication still fails; desktop actual usage works. Preserve
+this checkpoint before further work; inspect fresh quota. This is weekly exhaustion
+preparation, not a five-hour mandatory threshold claim.
+
+## Latest work — 2f701bf
+
+MW.06.01.01.01 is IN PROGRESS, both acceptance checks still pending. Partial browser
+onboarding lives in apps/supervisor. Optional same-origin API assets, self-only CSP,
+memory-only one-use bootstrap, skip/back/refresh/cancel/logout, workspace summaries
+and authenticated recheck are implemented. Registry changes invalidate SSE snapshots.
+Recheck admits no new path, requires CSRF, rechecks revoked sessions, limits four
+concurrent operations/one per workspace, ends HTTP wait at 3 seconds and retains
+hung native-work slots until settlement. Missing folder remains repair state.
+
+Build passed. Full suite 110/110 before final deadline addition; final focused
+API/workspace 20/20 including timeout, occupied slot and revoked-session checks.
+Browser first screen and empty-code validation visually verified. Authenticated
+wizard journey, manual registration, restart/offline, macOS/mobile not verified.
+Preview uses a disposable journal and a 180-second self-cleanup timer; no real user
+credentials/projects/harnesses/devices. Browser tab closed. No other runtime touched.
+
+Exact next action: continue MW.06.01.01.01 by connecting reviewed harness discovery/
+probes and trusted native folder selection/registration plus protected per-user
+persistence. Then test authenticated skip/retry/restart/Internet-off in the browser.
+Do not mark this task done from the partial shell; harness setup and folder-selection
+UI explicitly say unavailable. Overview is a count/status shell, not command UI.
+See apps/supervisor/README.md and PLAN.json checkpoint. Changed files are listed there.
 
 ## Objective and authority
 
@@ -17,7 +39,7 @@ harnesses, devices and projects. Current packages are foundations, not an instal
 tray/service/Supervisor or completed local alpha.
 
 Authoritative repo E:/developments/projects/Snowball_Middleware, branch
-codex/local-control-core. PLAN.json revision 10 is the only task ledger: 132 L0–L5
+codex/local-control-core. PLAN.json revision 11 is the only task ledger: 132 L0–L5
 nodes, 28 tasks, 56 checks, 40 discovery scenarios. 11/28 tasks done, 23/56 checks pass.
 Task tree is generated. Prioritize dependency-ready designDemand, then difficulty,
 then stable ID. Source Snowball_Control has a redirect, not a competing ledger.
@@ -31,7 +53,7 @@ missing trusted registration and runtime API wiring before presenting real actio
 Implement same-origin local status -> harness -> workspace -> optional device, with
 skip/cancel/retry and truthful empty/partial/auth/permission states. Do not present
 mock discovery as control. Onboarding and audio share priority 4/4; stable ID selects
-onboarding first. This next task is not started.
+onboarding first. This task is now partially implemented; latest section above supersedes the original entry plan.
 
 MW.05.01.01.01 is DONE in **3384d90**. Core WorkspaceRegistry separates metadata-only
 provider candidates from explicit root grants, pins canonical + physical identity,
@@ -205,7 +227,7 @@ Do not collapse queued large payload recovery into one giant transaction.
 
 ## Git state and preservation
 
-Middleware on codex/local-control-core; latest implementation **3384d90** is committed,
+Middleware on codex/local-control-core; latest implementation **2f701bf** is committed,
 then this handoff/RESUME are checkpointed. No uncommitted implementation remains. Verify git status/log/diff. No stash made.
 Sibling E:/developments/projects/Snowball_Control on pilot/codex-app-recon at d5eabaf
 has extensive PREEXISTING dirty/untracked host/hardware/docs. Only new MK20 plugin
