@@ -1,3 +1,147 @@
+# Local middleware — 2026-09-19 final checkpoint
+
+Handoff state: READY — mandatory quota handoff. Actual desktop usage: 5% five-hour
+remaining (95% used), 85% weekly remaining. New session initially had reset windows;
+no reset credit consumed. Implementation stopped at current atomic milestone. Do not
+start new work in this window. CodexBar's earlier authentication issue is unchanged;
+desktop actual usage is the valid source. Check fresh quota on resume.
+
+## Objective and authoritative state
+
+LOCAL control on the current user's PC, no mandatory cloud plane. Optional hardware,
+harnesses and audio; LAN requires explicit enablement. Authoritative repository:
+E:/developments/projects/Snowball_Middleware, branch codex/local-control-core.
+Latest implementation **4eccedc**. PLAN.json revision 12: 11/28 tasks done, 23/56
+acceptance checks passed, 40/40 scenarios mapped. MW.06.01.01.01 remains IN PROGRESS;
+A1/A2 remain pending. Do not label this as complete onboarding or packaged MVP.
+
+## Exact next action
+
+Read apps/supervisor/README.md, runtime.mjs and the task evidence. Continue
+MW.06.01.01.01 with native directory-dialog Windows/macOS behavior/cancellation
+verification and actionable selection/storage error messages. Then wire reviewed
+harness setup/auth/probe actions while keeping executable approval outside HTTP.
+Run actual authenticated recovery and Internet-off journeys before A1/A2 completion.
+Current browser and persistence foundation should be reused, not reimplemented.
+No change to blocked Codex exact-answer proof/login-environment question, HID
+model/physical gates or MK20 authenticated firmware gates. See historical detail below.
+
+## Completed work and important files
+
+- Preserved, reviewed and committed incoming harness-survey work from the previous
+  agent: explicit metadata-only rescan/API/SDK/cards, no probe or process start.
+- packages/core/src/workspace-store.ts: dedicated existing DurableLog, checked host
+  binding, snapshots validated and fsynced before granting/revoking, original root
+  identity retained on restart. Storage failure cannot publish a new grant.
+- packages/api/src/index.ts and SDK: empty-body trusted picker action, CSRF/auth,
+  cancel/disconnect/revocation/expiry guards immediately before durable commit,
+  one in-flight operation, bounded HTTP wait and no late grants. No browser path.
+- apps/supervisor/runtime.mjs/private-state.mjs: composition root, current-user
+  Windows DACL or POSIX owner/mode checks, native state files and separate locked
+  command/workspace logs. Existing broad/foreign permissions fail without repair.
+- native-picker.mjs/run.mjs: opt-in native chooser and interactive developer CLI.
+  Native Windows/macOS dialog interaction is NOT verified. Browser test used a
+  trusted temporary-directory chooser fixture. No tray/service installer yet.
+- SDK default fetch bound to globalThis: real browser bootstrap exposed the missing
+  Window receiver that Node tests had hidden. Added regression coverage.
+- Full details/limitations/sources: docs/middleware/evidence/MW.06.01.01.01/verification.md.
+
+## Tests and observable evidence
+
+Full npm test passed **124/124** before SDK receiver fix. Final API suite after
+that fix passed **17/17**, including its new regression. Store/selection/API 23/23,
+private-state ACL 2/2 and composed runtime restart 1/1 overlap those suites.
+Actual Windows browser: bootstrap -> no-harness skip -> empty workspace -> fixture
+folder registration -> no-device skip -> Overview; restart listener -> new bootstrap
+-> preserved workspace initially unverified -> recheck empty -> logout. Layout viewed.
+No user credentials, projects, native harness, inference, device or firmware touched.
+No actual OS Internet disconnect, macOS, native chooser interaction, physical device,
+installer/update or complete auth/probe journey tested. Checks remain pending.
+
+## Failed approaches and process cleanup
+
+Get-Acl autoload failed in Windows PowerShell; fixed helper now uses .NET ACL APIs,
+without execution-policy bypass. ACL test then passed, including refusing an Everyone
+read grant on a disposable state file. Browser fetch receiver issue fixed and actual
+journey rerun. Initial preview stdin was closed; it exited via its 300-second cleanup
+timer (exit 0). Second PTY preview stopped explicitly (exit 0). Both temp stores and
+browser tab cleaned up. Ignored .state fixture scripts/logs are not product endpoints.
+
+## Git and commands
+
+4eccedc includes the same-task incoming dirty slice and this verified implementation.
+This handoff/RESUME follow in a documentation commit. No remaining source edits or
+stash intended. Source Snowball_Control has preexisting extensive dirty changes;
+only its top HANDOFF pointer is refreshed, uncommitted. Do not reset/bulk commit it.
+
+npm run build
+npm run start:local -- --native-picker
+node --test tests/workspace-store.test.mjs tests/workspace-selection.test.mjs tests/local-runtime.test.mjs tests/private-state.test.mjs
+node docs/middleware/validate-plan.mjs --next
+
+CLI is interactive-only; it displays a one-use local bootstrap code and never embeds
+credentials in URLs or browser storage. Native picker is experimental. Never steal
+stale locks, reset corrupt state, or infer authenticated command control from discovery.
+
+---
+Historical checkpoints below; the section above supersedes their quota/next actions.
+
+# Local middleware — harness survey onboarding slice, 2026-09-19 UTC (muse-spark)
+
+Handoff state: READY. MW.06.01.01.01 stays IN PROGRESS (A1/A2 pending, no
+acceptance claimed). Added the read-only harness survey slice; trusted native
+workspace selection/registration, per-user persistence and browser end-to-end
+journeys remain. CodexBar returns no valid quota (claude provider credential
+error); per AGENTS quota-tool-failure rule, no percentage is invented and
+normal contained work continued. Last recorded actual usage (2026-09-19
+checkpoint): 32% five-hour, 1% weekly remaining — treat weekly budget as
+scarce, keep units atomic. Recheck before large work.
+
+Objective: 로컬 제어 middleware / MW.06 hardware-free supervision onboarding.
+Plan: E:/developments/projects/Snowball_Middleware, docs/middleware/PLAN.json
+rev 11, resumeTaskId MW.06.01.01.01 (unchanged).
+Active task ID / ancestor path: MW.06.01.01.01 under MW > MW.06 > MW.06.01.
+Actual Git branch / HEAD / dirty and untracked files: branch
+codex/local-control-core, HEAD 6e8967e plus uncommitted slice. Dirty/new:
+packages/api/src/index.ts, packages/client-sdk/src/index.ts,
+apps/supervisor/app.js (+README), packages/api/openapi.v1.json (+README),
+tests/local-api.test.mjs, docs/middleware/PLAN.json (checkpoint only),
+HANDOFF.md. No stash. Build outputs git-ignored.
+Completed work and exact evidence: optional `HarnessSurvey` on
+`LocalApiOptions` (describe/rescan, runtime-supplied); snapshot carries
+`harness` survey or null; explicit `POST /v1/harness/scan` with auth, CSRF,
+empty-body, busy-slot and revocation checks; SDK `scanHarness`; onboarding
+step 1 lists candidates with empty/partial/null states and never claims
+version or control; openapi v1 gains scanHarness + HarnessSurvey (10 paths);
+static test proves served assets reference no remote origin (J05/A2 support).
+`npm test`: 113/114 — 3 new tests pass; single failure is the known
+plugin-host crash-timing flake, 9/9 in isolation, untouched by this slice.
+Validator: 132 nodes, 40/40 scenarios mapped.
+Current incomplete work / changed files: see dirty list above; nothing
+committed. Probe execution NOT wired (deliberate — see decisions).
+Exact next action: trusted native workspace selection/registration plus
+protected per-user persistence into onboarding (manual explicit-grant path
+first; browser cannot pick native folders for the server), then browser-test
+authenticated skip/retry/restart and Internet-off journeys. After that,
+MW.07.01.01.01 audio-source split is the only other dependency-ready task.
+Tests run / not run / failures: npm run build pass; npm test 113/114 (flake
+above, isolated 9/9 pass); test:reference not rerun (reference/ untouched);
+optional speech, macOS, physical HID/MK20, pairing, real-provider control,
+tray/installer not run.
+Processes or device state to preserve: none started; no listener, login,
+probe execution, or device access from this slice. Hardware/daemon preserved.
+Decisions / constraints / failed approaches: browser never triggers probes —
+provider policies live in MW.03.02.01.01 and PROBES.md forbids HTTP-issued
+binary approvals; UI states this. Snapshot never auto-scans (explicit rescan
+only). One draft slip (stray no-op lines in a new test) removed before run.
+Blocker and alternative ready task: HID/MK20/owner-proof blockers unchanged
+(external inputs). Only other ready task: MW.07.01.01.01.
+Quota source / actual status: codexbar invalid (credential error); last
+recorded 32% five-hour / 1% weekly (2026-09-19). Automatic protection
+unavailable until codexbar authenticates.
+
+---
+
 # Local middleware — resumable checkpoint, 2026-09-19 UTC
 
 Handoff state: READY. User explicitly requested continued work until usage ends.
