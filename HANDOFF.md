@@ -1,11 +1,12 @@
 # Local middleware — resumable checkpoint, 2026-09-19 UTC
 
-Handoff state: READY — MANDATORY QUOTA HANDOFF. Final actual desktop usage is
-5% five-hour remaining (95% used), weekly 12% remaining. Implementation ended during
-the 13% preparation phase; only handoff preservation followed. No new implementation
-may start in this usage window. CodexBar authentication fails; desktop actual usage
-supplied these figures. No reset credit used. Check fresh usage or continue with
-another agent. This is not a finished MVP or production Codex support claim.
+Handoff state: READY — workspace milestone complete. Fresh actual desktop usage:
+64% five-hour remaining, 6% weekly remaining. The earlier five-hour window reset;
+its mandatory stop no longer applies. This is a conservative atomic checkpoint
+before a large UI/runtime work unit with low weekly headroom, not a claimed
+five-hour guard trigger. Check fresh usage before continuing. CodexBar still needs
+authentication; desktop actual usage works. No reset credit used.
+This is not a finished MVP or production Codex support claim.
 
 ## Objective and authority
 
@@ -16,22 +17,30 @@ harnesses, devices and projects. Current packages are foundations, not an instal
 tray/service/Supervisor or completed local alpha.
 
 Authoritative repo E:/developments/projects/Snowball_Middleware, branch
-codex/local-control-core. PLAN.json revision 9 is the only task ledger: 132 L0–L5
-nodes, 28 tasks, 56 checks, 40 discovery scenarios. 10/28 tasks done, 21/56 checks pass.
+codex/local-control-core. PLAN.json revision 10 is the only task ledger: 132 L0–L5
+nodes, 28 tasks, 56 checks, 40 discovery scenarios. 11/28 tasks done, 23/56 checks pass.
 Task tree is generated. Prioritize dependency-ready designDemand, then difficulty,
 then stable ID. Source Snowball_Control has a redirect, not a competing ledger.
 
 ## Exact next action and current task
 
-Run the plan validator with --next. Resume **MW.05.01.01.01** under
-MW > MW.05 > MW.05.01 > MW.05.01.01: local workspace registry/project associations.
-Read packages/core/src/identity.ts, packages/api/src/workspaces.ts and task inputs
-under reference/legacy-host before adding a new registry. Distinguish provider-reported
-project candidates from user-registered read roots. Implement explicit registration,
-canonical identity, relocation/permission/empty states and worktree boundaries without
-automatic project merging or lowercasing case-sensitive roots. Acceptance requires
-no escape via symlink/sibling/worktree and truthful moved/deleted/denied states.
-This task has not been implemented; checkpoint.nextAction names the first step.
+Run the plan validator with --next. Resume **MW.06.01.01.01** under
+MW > MW.06 > MW.06.01 > MW.06.01.01: local onboarding/Connections.
+Read API/SDK contracts and the workspace/device/harness registries first. Resolve
+missing trusted registration and runtime API wiring before presenting real actions.
+Implement same-origin local status -> harness -> workspace -> optional device, with
+skip/cancel/retry and truthful empty/partial/auth/permission states. Do not present
+mock discovery as control. Onboarding and audio share priority 4/4; stable ID selects
+onboarding first. This next task is not started.
+
+MW.05.01.01.01 is DONE in **3384d90**. Core WorkspaceRegistry separates metadata-only
+provider candidates from explicit root grants, pins canonical + physical identity,
+handles empty/missing/permission/replacement and explicit same-directory relocation,
+keeps separate worktree/alias project IDs and explicit logical links, and supplies a
+bounded restore codec that preserves original identity. API reads now revalidate
+root/file identity and deny .git/junction/sibling traversal. See ADR-007 and evidence.
+Persisting the codec in protected per-user storage, folder picker, and registry API/UI
+integration remain runtime/onboarding work; CorePersistV1 is not silently upgraded.
 
 MW.03.01.01.02 generic probes are DONE (91d84bd). MW.03.02.01.01 Codex reference
 plugin is implemented experimentally but BLOCKED at real acceptance. Before actual
@@ -47,7 +56,7 @@ needs_auth, empty thread list, isolated worker startup without autospawn, native
 child exit and temporary-folder removal. It sent no model turn. Native exact-answer
 decision proof remains unresolved; serverRequest/resolved can mean cleared, so
 submitted decisions intentionally remain unknown. macOS/Desktop-race evidence is
-also missing. Continue independent workspace work while these gates are unresolved.
+also missing. Continue independent onboarding work while these gates are unresolved.
 
 ## Completed work and commits
 
@@ -92,6 +101,15 @@ Latest implementation session:
 - Full test file concurrency capped at four after parallel startup fixture starvation.
   Production timeout limits were not relaxed. Final full build/test: **101/101 pass**.
 
+Current workspace session:
+- **3384d90**: workspace registry, API read integration, seven workspace tests,
+  ADR-007 and acceptance evidence. No user projects, accounts, hardware or network
+  discovery touched. Native Windows directories/junctions; case/permission fixtures.
+- Full suite's existing process-start timing tests were unstable even at four-file
+  concurrency. Non-timing plugin fixture budget is 2000 ms; test default now serial.
+  Deadline-specific assertions and all production timeouts remain unchanged.
+- Build passed, focused 17/17, final full serial **108/108** (23.3 seconds).
+
 ## Architecture and constraints
 
 Core imports Node builtins only, never hardware/provider/reference implementation.
@@ -130,7 +148,11 @@ No firmware or existing daemon changed, no real device contacted this session.
 
 ## Tests and verification
 
-- Final npm test (build + four-file test concurrency): **101/101 pass**.
+- Current build passed; focused workspace/API tests 17/17; final full
+  node --test --test-concurrency=1 tests: **108/108 pass**.
+- Initial full npm test 107/108 (plugin startup); four-file rerun 106/108
+  (binary fixture startup/output deadline). Serial default resolves observed load
+  failures. No production deadline relaxed. Prior milestone was 101/101.
 - Includes eight HTTP probe tests, seven binary probe tests, six Codex adapter tests
   (one real durable journal integration), three real Node stdio transport tests.
 - Native script: node scripts/verify-codex-local.mjs <selected-executable> <sha256>.
@@ -139,7 +161,7 @@ No firmware or existing daemon changed, no real device contacted this session.
   Final exit 0, connected/needs_auth/empty list, nativeChildExited=true and temp home
   removed. No user credentials or actual inference used. Official docs and locally
   generated 0.153.4 schema consulted; schema lives ignored under .state.
-- Plan: valid 132 nodes / 40 scenarios / 10 tasks done / 21 checks pass.
+- Plan: valid 132 nodes / 40 scenarios / 11 tasks done / 23 checks pass.
 - Native fixture and final git diff whitespace checks passed.
 - Source MK20 4/4 and reference 44/44 are historical results, not rerun this session.
 - Not run: real logged-in Codex create/send/events/decision/cancel, actual Desktop race,
@@ -149,7 +171,8 @@ No firmware or existing daemon changed, no real device contacted this session.
 
 ## Remaining work and external inputs
 
-1. Implement MW.05.01.01.01 workspace registry as above; do not restart generic probes.
+1. Implement MW.06.01.01.01 onboarding and its missing trusted registry/runtime wiring.
+   Workspace task is complete; do not recreate it or generic probes.
 2. Codex logged-in environment choice pending; actual control and decision evidence
    remain blocked. Unsupported Desktop/private routes stay unsupported on both OSes.
 3. HID selected model/report and physical Windows/macOS verification pending; reviewed
@@ -161,7 +184,7 @@ No firmware or existing daemon changed, no real device contacted this session.
 
 ## Failed approaches / known limitations
 
-Current-session resolved failures (full details in Codex evidence):
+Earlier-session resolved failures (full details in Codex evidence):
 - Initial direct native kill produced EBUSY removing the temporary home after PID
   exit. Native stdin EOF/closed-stdio wait and bounded rm retries passed on rerun.
 - Journal test cleanup ran before lock close (ENOTEMPTY); cleanup ordering fixed.
@@ -182,8 +205,8 @@ Do not collapse queued large payload recovery into one giant transaction.
 
 ## Git state and preservation
 
-Middleware on codex/local-control-core; implementation is selectively committed,
-then this handoff/RESUME are checkpointed. Verify git status/log/diff. No stash made.
+Middleware on codex/local-control-core; latest implementation **3384d90** is committed,
+then this handoff/RESUME are checkpointed. No uncommitted implementation remains. Verify git status/log/diff. No stash made.
 Sibling E:/developments/projects/Snowball_Control on pilot/codex-app-recon at d5eabaf
 has extensive PREEXISTING dirty/untracked host/hardware/docs. Only new MK20 plugin
 files were committed. Source HANDOFF's top pointer is refreshed uncommitted, preserving

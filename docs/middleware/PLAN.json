@@ -1225,7 +1225,7 @@
           "No historical/Desktop takeover; request ID namespaces, current turn/decision binding, ownership revocation and unknown delivery preserved.",
           "Actual isolated Windows native version/initialize/account/read/list and graceful worker/native cleanup verified; 101 full tests pass."
         ],
-        "nextAction": "Obtain selected logged-in Codex home for real owned create/send/events/decision/cancel acceptance and resolve exact-answer proof. Meanwhile dependency-ready MW.05.01.01.01 workspace registry.",
+        "nextAction": "Obtain selected logged-in Codex home for real owned create/send/events/decision/cancel acceptance and resolve exact-answer proof. Meanwhile dependency-ready MW.06.01.01.01 local onboarding.",
         "blockers": [
           "Actual authenticated control/decision/cancel not executed; user choice of login environment pending.",
           "serverRequest/resolved is not exact-answer acceptance proof; decision delivery deliberately remains unknown.",
@@ -1538,7 +1538,7 @@
           "Implemented profile-gated Windows/macOS backend contract, isolated worker and bounded physical safe-test engine; 11 synthetic/worker tests pass.",
           "Real Windows native metadata enumeration verified (26 collections, zero handles opened)."
         ],
-        "nextAction": "Obtain selected model and reviewed HID report contract, then run actual OS/physical tests. Independent resume: MW.05.01.01.01.",
+        "nextAction": "Obtain selected model and reviewed HID report contract, then run actual OS/physical tests. Independent resume: MW.06.01.01.01.",
         "blockers": [
           "Selected actual HID model/report contract and physical interaction required; production catalog intentionally empty.",
           "Actual macOS and two-unit/no-serial/port-change acceptance not available in this session."
@@ -1717,7 +1717,7 @@
           "Extracted bounded legacy key/knob decoder, preview renderer and explicitly opted-in lab UDP transport in hardware repository commit d5eabaf.",
           "Documented future authenticated pairing requirements; current firmware always fails production control admission."
         ],
-        "nextAction": "Implement and physically validate authenticated firmware pairing before enabling a production MK20 plugin. Independent resume: MW.05.01.01.01.",
+        "nextAction": "Implement and physically validate authenticated firmware pairing before enabling a production MK20 plugin. Independent resume: MW.06.01.01.01.",
         "blockers": [
           "Current MK20 firmware has no authenticated pairing protocol. Real-device success/cancel/expiry/identity/replay verification is unavailable."
         ],

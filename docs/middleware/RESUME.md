@@ -9,7 +9,7 @@
 5. `node docs/middleware/validate-plan.mjs --next`로 재개 우선 작업과 선행 조건이 만족된 task를 본다. 보고된 ready task를 자동 실행하기 전에 실제 증거와 task checkpoint를 대조한다.
 6. task의 L0→L3 조상 요구와 L5 checks를 읽고, steps[0] 또는 checkpoint.nextAction부터 실행한다. 이전 agent 이름/모델을 이유로 설계를 재작성하지 않는다.
 
-현재 재개 task: **MW.05.01.01.01** (로컬 workspace 등록과 프로젝트 연결). Generic probe 완료. Codex reference plugin은 Windows 빈 credential home 연결/정리까지만 실검증됐고 실제 로그인 제어/decision proof/macOS gate는 blocked다. HANDOFF.md의 새 next action을 따른다.
+현재 재개 task: **MW.06.01.01.01** (실패/skip 가능한 local onboarding). Workspace 등록/복구 경계 완료(3384d90). Generic probe 완료. Codex reference plugin은 Windows 빈 credential home 연결/정리까지만 실검증됐고 실제 로그인 제어/decision proof/macOS gate는 blocked다. HANDOFF.md의 새 next action을 따른다.
 
 원장의 기존 입력 경로 `host/src`, `host/tests`는 이제 `reference/legacy-host/src`, `reference/legacy-host/tests`에서 읽는다. 하드웨어 입력은 sibling `../Snowball_Control/hardware`에 남아 있다. 새 구현은 `packages/`에만 추가하고 reference 파일을 수정하지 않는다. 다음 작업부터 dependency 완료 여부와 designDemand/difficulty 우선순위를 `--next`로 확인한다.
 
@@ -70,10 +70,10 @@ in_progress와 checkpoint가 오래됐으면 Git diff/파일/실제 프로세스
 
 ## 6. 현재 checkpoint
 
-- PLAN.json revision 9: 10/28 task 완료, 21/56 acceptance pass. MW.05.01.01.01이 다음 의존성 충족 작업.
-- 91d84bd: generic HTTP/binary read-only probes 완료. fc0b203: experimental Codex owned-stdio plugin과 journal 경계.
-- 최종 전체 build/test 101/101 pass. Windows Codex 0.153.4 native 빈 home 연결/account/list/종료/임시폴더 정리 pass. 실제 로그인 송신/승인/취소는 미검증.
-- 실제 Codex 검수에 사용할 로그인 환경 선택 질문 대기 중. 기존 사용자 credentials를 복사하거나 Desktop task에 송신하지 않음.
-- Codex decision resolved 알림은 정확한 답변 수락 증거가 아니므로 unknown을 유지. macOS 및 기존 Desktop owner race 미검증. HID/MK20 physical gates도 blocked.
-- CodexBar 인증 실패 지속. 앱 actual 사용량 13%에서 준비했고 최종 5시간 5% remaining, weekly 12% remaining으로 의무 인수인계 기준에 도달했다. 구현 종료. reset credit 사용 없음.
-- Source repo 기존 dirty 상태 보존. 이번 세션은 native firmware/daemon 변경 없음. Plan authority는 이 repo 하나뿐이다.
+- PLAN.json revision 10: 11/28 task 완료, 23/56 acceptance pass. MW.06.01.01.01이 다음 의존성 충족 우선 작업.
+- 3384d90: 명시 workspace 등록, filesystem identity/복구/경계, 프로젝트 후보 분리와 논리 연결, API 읽기 재검증.
+- 빌드 및 focused 17/17 pass, 최종 전체 serial 108/108 pass. 병렬 실행의 기존 process-start timeout 실패는 evidence에 기록. 제품 timeout 변경 없음.
+- Workspace codec의 현재 사용자 보호 저장소 연결, trusted 폴더 선택과 registry API 연결은 온보딩/runtime에서 이어간다. 새 registry를 중복 구현하지 않는다.
+- Codex 실제 로그인 송신/승인/취소, exact-answer proof/macOS, HID physical/model, MK20 인증 firmware gate는 여전히 blocked. 로그인 환경 선택 질문 대기 중.
+- CodexBar 인증 실패; 앱 actual 최신 5시간 64% remaining, weekly 6% remaining. 이전 5시간 guard는 reset됨. 큰 UI 작업 전 원자적 checkpoint; reset credit 미사용.
+- Source repo dirty 상태 보존, native firmware/daemon 변경 없음. 이 repo의 PLAN.json만 authoritative.
