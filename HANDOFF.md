@@ -1,3 +1,55 @@
+# Local middleware — UI isolation finding, 2026-09-19 UTC (muse-spark)
+
+Handoff state: READY. MW.06.01.01.01 stays IN PROGRESS (A1/A2 pending).
+Key result: native folder-dialog clicks are blocked on an interactive-session
+validation vehicle — agent processes run Session 1 on a non-interactive
+desktop (notepad MainWindowHandle 0), so agent-launched pickers can never show
+UI. A speculative TopMost fix was tried, failed identically, and reverted.
+
+Objective: 로컬 제어 middleware / MW.06 hardware-free supervision onboarding.
+Plan: E:/developments/projects/Snowball_Middleware, docs/middleware/PLAN.json
+rev 14, resumeTaskId MW.06.01.01.01 (unchanged).
+Active task ID / ancestor path: MW.06.01.01.01 under MW > MW.06 > MW.06.01.
+Actual Git branch / HEAD / dirty and untracked files: branch
+codex/local-control-core, HEAD b205056 plus uncommitted HANDOFF/RESUME docs.
+No stash. Demo TEMP scaffolding only; repo has no product diff.
+Completed work and exact evidence: live disposable demo runtime served the
+real Supervisor to the user's browser; user confirmed bootstrap/one-use code,
+Harness survey-null screen, Workspace-empty screen, and the predicted stuck
+"확인 중…" on folder select (picker alive server-side, invisible). Stuck
+picker exited via the 120s budget (409 cancelled path); no grant published.
+TopMost-owner hardening reverted to committed state (wrong hypothesis,
+unverifiable here). Native-picker product code is byte-identical to f22db9f.
+Full `npm test` 127/127 still holds from the error-code slice; no product
+code changed this turn, so tests were not rerun. Validator: 132 nodes, 40/40
+scenarios, 11/28 tasks, 23/56 checks.
+Current incomplete work / changed files: HANDOFF.md and RESUME.md docs only.
+Exact next action: decide the interactive-session validation vehicle for
+native dialog clicks (user runs no scripts — agent stages everything); then
+harness setup/auth/probe wiring without HTTP approval, Internet-off and
+authenticated recovery journeys; A1/A2 pending. Reuse runtime/store.
+Tests run / not run / failures: probe scripts in TEMP verified listener
+200 + snapshot 401 + mint 200/43-char/60s; mechanical UI probe (notepad
+handle 0) is the load-bearing evidence. Full suite not rerun (no product
+diff). Speech, macOS, physical HID/MK20, pairing, real-provider control,
+tray/installer not run.
+Processes or device state to preserve: demo runtime from this turn may still
+idle until its 30-minute self-cleanup (loopback only, token-gated mint,
+disposable state, auto-deleted). No harness, probe, LAN, or device touched.
+Decisions / constraints / failed approaches: TopMost-owner tried and reverted
+— never ship z-order guesses without a visible-window check. The visible-
+window check (EnumWindows/MainWindowHandle during a live select) is the
+required pre-step before any further dialog change. Working preference
+(user, durable): the user does not run scripts; the agent runs all commands
+and stages live disposable runtimes for browser validation.
+Blocker and alternative ready task: native dialog clicks blocked on
+interactive-session vehicle (external). Only other ready task: MW.07.01.01.01.
+Quota source / actual status: codexbar usage --provider codex returns
+Authentication required; per AGENTS quota-tool-failure rule, no percentage is
+invented and normal contained work continued. Recheck before large work.
+
+---
+
 # Local middleware — selection-error slice, 2026-09-19 UTC (muse-spark)
 
 Handoff state: READY. MW.06.01.01.01 stays IN PROGRESS (A1/A2 pending, no

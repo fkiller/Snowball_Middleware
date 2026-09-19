@@ -70,14 +70,15 @@ in_progress와 checkpoint가 오래됐으면 Git diff/파일/실제 프로세스
 
 ## 6. 현재 checkpoint
 
-- PLAN revision 13, MW.06.01.01.01 in_progress; 11/28 tasks done, 23/56 checks pass.
-- f22db9f: actionable selection/storage error codes (WorkspaceFault, picker codes,
-  API 409/429/400/503, Supervisor notices, abort/permission/missing/invalid tests).
-- Full 127/127; focused selection/store/API/runtime 27/27. Previous 124/124 and
-  API 17/17 overlap the suite. Actual browser registration/skip/Overview/restart/
-  recheck/logout passed earlier with temporary native-picker fixture.
-- Interactive native Windows/macOS dialog, real auth/probe journey, actual
-  Internet-off and full Connections remain pending. A1/A2 not passed.
+- PLAN revision 14, MW.06.01.01.01 in_progress; 11/28 tasks done, 23/56 checks pass.
+- b205056: agent-context UI isolation finding (Session 1 non-interactive
+  desktop, notepad handle 0); user-confirmed bootstrap/Harness-null/
+  Workspace-empty screens; stuck-select behaves as predicted; TopMost reverted.
+- Full 127/127 holds from f22db9f (no product diff since; not rerun).
+  Listener 200, snapshot 401, mint 200/43-char/60s verified via TEMP probes.
+- Native dialog clicks blocked on interactive-session vehicle (user runs no
+  scripts). Harness wiring, Internet-off, auth recovery, A1/A2 still pending.
 - codexbar returns Authentication required; no percentage invented. Check fresh
   usage before large work.
-- No owned preview left running. Read HANDOFF top and task evidence for exact next action and constraints.
+- Demo runtime self-cleans in ~30 min (loopback, disposable state). Read HANDOFF
+  top and task evidence for exact next action and constraints.
