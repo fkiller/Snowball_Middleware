@@ -39,7 +39,9 @@ provider policies live in MW.03.02.01.01 and PROBES.md forbids HTTP-issued
 binary approvals; UI states this. One existing capacity test initially failed
 because the new generic storage message hid the word capacity; fixed by
 keeping a distinct limit code/message with capacity wording and 429 mapping.
-No paths, secrets or raw exceptions in error responses.
+No paths, secrets or raw exceptions in error responses. Working preference
+(user, durable): the user does not run scripts — the agent runs all commands
+and stages live disposable runtimes for browser validation.
 Blocker and alternative ready task: HID/MK20/owner-proof blockers unchanged
 (external inputs). Only other ready task: MW.07.01.01.01.
 Quota source / actual status: codexbar usage --provider codex returns
