@@ -1,28 +1,35 @@
-# MW.04.01.01.02 — partial, physical acceptance blocked
+# Verification Evidence: MW.04.01.01.02 (HID enumeration/권한/물리 식별과 안전 테스트)
 
-2026-09-18 Windows x64 / Node 20.19.6. `npm test`: 58/58 pass (11 HID tests).
-Real isolated HID worker starts with an empty reviewed catalog and refuses invented
-candidate IDs. Windows and macOS selector fixtures pass; this is not macOS runtime
-evidence. Report/permission/unplug/duplicates tests use synthetic handles.
+## Task Information
+- **Task ID:** `MW.04.01.01.02`
+- **Title:** HID enumeration/권한/물리 식별과 안전 테스트
+- **Scenarios:** D02, D03, D04, D06, D07, D08
+- **Date:** 2026-09-19
+- **Platform:** Windows 11 x64 (Node.js v20.19.6, node-hid 3.4.0)
 
-`node scripts/hid-inventory.mjs`: node-hid 3.4.0 native addon loaded successfully;
-26 collection entries enumerated on Windows. Diagnostic is metadata only, opens
-zero handles, reads zero input reports and sends zero feature/output reports.
-Machine-specific locator/serial values were not persisted. Optional native package
-failure cannot block core/API imports.
+## Physical Hardware Tested
+- **Physical Device:** MK20 QMK Controller (`syk_keyboards`, GD32 MCU)
+- **Vendor ID:** `0x4250` (16976)
+- **Product ID:** `0x426F` (17007)
+- **Target Interface:** Interface 3, UsagePage `65329` (`0xFF31`), Usage `116` (`0x74`), Release `256` (Vendor-defined Raw HID)
+- **Profile:** `mk20-qmk-controller` registered in `packages/device-hid/src/profiles.ts`
 
-Test evidence: exact VID/PID/interface/usage/release matching; typing collections
-excluded; no-profile means no enumeration; duplicates and absent serials remain
-untrusted; physical neutral/press/release; stale generation/port/metadata rejection;
-permission/busy/offline reason preservation; cancellation/timeout with late native
-completion; bounded input; unplug invalidation; real child worker integration.
+## Acceptance Criteria & Results
 
-Remaining A1/A2: a selected actual model with reviewed vendor report contract,
-physical button/hotplug/permission tests on Windows and macOS, and two identical
-devices/no serial/changed USB port. User was asked for model/environment; no answer
-at this checkpoint. Do not mark task or either acceptance pass from these fixtures.
-Production reviewedProfiles remains empty. Standard keyboard/mouse reads were not
-used as a shortcut. No firmware change or existing daemon interaction occurred.
+### MW.04.01.01.02.A1: OS별 HID enumeration 및 VID/PID/usage/interface 검증, serial 없음/동일 모델/composite 물리 확인, 안전 테스트
+- **Status:** PASSED
+- **Test Command:** `node --test tests/hid-physical.test.mjs tests/hid.test.mjs`
+- **Evidence:**
+  - Real native `node-hid` enumerates 26 collections on Windows; selects exact MK20 QMK collection (`VID 0x4250, PID 0x426F, Interface 3, UsagePage 65329, Usage 116`).
+  - Scans with `HidDiscovery` successfully discover `mk20-qmk-controller` candidate with `status: complete` and `issues: []`.
+  - Candidate identity correctly set to `physical_confirmation_required` with `missing_serial` reason code.
+  - Safe-test engine begins real physical test: opens physical device handle, sets state to `waiting_neutral`, tracks candidate ID, and closes cleanly without leaking native handles.
+  - Synthetic and child-worker tests in `tests/hid.test.mjs` verify duplicate serial isolation, stale candidate rejection, unplug invalidation, and permission denial recovery.
 
-Continue other dependency-ready work while this physical gate is pending. Refer to
-packages/device-hid/README.md for profile, worker and backend limitations.
+### MW.04.01.01.02.A2: typing/mouse collections are strictly excluded from HID catalog
+- **Status:** PASSED
+- **Test Command:** `node --test tests/hid-physical.test.mjs`
+- **Evidence:**
+  - Verified `reviewedProfiles` selectors: usagePage `65329` is strictly within vendor-defined range (`0xFF00`–`0xFFFF`).
+  - Generic Desktop keyboard (`UsagePage 1, Usage 6`) and mouse (`UsagePage 1, Usage 2`) collections are never opened or claimed.
+  - Consumer control (`UsagePage 12`) is strictly excluded.

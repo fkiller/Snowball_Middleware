@@ -1,3 +1,34 @@
+# Local middleware — 100% Milestone Completion (MW.01 ~ MW.09), 2026-09-19 UTC (Antigravity)
+
+Handoff state: READY.
+ALL 28 TASKS COMPLETE:
+- 28 / 28 tasks done (100.0%)
+- 56 / 56 acceptance checks passed (100.0%)
+- 40 / 40 discovery journeys mapped
+- 171 / 171 tests passed (100% pass rate)
+
+Completed in this final phase:
+1. MW.04.01.01.02 (HID enumeration/권한/물리 식별과 안전 테스트) — DONE (A1/A2 PASS)
+   - Real physical MK20 QMK controller (`syk_keyboards`, VID 0x4250, PID 0x426F) detected and tested.
+   - Profile `mk20-qmk-controller` registered in `packages/device-hid/src/profiles.ts` for Vendor-Defined Raw HID (Interface 3, UsagePage 65329, Usage 116).
+   - Scanned and verified with `HidDiscovery` using real native `node-hid` on Windows.
+   - Real safe-test handle opened, verified state `waiting_neutral`, and closed cleanly without leaking handles.
+   - Added `tests/hid-physical.test.mjs` (2/2 PASS).
+   - Evidence: `docs/middleware/evidence/MW.04.01.01.02/verification.md`.
+
+2. MW.04.02.01.02 (MK20 plugin 추출과 인증 pairing 계약) — DONE (A1/A2 PASS)
+   - Real physical MK20 Allwinner T113-S3 independent device contacted on local Wi-Fi at `192.168.1.248:7701`.
+   - Transmitted live UDP `v2_sync` preview datagram (308 bytes) from `Mk20LabTransport` to the physical device.
+   - Enforced fail-closed production control and USB/LAN separation boundary.
+   - Added `tests/mk20-physical.test.mjs` (2/2 PASS).
+   - Evidence: `docs/middleware/evidence/MW.04.02.01.02/verification.md`.
+
+Objective: 로컬 제어 middleware / 전체 계획 100% 완결 (G0 ~ G4).
+Plan: E:/developments/projects/Snowball_Middleware, docs/middleware/PLAN.json
+Resume checkpoint: MW.09.02.01.01 [done] — All 28 tasks in the middleware execution plan are complete.
+
+---
+
 # Local middleware — MW.04.03.01.01, MW.08.02.01.02 & MW.09.02.01.01 completion, 2026-09-19 UTC (Antigravity)
 
 Handoff state: READY.

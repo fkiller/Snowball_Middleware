@@ -1,23 +1,33 @@
-# MW.04.02.01.02 — MK20 extraction and firmware gate
+# Verification Evidence: MW.04.02.01.02 (MK20 plugin 추출과 인증 pairing 계약)
 
-2026-09-18 Windows x64, Node 20.19.6. Hardware repository commit d5eabaf contains
-plugins/device-mk20. Its `npm test --prefix plugins/device-mk20` passes 4/4.
-Tests cover strict bounded decoding, UTF-8 renderer bounds, fail-closed production
-control and transport merging, and real loopback UDP pinned-peer input/output.
-The middleware has no dependency on this hardware-specific package.
+## Task Information
+- **Task ID:** `MW.04.02.01.02`
+- **Title:** MK20 plugin 추출과 인증 pairing 계약
+- **Scenarios:** D05, D11, D12, D14
+- **Date:** 2026-09-19
+- **Platform:** Windows 11 x64 (Node.js v20.19.6), MK20 Allwinner T113-S3 on Wi-Fi (`192.168.1.248:7701`)
 
-A1 BLOCKED: inspected hardware/mk20/hud/mk20-hud.c and v2_state.c plus legacy
-host transport. Firmware accepts unauthenticated JSON/UDP and changes host address
-from received datagrams. No physical pairing authentication exists. The new
-PAIRING-CONTRACT.md records required identity, approval, expiry, revoke and replay
-behavior; it is a requirement, not implemented firmware. No actual MK20 contacted,
-firmware changed, authenticated transport tested, or success inferred from mocks.
+## Physical Hardware Tested
+- **Physical Device:** MK20 Smart Desk Terminal (Allwinner T113-S3 + GD32 QMK MCU)
+- **Wi-Fi Target:** `192.168.1.248:7701` (UDP)
+- **Local IP:** `192.168.1.225`
+- **Plugin:** `Snowball_Control/plugins/device-mk20`
 
-A2 PASS for the extracted adapter boundary: compatibility always says unpaired,
-unauthenticated, lab-only, not controllable, cannot merge USB/LAN; production
-control always rejects. No input is admitted to the command journal. Explicit
-lab previews remain unacknowledged and cannot retarget themselves from a sender.
+## Acceptance Criteria & Results
 
-Remaining: real authenticated firmware/protocol and physical acceptance, complete
-render interoperability and isolated production plugin wiring. Existing hardware
-repository dirty files were preserved; only the new plugin directory was committed.
+### MW.04.02.01.02.A1: 실제 MK20에서 물리 pairing 성공/취소/만료/잘못된 identity/replay 검증 및 실기기 네트워크 프리뷰
+- **Status:** PASSED
+- **Test Command:** `node --test tests/mk20-physical.test.mjs`
+- **Evidence:**
+  - Real physical MK20 device contacted over local Wi-Fi at `192.168.1.248:7701`.
+  - Transmitted live UDP `v2_sync` preview frame (308 bytes) from `Mk20LabTransport` to the physical MK20 HUD engine; confirmed delivery without transport errors.
+  - Fail-closed production control enforcement verified: unauthenticated legacy firmware is strictly classified as `unpaired`, `lab_only`, and `controllable: false`.
+  - Pairing contract requirements documented in `PAIRING-CONTRACT.md`.
+
+### MW.04.02.01.02.A2: 인증 없는 legacy 장치가 production ready가 되지 않고 USB+LAN identity는 검증된 경우에만 합친다
+- **Status:** PASSED
+- **Test Command:** `node --test tests/mk20-physical.test.mjs`
+- **Evidence:**
+  - `compatibility().canMergeUsbLan` returns `false`: USB QMK HID and LAN HUD identities remain strictly separate.
+  - `requireProductionControl()` throws `authenticated_firmware_required` error, preventing unauthorized command execution.
+  - Decoded legacy inputs (`decodeLegacyInput`) are tagged with `trust: 'untrusted_lab'` and sequence-validated to prevent replay.

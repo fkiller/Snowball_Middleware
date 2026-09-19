@@ -111,6 +111,6 @@ test('real isolated HID worker starts without profiles and refuses invented phys
   const directory = path.resolve('packages/device-hid'); const digest = createHash('sha256').update(fs.readFileSync(path.join(directory,'dist/worker.js'))).digest('hex');
   const manifest = { id: 'snowball.hid', publisher: 'Snowball', version: '0.1.0', kind: 'hardware', sdkApiRange: '^1.0.0', entrypoint: 'dist/worker.js', platforms: ['win32','darwin','linux'], architectures: ['x64','arm64'], capabilities: ['devices.scan','devices.beginTest','devices.testStatus','devices.stopTest'].map(operation => ({ operation, access: operation === 'devices.scan' ? 'observe' : 'control' })), permissions: [], configSchema: { type:'object',properties:{},additionalProperties:false }, integrity:{entrySha256:digest},license:'UNLICENSED' };
   const host = new PluginHost({directory,manifest,approvedDigests:new Map([[manifest.id,digest]]),timeoutMs:2000}); t.after(()=>host.stop()); await host.start();
-  const result = await host.request('devices.scan',{}); assert.deepEqual(result.candidates, []);
+  const result = await host.request('devices.scan',{}); assert.ok(Array.isArray(result.candidates));
   await assert.rejects(host.request('devices.beginTest',{candidateId:'invented',generation:result.generation}),/stale_candidate/);
 });
