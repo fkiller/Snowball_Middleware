@@ -74,6 +74,54 @@ export class HarnessDiscovery {
     // Avoid an unhandled rejection if cancellation arrives between filesystem calls.
     void stopped.catch(() => {});
     const add = (providerId: string, kind: HarnessCandidate['kind'], locator: string, alias: string, source: HarnessCandidate['sources'][number], stamp: string | null) => {
+      if (kind === 'file') {
+        const parsed = paths.parse(locator);
+        for (const existing of candidates.values()) {
+          if (existing.providerId === providerId && existing.kind === 'file') {
+            const existingParsed = paths.parse(existing.locator);
+            const sameDir = paths.normalize(existingParsed.dir).toLowerCase() === paths.normalize(parsed.dir).toLowerCase();
+            const sameStem = existingParsed.name.toLowerCase() === parsed.name.toLowerCase();
+            if (sameDir && sameStem) {
+              if (!existing.sources.includes(source)) existing.sources.push(source);
+              if (!existing.aliases.includes(locator)) existing.aliases.push(locator);
+              if (!existing.aliases.includes(alias)) existing.aliases.push(alias);
+              return;
+            }
+          }
+        }
+      }
+      if (kind === 'endpoint') {
+        const existingFile = [...candidates.values()].find(c => c.providerId === providerId && c.kind === 'file');
+        if (existingFile) {
+          if (!existingFile.sources.includes('registered')) existingFile.sources.push('registered');
+          if (!existingFile.aliases.includes(locator)) existingFile.aliases.push(locator);
+          if (!existingFile.aliases.includes(alias)) existingFile.aliases.push(alias);
+          return;
+        }
+      }
+      if (kind === 'file') {
+        const existingEndpointEntry = [...candidates.entries()].find(([_, c]) => c.providerId === providerId && c.kind === 'endpoint');
+        if (existingEndpointEntry) {
+          const [oldKey, oldCandidate] = existingEndpointEntry;
+          candidates.delete(oldKey);
+          const key = JSON.stringify([providerId, kind, locator]);
+          const mergedAliases = [...new Set([alias, oldCandidate.locator, ...oldCandidate.aliases])];
+          const mergedSources = [...new Set([source, ...oldCandidate.sources])];
+          candidates.set(key, {
+            id: createHash('sha256').update(key).digest('hex'),
+            providerId,
+            kind,
+            locator,
+            sources: mergedSources,
+            aliases: mergedAliases,
+            stamp,
+            version: null,
+            connection: 'unprobed',
+            controllable: false,
+          });
+          return;
+        }
+      }
       const key = JSON.stringify([providerId, kind, locator]);
       const existing = candidates.get(key);
       if (existing) { if (!existing.sources.includes(source)) existing.sources.push(source); if (!existing.aliases.includes(alias)) existing.aliases.push(alias); return; }
@@ -147,14 +195,14 @@ export function defaultDiscoveryProviders(platform: 'win32' | 'darwin' = (proces
   }
   providers.push({
     id: 'snowball.codex',
-    commandNames: isWin ? ['codex.exe', 'codex.cmd', 'codex'] : ['codex'],
+    commandNames: isWin ? ['codex.exe', 'codex.cmd'] : ['codex'],
     knownPaths: codexKnown,
   });
 
   // OpenCode
   providers.push({
     id: 'snowball.opencode',
-    commandNames: isWin ? ['opencode.cmd', 'opencode.exe', 'opencode'] : ['opencode'],
+    commandNames: isWin ? ['opencode.cmd', 'opencode.exe'] : ['opencode'],
     knownPaths: [],
     endpoints: ['http://127.0.0.1:4096'],
   });
@@ -169,7 +217,7 @@ export function defaultDiscoveryProviders(platform: 'win32' | 'darwin' = (proces
   }
   providers.push({
     id: 'snowball.antigravity',
-    commandNames: isWin ? ['agy.exe', 'agy.cmd', 'agy'] : ['agy'],
+    commandNames: isWin ? ['agy.exe', 'agy.cmd'] : ['agy'],
     knownPaths: agyKnown,
   });
 

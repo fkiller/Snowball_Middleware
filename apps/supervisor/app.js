@@ -364,8 +364,8 @@ function render() {
         '로컬 실행기가 후보 목록을 제공하지 않았습니다. 자동 설치·로그인·프로세스 시작 없이 건너뛸 수 있습니다.'
       );
     } else {
-      if (survey.status === 'partial' || survey.stale) {
-        card('이전 Harness 결과', '최신 검사가 아닙니다. 다시 찾기로 갱신할 수 있으며, 늦은 결과는 무시됩니다.');
+      if (survey.stale) {
+        card('이전 Harness 결과', '최신 검사가 완료되지 않아 이전 검사 결과를 유지 중입니다. 다시 찾기로 갱신할 수 있습니다.');
       }
       if (!survey.candidates.length) {
         card(

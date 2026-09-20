@@ -1,0 +1,197 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
+import {
+  defaultDiscoveryProviders,
+  DeviceRegistry,
+  CommandJournal,
+  WorkspaceStore,
+  HarnessDiscovery,
+  createHostId,
+  parseHostId,
+  resolveUserDataDir
+} from '../packages/core/dist/index.js';
+import { LocalApi, loadSupervisorAssets } from '../packages/api/dist/index.js';
+import { ensurePrivateStateDirectory } from '../apps/supervisor/private-state.mjs';
+import { Mk20LabTransport } from '../../Snowball_Control/plugins/device-mk20/src/index.mjs';
+
+const directory = ensurePrivateStateDirectory(resolveUserDataDir());
+const hostIdFile = path.join(directory, 'host.v1.json');
+let hostId;
+try {
+  const data = JSON.parse(fs.readFileSync(hostIdFile, 'utf8'));
+  hostId = parseHostId(data.hostId);
+} catch {
+  hostId = createHostId();
+  fs.writeFileSync(hostIdFile, JSON.stringify({ version: 1, hostId }) + '\n');
+}
+
+const commandDir = ensurePrivateStateDirectory(path.join(directory, 'commands'));
+const workspaceDir = ensurePrivateStateDirectory(path.join(directory, 'workspaces'));
+
+// Clean up stale lock files from previous runs if process is dead
+for (const dir of [commandDir, workspaceDir]) {
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      if (f.endsWith('.lock')) {
+        const lockPath = path.join(dir, f);
+        try {
+          const lockData = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+          if (lockData.pid) {
+            try { process.kill(lockData.pid, 0); }
+            catch { fs.unlinkSync(lockPath); }
+          }
+        } catch {
+          try { fs.unlinkSync(lockPath); } catch {}
+        }
+      }
+    }
+  } catch {}
+}
+
+const journal = new CommandJournal({ hostId, directory: commandDir });
+const store = new WorkspaceStore({ hostId, directory: workspaceDir });
+const devices = new DeviceRegistry();
+const discovery = new HarnessDiscovery();
+const providers = defaultDiscoveryProviders();
+
+const harness = {
+  describe: () => discovery.snapshot(),
+  rescan: () => discovery.scan(providers, { platform: process.platform, pathValue: process.env.PATH ?? '' }),
+};
+
+const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
+const supervisor = await loadSupervisorAssets(repositoryRoot);
+
+const api = new LocalApi({
+  journal,
+  workspaceStore: store,
+  devices,
+  harness,
+  supervisor,
+  port: 8765
+});
+
+await api.start();
+
+const bootstrapFile = path.join(directory, 'live-bootstrap.json');
+function refreshCode() {
+  try {
+    const bootstrap = api.issueBootstrap();
+    const info = {
+      origin: api.origin,
+      code: bootstrap.code,
+      expiresAt: bootstrap.expiresAt,
+      url: `${api.origin}/`
+    };
+    fs.writeFileSync(bootstrapFile, JSON.stringify(info, null, 2) + '\n');
+    return info;
+  } catch {
+    return null;
+  }
+}
+
+const currentBootstrap = refreshCode();
+setInterval(refreshCode, 30_000);
+
+console.log('====================================================');
+console.log('  SNOWBALL MIDDLEWARE IS ONLINE');
+console.log('====================================================');
+console.log(`  Web Supervisor URL : ${api.origin}/`);
+console.log(`  Bootstrap Code     : ${currentBootstrap?.code}`);
+console.log('====================================================');
+
+// Connect to physical MK20 device at 192.168.1.248:7701
+const mk20 = new Mk20LabTransport({
+  labEnabled: true,
+  localAddress: '192.168.1.225',
+  targetAddress: '192.168.1.248',
+  targetPort: 7701
+});
+
+let mk20Online = false;
+try {
+  await mk20.start();
+  mk20Online = true;
+  console.log('  MK20 Hardware      : CONNECTED (192.168.1.248:7701)');
+} catch (err) {
+  console.log('  MK20 Hardware      : FAILED (' + err.message + ')');
+}
+
+// Map of MK20 physical keys to labels
+const keyLabels = [
+  { id: 1, top: 'Turn', main: 'APPROVE', flags: 1 },
+  { id: 2, top: 'Turn', main: 'REJECT', flags: 2 },
+  { id: 3, top: 'Turn', main: 'RETRY', flags: 0 },
+  { id: 4, top: 'Turn', main: 'CANCEL', flags: 4 },
+  { id: 5, top: 'Harness', main: 'CODEX', flags: 1 },
+  { id: 6, top: 'Harness', main: 'ANTIGRAV', flags: 1 },
+  { id: 7, top: 'View', main: 'PLAN', flags: 0 },
+  { id: 8, top: 'View', main: 'DIFF', flags: 0 },
+  { id: 9, top: 'Files', main: 'BROWSE', flags: 0 },
+  { id: 10, top: 'Files', main: 'CHANGES', flags: 0 },
+  { id: 11, top: 'Voice', main: 'TALK', flags: 1 },
+  { id: 12, top: 'Voice', main: 'SEND', flags: 2 },
+  { id: 13, top: 'Proj', main: 'LIST', flags: 0 },
+  { id: 14, top: 'Proj', main: 'SWITCH', flags: 0 },
+  { id: 15, top: 'Session', main: 'NEW', flags: 1 },
+  { id: 16, top: 'Session', main: 'ATTACH', flags: 0 },
+  { id: 17, top: 'Action', main: 'OK', flags: 1 },
+  { id: 18, top: 'Action', main: 'BACK', flags: 0 },
+  { id: 19, top: 'Action', main: 'UP', flags: 0 },
+  { id: 20, top: 'Action', main: 'DOWN', flags: 0 }
+];
+
+let tick = 0;
+async function paintMk20() {
+  if (!mk20Online) return;
+  tick++;
+  const activeHarnesses = harness.describe().candidates.filter(c => c.controllable).map(c => c.id.replace('snowball.', '')).join(', ') || 'Codex, Antigrav';
+  const projects = store.list();
+  const projName = projects[0]?.displayName || 'Snowball_Control';
+
+  try {
+    await mk20.preview({
+      title: 'Snowball Middleware',
+      subtitle: `Online: ${api.origin}`,
+      lines: [
+        `Web UI: ${api.origin}/`,
+        `Project: ${projName} (${projects.length} loaded)`,
+        `Harnesses: ${activeHarnesses}`,
+        `Status: READY (tick #${tick})`
+      ],
+      scroll: 0,
+      totalLines: 4,
+      volume: 60,
+      muted: false,
+      keys: keyLabels
+    });
+  } catch (err) {
+    // ignore transient network error
+  }
+}
+
+// Initial paint and periodic heartbeat
+await paintMk20();
+const timer = setInterval(() => { void paintMk20(); }, 1500);
+
+mk20.on('lab.input', input => {
+  console.log('[MK20 INPUT RECEIVED]:', input);
+  void paintMk20();
+});
+
+console.log('====================================================');
+console.log('  RUNNING DAEMON (Press Ctrl+C to stop)');
+console.log('====================================================');
+
+const cleanup = async () => {
+  clearInterval(timer);
+  await mk20.close();
+  await api.close();
+  store.close();
+  journal.close();
+  process.exit(0);
+};
+
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
