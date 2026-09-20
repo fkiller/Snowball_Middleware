@@ -368,7 +368,7 @@ function render() {
     if (!survey) {
       card(
         'Harness survey 미연결',
-        '로컬 실행기가 후보 목록을 제공하지 않았습니다. 자동 설치·로그인·프로세스 시작 없이 건너뛸 수 있습니다.'
+        '로컬 실행기가 후보 목록을 제공하지 않았습니다. 계속 진행할 수 있습니다.'
       );
     } else {
       if (survey.stale) {
@@ -377,26 +377,28 @@ function render() {
       if (!survey.candidates.length) {
         card(
           '설치된 Harness 후보 없음',
-          '로컬 실행기에 Harness를 설치·등록한 뒤 다시 찾기. 자동 설치·실행은 하지 않습니다.'
+          '로컬 실행기에 Harness를 설치·등록한 뒤 다시 찾기를 눌러주세요.'
         );
       }
       for (const candidate of survey.candidates) {
         card(
           `${candidate.providerId} · ${candidate.kind === 'file' ? '설치 파일' : '로컬 등록 주소'}`,
-          `${candidate.locator} — 버전 미확인 · 연결 검사 전. 제어 가능으로 표시하지 않습니다.`
+          `${candidate.locator} — 감지됨 · 연결 검사 전`
         );
       }
-      $('actions').append(
-        button(
-          'Harness 다시 찾기',
-          () => void run(async signal => {
-            await client.scanHarness(signal);
-            return client.snapshot(signal);
-          }),
-          true
-        )
-      );
     }
+    $('actions').append(
+      button('다음 (작업 공간)', () => go(2)),
+      button(
+        'Harness 다시 찾기',
+        () => void run(async signal => {
+          await client.scanHarness(signal);
+          return client.snapshot(signal);
+        }),
+        true
+      )
+    );
+    return;
   }
 
   if (step === 2) {
@@ -405,16 +407,8 @@ function render() {
       card(
         '등록된 작업 공간 없음',
         snapshot?.workspaceSelectionAvailable
-          ? '이 컴퓨터의 폴더를 직접 선택하거나 등록 없이 계속하세요.'
+          ? '이 컴퓨터의 프로젝트 폴더를 직접 선택하거나 등록 없이 다음으로 계속할 수 있습니다.'
           : '현재 실행기에서는 폴더 선택을 사용할 수 없습니다. 등록 없이도 계속할 수 있습니다.'
-      );
-    }
-    if (snapshot?.workspaceSelectionAvailable) {
-      $('actions').append(
-        button('폴더 선택', () => void run(async signal => {
-          await client.selectWorkspace(signal);
-          return client.snapshot(signal);
-        }))
       );
     }
     for (const workspace of workspaces) {
@@ -427,36 +421,42 @@ function render() {
         }), true)
       );
     }
+    if (snapshot?.workspaceSelectionAvailable) {
+      $('actions').append(
+        button('폴더 선택', () => void run(async signal => {
+          await client.selectWorkspace(signal);
+          return client.snapshot(signal);
+        }))
+      );
+    }
+    $('actions').append(
+      button('다음 (장치)', () => go(3)),
+      button('이전 (Harness)', () => go(1), true)
+    );
+    return;
   }
 
   if (step === 3) {
     const devices = snapshot?.devices ?? [];
     card(
       devices.length ? `등록된 장치 ${devices.length}개` : '등록된 장치 없음',
-      '발견과 인증·제어 가능 여부는 다릅니다. 이 화면은 장치 검색이나 입력을 자동으로 시작하지 않습니다.'
+      '하드웨어 장치가 연결되어 있지 않아도 웹과 CLI에서 모든 기능을 정상 사용할 수 있습니다.'
     );
+    $('actions').append(
+      button('Overview 시작', () => go(4)),
+      button('이전 (작업 공간)', () => go(2), true)
+    );
+    return;
   }
 
   if (step === 4) {
     renderOverview();
-  } else {
-    if (step > 1) $('actions').append(button('이전', () => go(step - 1), true));
-    $('actions').append(button(step === 3 ? '하드웨어 없이 Overview 열기' : '건너뛰고 계속', () => go(step + 1)));
+    $('actions').append(
+      button('새로고침', () => void run(signal => client.snapshot(signal)), true),
+      button('설정 다시 보기', () => go(1), true)
+    );
+    return;
   }
-
-  $('actions').append(
-    button('새로 고침', () => void run(signal => client.snapshot(signal)), true),
-    button('확인 취소', () => {
-      cancel();
-      $('notice').textContent = '확인을 취소했습니다. 마지막으로 받은 상태를 유지합니다.';
-    }, true),
-    button('연결 종료', async () => {
-      cancel();
-      await client.logout().catch(() => {});
-      snapshot = undefined;
-      go(0);
-    }, true)
-  );
 }
 
 // Initial load: try to fetch snapshot immediately (no-auth or active session)
