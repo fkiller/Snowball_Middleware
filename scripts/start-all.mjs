@@ -14,6 +14,8 @@ import {
 import { LocalApi, loadSupervisorAssets } from '../packages/api/dist/index.js';
 import { ensurePrivateStateDirectory } from '../apps/supervisor/private-state.mjs';
 import { Mk20LabTransport } from '../../Snowball_Control/plugins/device-mk20/src/index.mjs';
+import { HidDiscovery, loadNativeBackend } from '../packages/device-hid/dist/index.js';
+import { reviewedProfiles } from '../packages/device-hid/dist/profiles.js';
 
 const directory = ensurePrivateStateDirectory(resolveUserDataDir());
 const hostIdFile = path.join(directory, 'host.v1.json');
@@ -114,9 +116,52 @@ let mk20Online = false;
 try {
   await mk20.start();
   mk20Online = true;
-  console.log('  MK20 Hardware      : CONNECTED (192.168.1.248:7701)');
+  console.log('  MK20 LAN Hardware  : CONNECTED (192.168.1.248:7701)');
+
+  // Register MK20 LAN device in DeviceRegistry
+  const lanSource = { pluginId: 'plugin.mk20', instanceId: 'desk-terminal' };
+  const lanGen = devices.beginScan(lanSource);
+  const lanCand = devices.observe(lanSource, lanGen, {
+    nativeDeviceId: 'mk20-lan-192.168.1.248:7701',
+    label: 'MK20 Smart Desk Terminal (192.168.1.248:7701)',
+    transport: 'lan',
+    capabilities: ['button', 'select-session', 'display'],
+    supported: true,
+    verifiedIdentity: 'mk20-hw-192.168.1.248',
+  });
+  devices.finishScan(lanSource, lanGen, 'ready');
+  if (lanCand) {
+    devices.register(lanCand.candidateId, lanGen);
+  }
 } catch (err) {
-  console.log('  MK20 Hardware      : FAILED (' + err.message + ')');
+  console.log('  MK20 LAN Hardware  : FAILED (' + err.message + ')');
+}
+
+// Detect and register MK20 USB Raw HID controller in DeviceRegistry
+try {
+  const backend = loadNativeBackend();
+  const hidDisc = new HidDiscovery(backend, reviewedProfiles);
+  const hidScan = await hidDisc.scan();
+  const mk20Hid = hidScan.candidates.find(c => c.profileId === 'mk20-qmk-controller');
+  if (mk20Hid) {
+    const hidSource = { pluginId: 'plugin.device-hid', instanceId: 'mk20-qmk' };
+    const hidGen = devices.beginScan(hidSource);
+    const hidCand = devices.observe(hidSource, hidGen, {
+      nativeDeviceId: `mk20-hid-${mk20Hid.vendorId}:${mk20Hid.productId}`,
+      label: 'MK20 QMK Keypad Controller (USB Raw HID)',
+      transport: 'hid',
+      capabilities: ['button', 'select-session'],
+      supported: true,
+      verifiedIdentity: `mk20-qmk-${mk20Hid.vendorId}:${mk20Hid.productId}`,
+    });
+    devices.finishScan(hidSource, hidGen, 'ready');
+    if (hidCand) {
+      devices.register(hidCand.candidateId, hidGen);
+      console.log('  MK20 USB Raw HID   : CONNECTED (Vendor 0x4250 / Product 0x426F)');
+    }
+  }
+} catch (err) {
+  console.log('  MK20 USB Raw HID   : FAILED (' + err.message + ')');
 }
 
 // Map of MK20 physical keys to labels

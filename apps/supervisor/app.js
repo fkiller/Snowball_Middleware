@@ -438,10 +438,27 @@ function render() {
 
   if (step === 3) {
     const devices = snapshot?.devices ?? [];
-    card(
-      devices.length ? `등록된 장치 ${devices.length}개` : '등록된 장치 없음',
-      '하드웨어 장치가 연결되어 있지 않아도 웹과 CLI에서 모든 기능을 정상 사용할 수 있습니다.'
-    );
+    const candidates = snapshot?.deviceCandidates ?? [];
+    if (!devices.length && !candidates.length) {
+      card(
+        '등록된 장치 없음',
+        '하드웨어 장치가 연결되어 있지 않아도 웹과 CLI에서 모든 기능을 정상 사용할 수 있습니다.'
+      );
+    }
+    for (const dev of devices) {
+      card(
+        `${dev.label} · [${dev.transport.toUpperCase()}]`,
+        `상태: ${dev.state === 'ready' ? '연결됨 (Ready)' : dev.state} · 기능: ${dev.capabilities.join(', ')}`
+      );
+    }
+    for (const cand of candidates) {
+      if (!devices.some(d => d.source?.pluginId === cand.source?.pluginId && d.label === cand.label)) {
+        card(
+          `${cand.label} · [${cand.transport.toUpperCase()}] (후보)`,
+          `감지됨 · 등록 대기`
+        );
+      }
+    }
     $('actions').append(
       button('Overview 시작', () => go(4)),
       button('이전 (작업 공간)', () => go(2), true)
