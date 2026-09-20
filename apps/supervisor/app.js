@@ -20,6 +20,10 @@ let generation = 0;
 let harnessFilter = 'all';
 let workspaceFilter = 'all';
 let activeDraft = null; // { destinationKey: string, ownerId: string | null, text: string, readOnly: boolean }
+let selectedHarnesses = new Set();
+let selectedDevices = new Set();
+let harnessesInitialized = false;
+let devicesInitialized = false;
 
 const node = (tag, text) => {
   const element = document.createElement(tag);
@@ -88,9 +92,20 @@ function selectionNotice(code) {
   return '확인을 완료하지 못했습니다. 로컬 서비스와 접근 권한을 확인한 뒤 다시 시도하세요.';
 }
 
-function card(title, detail, action, badge = null) {
+function card(title, detail, action, badge = null, checkbox = null) {
   const c = node('div');
   c.className = 'card';
+  c.style.display = 'flex';
+  c.style.alignItems = 'center';
+  c.style.justifyContent = 'space-between';
+
+  const left = node('div');
+  left.style.display = 'flex';
+  left.style.alignItems = 'center';
+  left.style.gap = '12px';
+
+  if (checkbox) left.append(checkbox);
+
   const text = node('div');
   const titleEl = node('strong', title);
   if (badge) {
@@ -99,7 +114,9 @@ function card(title, detail, action, badge = null) {
     titleEl.prepend(b);
   }
   text.append(titleEl, node('p', detail));
-  c.append(text);
+  left.append(text);
+  c.append(left);
+
   if (action) c.append(action);
   $('content').append(c);
   return c;
@@ -371,6 +388,10 @@ function render() {
         '로컬 실행기가 후보 목록을 제공하지 않았습니다. 계속 진행할 수 있습니다.'
       );
     } else {
+      if (!harnessesInitialized && survey.candidates.length) {
+        selectedHarnesses = new Set(survey.candidates.map(c => c.id));
+        harnessesInitialized = true;
+      }
       if (survey.stale) {
         card('이전 Harness 결과', '최신 검사가 완료되지 않아 이전 검사 결과를 유지 중입니다. 다시 찾기로 갱신할 수 있습니다.');
       }
@@ -381,14 +402,34 @@ function render() {
         );
       }
       for (const candidate of survey.candidates) {
+        const isSelected = selectedHarnesses.has(candidate.id);
+        const cb = node('input');
+        cb.type = 'checkbox';
+        cb.checked = isSelected;
+        cb.style.width = '18px';
+        cb.style.height = '18px';
+        cb.style.cursor = 'pointer';
+        cb.addEventListener('change', () => {
+          if (cb.checked) selectedHarnesses.add(candidate.id);
+          else selectedHarnesses.delete(candidate.id);
+          render();
+        });
+
         card(
           `${candidate.providerId} · ${candidate.kind === 'file' ? '설치 파일' : '로컬 등록 주소'}`,
-          `${candidate.locator} — 감지됨 · 연결 검사 전`
+          `${candidate.locator} — ${isSelected ? '사용 선택됨' : '미사용 (선택 해제됨)'}`,
+          null,
+          isSelected ? '선택됨' : '제외',
+          cb
         );
       }
     }
+    const selCount = selectedHarnesses.size;
     $('actions').append(
-      button('다음 (작업 공간)', () => go(2)),
+      button(
+        selCount > 0 ? `다음 (선택된 Harness ${selCount}개)` : '다음 (Harness 미선택)',
+        () => go(2)
+      ),
       button(
         'Harness 다시 찾기',
         () => void run(async signal => {
@@ -439,6 +480,10 @@ function render() {
   if (step === 3) {
     const devices = snapshot?.devices ?? [];
     const candidates = snapshot?.deviceCandidates ?? [];
+    if (!devicesInitialized && devices.length) {
+      selectedDevices = new Set(devices.map(d => d.deviceId));
+      devicesInitialized = true;
+    }
     if (!devices.length && !candidates.length) {
       card(
         '등록된 장치 없음',
@@ -446,9 +491,25 @@ function render() {
       );
     }
     for (const dev of devices) {
+      const isSelected = selectedDevices.has(dev.deviceId);
+      const cb = node('input');
+      cb.type = 'checkbox';
+      cb.checked = isSelected;
+      cb.style.width = '18px';
+      cb.style.height = '18px';
+      cb.style.cursor = 'pointer';
+      cb.addEventListener('change', () => {
+        if (cb.checked) selectedDevices.add(dev.deviceId);
+        else selectedDevices.delete(dev.deviceId);
+        render();
+      });
+
       card(
         `${dev.label} · [${dev.transport.toUpperCase()}]`,
-        `상태: ${dev.state === 'ready' ? '연결됨 (Ready)' : dev.state} · 기능: ${dev.capabilities.join(', ')}`
+        `상태: ${dev.state === 'ready' ? '연결됨 (Ready)' : dev.state} · 기능: ${dev.capabilities.join(', ')} — ${isSelected ? '활성화됨' : '비활성 (선택 해제됨)'}`,
+        null,
+        isSelected ? '선택됨' : '제외',
+        cb
       );
     }
     for (const cand of candidates) {
@@ -459,8 +520,12 @@ function render() {
         );
       }
     }
+    const devCount = selectedDevices.size;
     $('actions').append(
-      button('Overview 시작', () => go(4)),
+      button(
+        devCount > 0 ? `Overview 시작 (장치 ${devCount}개 사용)` : 'Overview 시작 (하드웨어 없이)',
+        () => go(4)
+      ),
       button('이전 (작업 공간)', () => go(2), true)
     );
     return;
