@@ -21,7 +21,7 @@ function loadHostId(directory) {
 }
 
 /** Development composition root, not an installed service or a cloud control plane. */
-export async function startLocalRuntime({ dataDir = resolveUserDataDir(), repositoryRoot = fileURLToPath(new URL('../..', import.meta.url)), providers = [], enableNativePicker = false, chooseWorkspace } = {}) {
+export async function startLocalRuntime({ dataDir = resolveUserDataDir(), repositoryRoot = fileURLToPath(new URL('../..', import.meta.url)), providers = [], enableNativePicker = false, chooseWorkspace, noAuth = false } = {}) {
   // This boundary validates native privacy before any user registration is loaded.
   const directory = ensurePrivateStateDirectory(dataDir);
   const hostId = loadHostId(directory);
@@ -37,7 +37,7 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
       describe: () => discovery.snapshot(),
       rescan: () => discovery.scan(reviewed, { platform: process.platform, pathValue: process.env.PATH ?? '' }),
     } : undefined;
-    api = new LocalApi({ journal, workspaceStore: store, harness,
+    api = new LocalApi({ journal, workspaceStore: store, harness, noAuth,
       chooseWorkspace: chooseWorkspace ?? (enableNativePicker && ['win32', 'darwin'].includes(process.platform) ? chooseNativeWorkspace : undefined),
       supervisor: await loadSupervisorAssets(repositoryRoot) });
     await api.start();

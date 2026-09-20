@@ -306,7 +306,14 @@ function renderOverview() {
 
 function render() {
   $('steps').replaceChildren(
-    ...labels.map((name, index) => node(index === step ? 'strong' : 'span', `${index + 1}. ${name}`))
+    ...labels.map((name, index) => {
+      const el = node(index === step ? 'strong' : 'span', `${index + 1}. ${name}`);
+      if (snapshot && index > 0) {
+        el.style.cursor = 'pointer';
+        el.addEventListener('click', () => go(index));
+      }
+      return el;
+    })
   );
   $('content').replaceChildren();
   $('actions').replaceChildren();
@@ -452,5 +459,12 @@ function render() {
   );
 }
 
-// Initial render
-render();
+// Initial load: try to fetch snapshot immediately (no-auth or active session)
+void (async () => {
+  try {
+    const result = await client.snapshot();
+    snapshot = result;
+    step = 1;
+  } catch {}
+  render();
+})();

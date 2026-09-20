@@ -69,7 +69,8 @@ const api = new LocalApi({
   devices,
   harness,
   supervisor,
-  port: 8765
+  port: 8765,
+  noAuth: true,
 });
 
 await api.start();

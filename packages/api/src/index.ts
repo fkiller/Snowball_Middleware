@@ -40,6 +40,7 @@ export interface LocalApiOptions {
   sessionTtlMs?: number; eventCapacity?: number; now?: () => number;
   supervisor?: SupervisorAssets;
   workspaceStore?: WorkspaceStore;
+  noAuth?: boolean;
   /** Trusted native picker. The HTTP request never supplies a path or display name. */
   chooseWorkspace?: (signal: AbortSignal) => Promise<{ root: string; displayName: string } | null>;
 }
@@ -80,7 +81,15 @@ export class LocalApi {
   private attemptWindow = 0;
   private closed = false;
   private starting = false;
+  private readonly defaultSession: Session;
   constructor(private readonly options: LocalApiOptions) {
+    this.defaultSession = {
+      controllerId: 'ctrl_local_user',
+      csrfHash: '',
+      expiresAt: Number.MAX_SAFE_INTEGER,
+      requests: 0,
+      window: 0,
+    };
     this.now = options.now ?? Date.now;
     this.settings = {
       revision: 1,
@@ -186,6 +195,13 @@ export class LocalApi {
     if (!req.url?.startsWith('/') || req.url.startsWith('//') || req.url.length > 2048 || req.url.includes('#')) fail(400, 'invalid_url');
   }
   private authenticate(req: IncomingMessage): Session {
+    if (this.options.noAuth) {
+      if (req.headers.authorization && /^Bearer [A-Za-z0-9_-]{43}$/.test(req.headers.authorization)) {
+        const s = this.sessions.get(digest(req.headers.authorization.slice(7)));
+        if (s && s.expiresAt > this.now()) return s;
+      }
+      return this.defaultSession;
+    }
     const auth = req.headers.authorization;
     if (!auth || !/^Bearer [A-Za-z0-9_-]{43}$/.test(auth)) fail(401, 'unauthorized');
     const session = this.sessions.get(digest(auth.slice(7)));
@@ -196,6 +212,7 @@ export class LocalApi {
     return session;
   }
   private stillAuthorized(req: IncomingMessage, session: Session): void {
+    if (this.options.noAuth && session === this.defaultSession) return;
     if (session.expiresAt <= this.now() || this.sessions.get(digest(req.headers.authorization!.slice(7))) !== session) fail(401, 'unauthorized');
   }
   private async body(req: IncomingMessage): Promise<Record<string, unknown>> {
