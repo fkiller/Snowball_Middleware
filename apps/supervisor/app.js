@@ -1,7 +1,7 @@
 import { LocalClient } from '/supervisor/client.js';
 
 const client = new LocalClient(location.origin);
-const labels = ['로컬 연결', 'Harness', '프로젝트 (작업 공간)', '장치 · 선택', 'Overview'];
+const labels = ['로컬 연결', 'Harness', '장치 · 선택', 'Overview'];
 const names = {
   ready: '사용 가능',
   empty: '빈 작업 공간',
@@ -19,7 +19,6 @@ let generation = 0;
 // State for Overview & Attention (MW.06.02.01.01)
 let harnessFilter = 'all';
 let workspaceFilter = 'all';
-let workspaceViewMode = 'by_harness'; // 'by_harness' | 'by_project'
 let activeDraft = null; // { destinationKey: string, ownerId: string | null, text: string, readOnly: boolean }
 let selectedHarnesses = new Set();
 let selectedDevices = new Set();
@@ -299,69 +298,80 @@ function renderOverview() {
     $('content').append(draftCard);
   }
 
-  // 4. Projects (Workspaces) List
-  const workspaces = snapshot?.workspaceDetails ?? [];
-  const wsHeader = node('h3', `등록된 프로젝트 / 작업 공간 (${workspaces.length}개)`);
-  wsHeader.style.margin = '20px 0 8px';
-  $('content').append(wsHeader);
-
-  if (!workspaces.length) {
-    card('등록된 프로젝트 없음', '상단 2. 작업 공간 메뉴에서 프로젝트 폴더를 등록할 수 있습니다.');
-  } else {
-    for (const ws of workspaces) {
-      card(
-        ws.displayName,
-        `상태: ${names[ws.status] ?? ws.status} · ID: ${ws.workspaceId}`,
-        button('작업 공간 설정', () => go(2), true),
-        'PROJECT'
-      );
-    }
-  }
-
-  // 5. Session List
-  const listHeader = node('h3', `작업 세션 목록 (${sessions.length}개)`);
-  listHeader.style.margin = '24px 0 8px';
-  $('content').append(listHeader);
+  // 4. Reflective Harness Projects & Sessions
+  const allCandidates = snapshot?.workspaceCandidates ?? [];
+  const candidates = snapshot?.harness?.candidates ?? [];
+  const activeHarnesses = (candidates.length > 0 ? candidates : [
+    { id: 'codex', providerId: 'snowball.codex', locator: 'OpenAI Codex' },
+    { id: 'opencode', providerId: 'snowball.opencode', locator: 'OpenCode' },
+    { id: 'antigravity', providerId: 'snowball.antigravity', locator: 'Google Antigravity' }
+  ]).filter(h => {
+    if (selectedHarnesses.size > 0 && !selectedHarnesses.has(h.id)) return false;
+    if (harnessFilter === 'all') return true;
+    return h.providerId === harnessFilter || (h.id && harnessFilter.includes(h.id));
+  });
 
   const filteredSessions = sessions.filter(s => {
     if (harnessFilter === 'all') return true;
     return s.sessionKey.includes(`/${harnessFilter}/`) || s.sessionKey.includes(`:${harnessFilter}:`);
   });
 
-  if (!filteredSessions.length) {
-    card('조건에 맞는 작업 없음', '현재 선택된 필터에 해당하는 작업이 없습니다.');
+  for (const h of activeHarnesses) {
+    const hName = (h.providerId || '').replace('snowball.', '').toUpperCase() || h.id;
+    const hCandidates = allCandidates.filter(
+      c => c.harness?.pluginId === h.providerId || (h.id && c.harness?.pluginId?.includes(h.id))
+    );
+    const hSessions = filteredSessions.filter(
+      s => s.sessionKey.includes(`/${h.providerId}/`) || s.sessionKey.includes(`:${h.providerId}:`) || (h.id && s.sessionKey.includes(h.id))
+    );
+
+    const projectLines = hCandidates.length > 0
+      ? hCandidates.map(c => `• ${c.displayName} (${c.root || '로컬'})`).join('\n')
+      : '연결된 프로젝트 없음';
+
+    // Harness Card showing its real projects
+    card(
+      `Harness: ${hName} (${h.locator})`,
+      `프로젝트 (${hCandidates.length}개):\n${projectLines}`,
+      null,
+      `${hCandidates.length}개 프로젝트`
+    );
+
+    // Sessions for this harness
+    for (const s of hSessions) {
+      const isOwned = !s.readOnly && s.ownerId !== null;
+      const sessionAction = button(
+        isOwned ? '명령 작성' : '조회 전용',
+        () => {
+          if (!isOwned) {
+            $('notice').textContent = '조회 전용 작업입니다. 새 명령을 보낼 수 없습니다.';
+            return;
+          }
+          activeDraft = {
+            destinationKey: s.sessionKey,
+            ownerId: s.ownerId,
+            text: '',
+            readOnly: !isOwned,
+          };
+          render();
+        },
+        !isOwned
+      );
+
+      const parts = s.sessionKey.split('/');
+      const sessionName = parts[3] || parts[parts.length - 1] || s.sessionKey;
+
+      card(
+        `↳ 세션: ${sessionName}`,
+        `세션 키: ${s.sessionKey} · 소유자: ${s.ownerId || '조회 전용'} · revision: ${s.revision}`,
+        sessionAction,
+        isOwned ? '활성 세션' : '조회전용'
+      );
+    }
   }
 
-  for (const s of filteredSessions) {
-    const isOwned = !s.readOnly && s.ownerId !== null;
-    const sessionAction = button(
-      isOwned ? '명령 작성' : '조회 전용',
-      () => {
-        if (!isOwned) {
-          $('notice').textContent = '조회 전용 작업입니다. 새 명령을 보낼 수 없습니다.';
-          return;
-        }
-        activeDraft = {
-          destinationKey: s.sessionKey,
-          ownerId: s.ownerId,
-          text: '',
-          readOnly: !isOwned,
-        };
-        render();
-      },
-      !isOwned
-    );
-
-    const parts = s.sessionKey.split('/');
-    const harnessName = parts[1] || s.sessionKey;
-    const sessionName = parts[3] || s.sessionKey;
-
-    card(
-      `${harnessName} · ${sessionName}`,
-      `세션 키: ${s.sessionKey} · 소유자: ${s.ownerId || '조회 전용'} · revision: ${s.revision}`,
-      sessionAction,
-      isOwned ? '활성 세션' : '조회전용'
-    );
+  if (activeHarnesses.length === 0) {
+    card('조건에 맞는 Harness 없음', '현재 선택된 필터에 해당하는 Harness 또는 작업이 없습니다.');
   }
 }
 
@@ -379,20 +389,18 @@ function render() {
   $('content').replaceChildren();
   $('actions').replaceChildren();
   $('notice').textContent = '';
-  $('eyebrow').textContent = step === 4 ? 'LOCAL OVERVIEW' : `GET STARTED · ${step + 1} / 4`;
+  $('eyebrow').textContent = step === 3 ? 'LOCAL OVERVIEW' : `GET STARTED · ${step + 1} / 3`;
   $('title').textContent = [
     '내 작업을 한곳에서',
     '사용하는 Harness 연결',
-    '프로젝트 (작업 공간) 확인',
     '원하는 방식으로 조작',
     '이 컴퓨터의 작업',
   ][step];
   $('description').textContent = [
     '로컬 실행기에서 받은 일회용 코드를 입력하세요. Snowball 클라우드 계정은 필요하지 않습니다.',
-    'Harness 연결은 선택 사항입니다. 검토된 후보 목록만 표시하며, 버전·제어 가능 상태를 추정하지 않습니다.',
-    '선택한 Harness(Codex, OpenCode, Antigravity)에서 작업할 프로젝트 폴더입니다. Harness별 또는 프로젝트별로 확인할 수 있습니다.',
+    '연결할 AI Harness(Codex, OpenCode, Antigravity)를 선택하세요. 탐색된 실제 프로젝트와 세션이 자동으로 연동됩니다.',
     '장치는 선택 사항입니다. 현재 등록 상태를 확인하거나 하드웨어 없이 계속하세요.',
-    '로컬 서비스가 보고한 작업과 Attention(승인 대기, 오류) 상태입니다.',
+    '선택한 Harness의 프로젝트 및 세션, Attention(승인 대기, 오류) 상태입니다.',
   ][step];
 
   if (step === 0) {
@@ -472,8 +480,13 @@ function render() {
     const selCount = selectedHarnesses.size;
     $('actions').append(
       button(
-        selCount > 0 ? `다음 (선택된 Harness ${selCount}개)` : '다음 (Harness 미선택)',
+        selCount > 0 ? `다음 (장치 · ${selCount}개 선택됨)` : '다음 (장치)',
         () => go(2)
+      ),
+      button(
+        '바로 시작 (Overview)',
+        () => go(3),
+        true
       ),
       button(
         'Harness 다시 찾기',
@@ -488,123 +501,6 @@ function render() {
   }
 
   if (step === 2) {
-    const workspaces = snapshot?.workspaceDetails ?? [];
-    const candidates = snapshot?.harness?.candidates ?? [];
-    const activeHarnesses = candidates.filter(c => selectedHarnesses.size === 0 || selectedHarnesses.has(c.id));
-
-    // Auto-recheck any workspaces that are currently 'unavailable'
-    const unverified = workspaces.filter(w => w.status === 'unavailable');
-    if (unverified.length > 0) {
-      setTimeout(() => {
-        void run(async signal => {
-          for (const w of unverified) {
-            try { await client.recheckWorkspace(w.workspaceId, signal); } catch {}
-          }
-          return client.snapshot(signal);
-        });
-      }, 50);
-    }
-
-    // View mode toggle bar
-    const toggleBar = node('div');
-    toggleBar.style.display = 'flex';
-    toggleBar.style.gap = '8px';
-    toggleBar.style.marginBottom = '16px';
-
-    const btnHarnessView = button(
-      'Harness별로 보기',
-      () => { workspaceViewMode = 'by_harness'; render(); },
-      workspaceViewMode !== 'by_harness'
-    );
-    const btnProjectView = button(
-      '프로젝트별로 보기',
-      () => { workspaceViewMode = 'by_project'; render(); },
-      workspaceViewMode !== 'by_project'
-    );
-    toggleBar.append(btnHarnessView, btnProjectView);
-    $('content').append(toggleBar);
-
-    if (!workspaces.length) {
-      card(
-        '등록된 프로젝트(작업 공간) 없음',
-        snapshot?.workspaceSelectionAvailable
-          ? '이 컴퓨터의 프로젝트 폴더를 직접 선택하거나 등록 없이 다음으로 계속할 수 있습니다.'
-          : '현재 실행기에서는 폴더 선택을 사용할 수 없습니다. 등록 없이도 계속할 수 있습니다.'
-      );
-    } else if (workspaceViewMode === 'by_harness') {
-      const harnessList = activeHarnesses.length > 0 ? activeHarnesses : [
-        { id: 'codex', providerId: 'snowball.codex', locator: 'OpenAI Codex' },
-        { id: 'opencode', providerId: 'snowball.opencode', locator: 'OpenCode' },
-        { id: 'antigravity', providerId: 'snowball.antigravity', locator: 'Google Antigravity' }
-      ];
-
-      const allCandidates = snapshot?.workspaceCandidates ?? [];
-
-      for (const h of harnessList) {
-        const hName = (h.providerId || '').replace('snowball.', '').toUpperCase() || h.id;
-        const matchingCandidates = allCandidates.filter(
-          c => c.harness?.pluginId === h.providerId || (h.id && c.harness?.pluginId?.includes(h.id))
-        );
-
-        const projectLines = matchingCandidates.length > 0
-          ? matchingCandidates.map(c => {
-              const matched = workspaces.find(w =>
-                w.displayName.toLowerCase() === c.displayName.toLowerCase() ||
-                (w.displayName && c.displayName.toLowerCase().includes(w.displayName.toLowerCase()))
-              );
-              const statusText = matched ? `[${names[matched.status] ?? matched.status}]` : '[Harness 프로젝트]';
-              return `• ${c.displayName} (${c.root || '로컬'}) ${statusText}`;
-            }).join('\n')
-          : workspaces.map(w => `• ${w.displayName} [${names[w.status] ?? w.status}]`).join('\n');
-
-        card(
-          `Harness: ${hName} (${h.locator})`,
-          `연결된 프로젝트:\n${projectLines}`,
-          button('프로젝트 관리', () => { workspaceViewMode = 'by_project'; render(); }, true),
-          `${matchingCandidates.length || workspaces.length}개 프로젝트`
-        );
-      }
-    } else {
-      const allCandidates = snapshot?.workspaceCandidates ?? [];
-      for (const workspace of workspaces) {
-        const supportedHarnesses = [...new Set(
-          allCandidates
-            .filter(c =>
-              c.displayName.toLowerCase() === workspace.displayName.toLowerCase() ||
-              (workspace.displayName && c.displayName.toLowerCase().includes(workspace.displayName.toLowerCase()))
-            )
-            .map(c => (c.harness?.pluginId || '').replace('snowball.', '').toUpperCase())
-        )];
-        const harnessNames = supportedHarnesses.length > 0 ? supportedHarnesses.join(', ') : '전체 지원';
-
-        card(
-          `📁 ${workspace.displayName}`,
-          `상태: ${names[workspace.status] ?? workspace.status}\n발견된 Harness: ${harnessNames}\n작업 공간 ID: ${workspace.workspaceId}`,
-          button('다시 확인', () => void run(async signal => {
-            await client.recheckWorkspace(workspace.workspaceId, signal);
-            return client.snapshot(signal);
-          }), true),
-          'PROJECT'
-        );
-      }
-    }
-
-    if (snapshot?.workspaceSelectionAvailable) {
-      $('actions').append(
-        button('새 프로젝트 폴더 선택', () => void run(async signal => {
-          await client.selectWorkspace(signal);
-          return client.snapshot(signal);
-        }))
-      );
-    }
-    $('actions').append(
-      button('다음 (장치)', () => go(3)),
-      button('이전 (Harness)', () => go(1), true)
-    );
-    return;
-  }
-
-  if (step === 3) {
     const devices = snapshot?.devices ?? [];
     const candidates = snapshot?.deviceCandidates ?? [];
     if (!devicesInitialized && devices.length) {
@@ -651,19 +547,19 @@ function render() {
     const devCount = selectedDevices.size;
     $('actions').append(
       button(
-        devCount > 0 ? `Overview 시작 (장치 ${devCount}개 사용)` : 'Overview 시작 (하드웨어 없이)',
-        () => go(4)
+        devCount > 0 ? `시작하기 (장치 ${devCount}개 사용)` : '시작하기 (하드웨어 없이)',
+        () => go(3)
       ),
-      button('이전 (작업 공간)', () => go(2), true)
+      button('이전 (Harness)', () => go(1), true)
     );
     return;
   }
 
-  if (step === 4) {
+  if (step === 3) {
     renderOverview();
     $('actions').append(
       button('새로고침', () => void run(signal => client.snapshot(signal)), true),
-      button('Harness / 장치 설정 변경', () => go(1), true)
+      button('Harness / 장치 다시 설정', () => go(1), true)
     );
     return;
   }
