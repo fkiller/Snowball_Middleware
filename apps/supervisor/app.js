@@ -567,7 +567,11 @@ function render() {
 // Initial load: try to fetch snapshot immediately (no-auth or active session)
 void (async () => {
   try {
-    const result = await client.snapshot();
+    let result = await client.snapshot();
+    if (!result.harness || result.harness.status === 'idle' || !result.harness.candidates.length) {
+      await client.scanHarness().catch(() => {});
+      result = await client.snapshot();
+    }
     snapshot = result;
     step = 1;
   } catch {}

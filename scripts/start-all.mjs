@@ -57,6 +57,11 @@ const devices = new DeviceRegistry();
 const discovery = new HarnessDiscovery();
 const providers = defaultDiscoveryProviders();
 
+// Run initial harness discovery scan on startup
+try {
+  await discovery.scan(providers, { platform: process.platform, pathValue: process.env.PATH ?? '' });
+} catch {}
+
 const harness = {
   describe: () => discovery.snapshot(),
   rescan: () => discovery.scan(providers, { platform: process.platform, pathValue: process.env.PATH ?? '' }),
