@@ -63,21 +63,30 @@ try {
   await discovery.scan(providers, { platform: process.platform, pathValue: process.env.PATH ?? '' });
 } catch {}
 
-// Register default local projects if none exist
-if (store.list().length === 0) {
-  const defaultProjects = [
-    { root: 'e:\\developments\\projects\\Snowball_Control', name: 'Snowball_Control' },
-    { root: 'e:\\developments\\projects\\Snowball_Middleware', name: 'Snowball_Middleware' }
-  ];
-  for (const p of defaultProjects) {
-    if (fs.existsSync(p.root)) {
-      try {
-        await store.registerSelected(p.root, p.name);
-        console.log(`  Registered Project : ${p.name}`);
-      } catch (err) {
-        console.log(`  Project register note (${p.name}):`, err.message);
-      }
+// Register default local projects if not already registered
+const defaultProjects = [
+  { root: 'e:\\developments\\projects\\Snowball_Control', name: 'Snowball_Control' },
+  { root: 'e:\\developments\\projects\\Snowball_Middleware', name: 'Snowball_Middleware' }
+];
+const existingNames = new Set(store.list().map(w => w.displayName));
+for (const p of defaultProjects) {
+  if (!existingNames.has(p.name) && fs.existsSync(p.root)) {
+    try {
+      await store.registerSelected(p.root, p.name);
+      console.log(`  Registered Project : ${p.name}`);
+    } catch (err) {
+      console.log(`  Project register note (${p.name}):`, err.message);
     }
+  }
+}
+
+// Refresh all workspaces on startup so restored entries transition to 'ready'
+for (const ws of store.list()) {
+  try {
+    const refreshed = await store.refresh(ws.workspaceId);
+    console.log(`  Verified Project   : ${refreshed.displayName} [${refreshed.status}]`);
+  } catch (err) {
+    console.log(`  Project verify note (${ws.displayName}):`, err.message);
   }
 }
 

@@ -1,7 +1,7 @@
 import { LocalClient } from '/supervisor/client.js';
 
 const client = new LocalClient(location.origin);
-const labels = ['로컬 연결', 'Harness', '작업 공간', '장치 · 선택', 'Overview'];
+const labels = ['로컬 연결', 'Harness', '프로젝트 (작업 공간)', '장치 · 선택', 'Overview'];
 const names = {
   ready: '사용 가능',
   empty: '빈 작업 공간',
@@ -19,6 +19,7 @@ let generation = 0;
 // State for Overview & Attention (MW.06.02.01.01)
 let harnessFilter = 'all';
 let workspaceFilter = 'all';
+let workspaceViewMode = 'by_harness'; // 'by_harness' | 'by_project'
 let activeDraft = null; // { destinationKey: string, ownerId: string | null, text: string, readOnly: boolean }
 let selectedHarnesses = new Set();
 let selectedDevices = new Set();
@@ -134,7 +135,9 @@ function card(title, detail, action, badge = null, checkbox = null, selected = n
     b.className = 'badge';
     titleEl.prepend(b);
   }
-  text.append(titleEl, node('p', detail));
+  const detailEl = node('p', detail);
+  detailEl.style.whiteSpace = 'pre-line';
+  text.append(titleEl, detailEl);
   left.append(text);
   c.append(left);
 
@@ -380,14 +383,14 @@ function render() {
   $('title').textContent = [
     '내 작업을 한곳에서',
     '사용하는 Harness 연결',
-    '작업 공간 확인',
+    '프로젝트 (작업 공간) 확인',
     '원하는 방식으로 조작',
     '이 컴퓨터의 작업',
   ][step];
   $('description').textContent = [
     '로컬 실행기에서 받은 일회용 코드를 입력하세요. Snowball 클라우드 계정은 필요하지 않습니다.',
     'Harness 연결은 선택 사항입니다. 검토된 후보 목록만 표시하며, 버전·제어 가능 상태를 추정하지 않습니다.',
-    '로컬에서 명시적으로 등록한 폴더만 표시합니다. Harness가 알려 준 경로는 자동 등록하지 않습니다.',
+    '선택한 Harness(Codex, OpenCode, Antigravity)에서 작업할 프로젝트 폴더입니다. Harness별 또는 프로젝트별로 확인할 수 있습니다.',
     '장치는 선택 사항입니다. 현재 등록 상태를 확인하거나 하드웨어 없이 계속하세요.',
     '로컬 서비스가 보고한 작업과 Attention(승인 대기, 오류) 상태입니다.',
   ][step];
@@ -486,27 +489,89 @@ function render() {
 
   if (step === 2) {
     const workspaces = snapshot?.workspaceDetails ?? [];
+    const candidates = snapshot?.harness?.candidates ?? [];
+    const activeHarnesses = candidates.filter(c => selectedHarnesses.size === 0 || selectedHarnesses.has(c.id));
+
+    // Auto-recheck any workspaces that are currently 'unavailable'
+    const unverified = workspaces.filter(w => w.status === 'unavailable');
+    if (unverified.length > 0) {
+      setTimeout(() => {
+        void run(async signal => {
+          for (const w of unverified) {
+            try { await client.recheckWorkspace(w.workspaceId, signal); } catch {}
+          }
+          return client.snapshot(signal);
+        });
+      }, 50);
+    }
+
+    // View mode toggle bar
+    const toggleBar = node('div');
+    toggleBar.style.display = 'flex';
+    toggleBar.style.gap = '8px';
+    toggleBar.style.marginBottom = '16px';
+
+    const btnHarnessView = button(
+      'Harness별로 보기',
+      () => { workspaceViewMode = 'by_harness'; render(); },
+      workspaceViewMode !== 'by_harness'
+    );
+    const btnProjectView = button(
+      '프로젝트별로 보기',
+      () => { workspaceViewMode = 'by_project'; render(); },
+      workspaceViewMode !== 'by_project'
+    );
+    toggleBar.append(btnHarnessView, btnProjectView);
+    $('content').append(toggleBar);
+
     if (!workspaces.length) {
       card(
-        '등록된 작업 공간 없음',
+        '등록된 프로젝트(작업 공간) 없음',
         snapshot?.workspaceSelectionAvailable
           ? '이 컴퓨터의 프로젝트 폴더를 직접 선택하거나 등록 없이 다음으로 계속할 수 있습니다.'
           : '현재 실행기에서는 폴더 선택을 사용할 수 없습니다. 등록 없이도 계속할 수 있습니다.'
       );
+    } else if (workspaceViewMode === 'by_harness') {
+      const harnessList = activeHarnesses.length > 0 ? activeHarnesses : [
+        { id: 'codex', providerId: 'snowball.codex', locator: 'OpenAI Codex' },
+        { id: 'opencode', providerId: 'snowball.opencode', locator: 'OpenCode' },
+        { id: 'antigravity', providerId: 'snowball.antigravity', locator: 'Google Antigravity' }
+      ];
+
+      for (const h of harnessList) {
+        const hName = (h.providerId || '').replace('snowball.', '').toUpperCase() || h.id;
+        const projectLines = workspaces
+          .map(w => `• ${w.displayName} [${names[w.status] ?? w.status}]`)
+          .join('\n');
+
+        card(
+          `Harness: ${hName} (${h.locator})`,
+          `연결된 프로젝트:\n${projectLines}`,
+          button('프로젝트 관리', () => { workspaceViewMode = 'by_project'; render(); }, true),
+          `${workspaces.length}개 프로젝트 연결`
+        );
+      }
+    } else {
+      for (const workspace of workspaces) {
+        const harnessNames = (activeHarnesses.length > 0 ? activeHarnesses : [
+          { providerId: 'Codex' }, { providerId: 'OpenCode' }, { providerId: 'Antigravity' }
+        ]).map(h => (h.providerId || '').replace('snowball.', '')).join(', ');
+
+        card(
+          `📁 ${workspace.displayName}`,
+          `상태: ${names[workspace.status] ?? workspace.status}\n지원 Harness: ${harnessNames}\n작업 공간 ID: ${workspace.workspaceId}`,
+          button('다시 확인', () => void run(async signal => {
+            await client.recheckWorkspace(workspace.workspaceId, signal);
+            return client.snapshot(signal);
+          }), true),
+          'PROJECT'
+        );
+      }
     }
-    for (const workspace of workspaces) {
-      card(
-        workspace.displayName,
-        names[workspace.status] ?? '알 수 없는 상태',
-        button('다시 확인', () => void run(async signal => {
-          await client.recheckWorkspace(workspace.workspaceId, signal);
-          return client.snapshot(signal);
-        }), true)
-      );
-    }
+
     if (snapshot?.workspaceSelectionAvailable) {
       $('actions').append(
-        button('폴더 선택', () => void run(async signal => {
+        button('새 프로젝트 폴더 선택', () => void run(async signal => {
           await client.selectWorkspace(signal);
           return client.snapshot(signal);
         }))
