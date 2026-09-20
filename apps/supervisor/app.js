@@ -338,8 +338,6 @@ function renderOverview() {
       isOwned ? '소유' : '조회전용'
     );
   }
-
-  $('actions').append(button('연결 설정 다시 보기', () => go(1), true));
 }
 
 function render() {
@@ -558,7 +556,7 @@ function render() {
     renderOverview();
     $('actions').append(
       button('새로고침', () => void run(signal => client.snapshot(signal)), true),
-      button('설정 다시 보기', () => go(1), true)
+      button('Harness / 장치 설정 변경', () => go(1), true)
     );
     return;
   }
