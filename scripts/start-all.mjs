@@ -17,6 +17,7 @@ import { ensurePrivateStateDirectory } from '../apps/supervisor/private-state.mj
 import { Mk20LabTransport } from '../../Snowball_Control/plugins/device-mk20/src/index.mjs';
 import { HidDiscovery, loadNativeBackend } from '../packages/device-hid/dist/index.js';
 import { reviewedProfiles } from '../packages/device-hid/dist/profiles.js';
+import { scanHarnessProjects } from './harness-project-scanner.mjs';
 
 const directory = ensurePrivateStateDirectory(resolveUserDataDir());
 const hostIdFile = path.join(directory, 'host.v1.json');
@@ -88,6 +89,20 @@ for (const ws of store.list()) {
   } catch (err) {
     console.log(`  Project verify note (${ws.displayName}):`, err.message);
   }
+}
+
+// Scan and report real project candidates for each harness
+try {
+  const harnessProjectsMap = scanHarnessProjects();
+  const allCandidates = [
+    ...harnessProjectsMap['snowball.codex'],
+    ...harnessProjectsMap['snowball.antigravity'],
+    ...harnessProjectsMap['snowball.opencode']
+  ];
+  store.reportCandidates(allCandidates);
+  console.log(`  Reported ${allCandidates.length} real harness project candidates`);
+} catch (err) {
+  console.log('  Harness project scan note:', err.message);
 }
 
 // Register default sessions for each harness if none exist

@@ -2,9 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DurableLog, JournalFault } from './durable-log.js';
 import { parseHostId } from './identity.js';
-import { WorkspaceRegistry, localWorkspaceIO, type RegisteredWorkspace, type WorkspaceIO } from './workspaces.js';
+import { WorkspaceRegistry, localWorkspaceIO, type RegisteredWorkspace, type WorkspaceIO, type ProjectCandidate } from './workspaces.js';
 
-export type WorkspaceAccess = Pick<WorkspaceRegistry, 'list' | 'refresh' | 'assertReadable' | 'subscribe'>;
+export type WorkspaceAccess = Pick<WorkspaceRegistry, 'list' | 'refresh' | 'assertReadable' | 'subscribe' | 'listCandidates'>;
 /** Coded selection/storage failure. Message stays generic; code guides user action without paths. */
 export class WorkspaceFault extends Error {
   constructor(
@@ -158,6 +158,8 @@ export class WorkspaceStore implements WorkspaceAccess {
     if (result.status !== 'ready' && result.status !== 'empty') throw new Error('Workspace requires repair');
     return result;
   }
+  listCandidates(): ProjectCandidate[] { this.assertOpen(); return this.current.listCandidates(); }
+  reportCandidates(candidates: readonly ProjectCandidate[]): void { this.assertOpen(); this.current.reportCandidates(candidates); }
   close(): void {
     if (this.closed) return;
     this.closed = true; this.detach(); this.listeners.clear(); this.log.close();

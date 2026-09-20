@@ -241,6 +241,7 @@ export class LocalApi {
       decisions: this.options.journal.listDecisions().map(d => ({ decisionId: d.decisionId, sessionKey: d.sessionKey, ownerId: d.ownerId, status: d.status, revision: d.revision, ...(d.expiresAt !== undefined ? { expiresAt: d.expiresAt } : {}) })),
       workspaces: this.options.workspaces?.list() ?? [],
       workspaceDetails: this.options.workspaces?.describe() ?? [],
+      workspaceCandidates: this.options.workspaces?.listCandidates() ?? [],
       workspaceSelectionAvailable: !!(this.options.workspaceStore && this.options.chooseWorkspace),
       devices: this.options.devices?.list() ?? [],
       deviceSources: this.options.devices?.sourceStates() ?? [],

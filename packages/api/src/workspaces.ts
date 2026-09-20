@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { constants } from 'node:fs';
-import { WorkspaceRegistry, type WorkspaceAccess, type RegisteredWorkspace, type WorkspaceStatus } from '@snowball/core';
+import { WorkspaceRegistry, type WorkspaceAccess, type RegisteredWorkspace, type WorkspaceStatus, type ProjectCandidate } from '@snowball/core';
 
 export interface WorkspaceSummary { workspaceId: string; projectId: string; displayName: string; status: WorkspaceStatus }
 const summarize = (entry: RegisteredWorkspace): WorkspaceSummary => ({ workspaceId: entry.workspaceId,
@@ -20,6 +20,7 @@ export class WorkspaceFiles {
   }
   list(): { workspaceId: string }[] { return this.registry.list().map(({ workspaceId }) => ({ workspaceId })); }
   describe(): WorkspaceSummary[] { return this.registry.list().map(summarize); }
+  listCandidates(): ProjectCandidate[] { return this.registry.listCandidates?.() ?? []; }
   subscribe(listener: () => void): () => void { return this.registry.subscribe(listener); }
   async recheck(workspaceId: string): Promise<WorkspaceSummary> { return summarize(await this.registry.refresh(workspaceId)); }
   async read(workspaceId: string, relative: string): Promise<{ text: string }> {

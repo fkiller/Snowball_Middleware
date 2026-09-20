@@ -538,28 +538,48 @@ function render() {
         { id: 'antigravity', providerId: 'snowball.antigravity', locator: 'Google Antigravity' }
       ];
 
+      const allCandidates = snapshot?.workspaceCandidates ?? [];
+
       for (const h of harnessList) {
         const hName = (h.providerId || '').replace('snowball.', '').toUpperCase() || h.id;
-        const projectLines = workspaces
-          .map(w => `• ${w.displayName} [${names[w.status] ?? w.status}]`)
-          .join('\n');
+        const matchingCandidates = allCandidates.filter(
+          c => c.harness?.pluginId === h.providerId || (h.id && c.harness?.pluginId?.includes(h.id))
+        );
+
+        const projectLines = matchingCandidates.length > 0
+          ? matchingCandidates.map(c => {
+              const matched = workspaces.find(w =>
+                w.displayName.toLowerCase() === c.displayName.toLowerCase() ||
+                (w.displayName && c.displayName.toLowerCase().includes(w.displayName.toLowerCase()))
+              );
+              const statusText = matched ? `[${names[matched.status] ?? matched.status}]` : '[Harness 프로젝트]';
+              return `• ${c.displayName} (${c.root || '로컬'}) ${statusText}`;
+            }).join('\n')
+          : workspaces.map(w => `• ${w.displayName} [${names[w.status] ?? w.status}]`).join('\n');
 
         card(
           `Harness: ${hName} (${h.locator})`,
           `연결된 프로젝트:\n${projectLines}`,
           button('프로젝트 관리', () => { workspaceViewMode = 'by_project'; render(); }, true),
-          `${workspaces.length}개 프로젝트 연결`
+          `${matchingCandidates.length || workspaces.length}개 프로젝트`
         );
       }
     } else {
+      const allCandidates = snapshot?.workspaceCandidates ?? [];
       for (const workspace of workspaces) {
-        const harnessNames = (activeHarnesses.length > 0 ? activeHarnesses : [
-          { providerId: 'Codex' }, { providerId: 'OpenCode' }, { providerId: 'Antigravity' }
-        ]).map(h => (h.providerId || '').replace('snowball.', '')).join(', ');
+        const supportedHarnesses = [...new Set(
+          allCandidates
+            .filter(c =>
+              c.displayName.toLowerCase() === workspace.displayName.toLowerCase() ||
+              (workspace.displayName && c.displayName.toLowerCase().includes(workspace.displayName.toLowerCase()))
+            )
+            .map(c => (c.harness?.pluginId || '').replace('snowball.', '').toUpperCase())
+        )];
+        const harnessNames = supportedHarnesses.length > 0 ? supportedHarnesses.join(', ') : '전체 지원';
 
         card(
           `📁 ${workspace.displayName}`,
-          `상태: ${names[workspace.status] ?? workspace.status}\n지원 Harness: ${harnessNames}\n작업 공간 ID: ${workspace.workspaceId}`,
+          `상태: ${names[workspace.status] ?? workspace.status}\n발견된 Harness: ${harnessNames}\n작업 공간 ID: ${workspace.workspaceId}`,
           button('다시 확인', () => void run(async signal => {
             await client.recheckWorkspace(workspace.workspaceId, signal);
             return client.snapshot(signal);
