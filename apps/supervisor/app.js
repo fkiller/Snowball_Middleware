@@ -92,17 +92,38 @@ function selectionNotice(code) {
   return '확인을 완료하지 못했습니다. 로컬 서비스와 접근 권한을 확인한 뒤 다시 시도하세요.';
 }
 
-function card(title, detail, action, badge = null, checkbox = null) {
+function card(title, detail, action, badge = null, checkbox = null, selected = null) {
   const c = node('div');
   c.className = 'card';
   c.style.display = 'flex';
   c.style.alignItems = 'center';
   c.style.justifyContent = 'space-between';
+  c.style.transition = 'background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease';
+
+  if (selected === true) {
+    c.style.background = '#1a2b23';
+    c.style.borderColor = '#588a73';
+    c.style.opacity = '1';
+  } else if (selected === false) {
+    c.style.background = 'transparent';
+    c.style.borderColor = '#2a363f';
+    c.style.opacity = '0.55';
+  }
+
+  if (checkbox) {
+    c.style.cursor = 'pointer';
+    c.addEventListener('click', e => {
+      if (e.target !== checkbox && !e.target.closest('button')) {
+        checkbox.checked = !checkbox.checked;
+        checkbox.dispatchEvent(new Event('change'));
+      }
+    });
+  }
 
   const left = node('div');
   left.style.display = 'flex';
   left.style.alignItems = 'center';
-  left.style.gap = '12px';
+  left.style.gap = '14px';
 
   if (checkbox) left.append(checkbox);
 
@@ -417,10 +438,11 @@ function render() {
 
         card(
           `${candidate.providerId} · ${candidate.kind === 'file' ? '설치 파일' : '로컬 등록 주소'}`,
-          `${candidate.locator} — ${isSelected ? '사용 선택됨' : '미사용 (선택 해제됨)'}`,
+          candidate.locator,
           null,
-          isSelected ? '선택됨' : '제외',
-          cb
+          null,
+          cb,
+          isSelected
         );
       }
     }
@@ -506,10 +528,11 @@ function render() {
 
       card(
         `${dev.label} · [${dev.transport.toUpperCase()}]`,
-        `상태: ${dev.state === 'ready' ? '연결됨 (Ready)' : dev.state} · 기능: ${dev.capabilities.join(', ')} — ${isSelected ? '활성화됨' : '비활성 (선택 해제됨)'}`,
+        `상태: ${dev.state === 'ready' ? '연결됨 (Ready)' : dev.state} · 기능: ${dev.capabilities.join(', ')}`,
         null,
-        isSelected ? '선택됨' : '제외',
-        cb
+        null,
+        cb,
+        isSelected
       );
     }
     for (const cand of candidates) {
