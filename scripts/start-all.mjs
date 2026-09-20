@@ -17,7 +17,9 @@ import { ensurePrivateStateDirectory } from '../apps/supervisor/private-state.mj
 import { Mk20LabTransport } from '../../Snowball_Control/plugins/device-mk20/src/index.mjs';
 import { HidDiscovery, loadNativeBackend } from '../packages/device-hid/dist/index.js';
 import { reviewedProfiles } from '../packages/device-hid/dist/profiles.js';
+import os from 'node:os';
 import { scanHarnessProjects } from './harness-project-scanner.mjs';
+import { scanAllHarnessSessions } from './harness-session-scanner.mjs';
 
 const directory = ensurePrivateStateDirectory(resolveUserDataDir());
 const hostIdFile = path.join(directory, 'host.v1.json');
@@ -105,26 +107,30 @@ try {
   console.log('  Harness project scan note:', err.message);
 }
 
-// Register default sessions for each harness if none exist
-if (journal.listSessions().length === 0) {
-  const initialSessions = [
-    { pluginId: 'snowball.codex', instanceId: 'default', nativeId: 'codex-main', ownerId: 'owner-local' },
-    { pluginId: 'snowball.opencode', instanceId: 'default', nativeId: 'opencode-main', ownerId: 'owner-local' },
-    { pluginId: 'snowball.antigravity', instanceId: 'default', nativeId: 'antigravity-main', ownerId: 'owner-local' },
-  ];
-  for (const s of initialSessions) {
-    try {
-      const sessionKey = formatSessionKey({
-        hostId,
-        harness: { pluginId: s.pluginId, instanceId: s.instanceId },
-        nativeSessionId: s.nativeId,
-      });
-      journal.registerSession(sessionKey, s.ownerId);
-      console.log(`  Registered Session : ${sessionKey}`);
-    } catch (err) {
-      console.log(`  Session register note (${s.nativeId}):`, err.message);
+// Register real sessions discovered from Codex, Antigravity, and OpenCode
+let realSessionsData = null;
+let realTurnsData = null;
+try {
+  const { sessionsByHarness, turnsStore } = scanAllHarnessSessions();
+  realSessionsData = sessionsByHarness;
+  realTurnsData = turnsStore;
+  for (const [pluginId, projs] of Object.entries(sessionsByHarness)) {
+    for (const [projName, sList] of Object.entries(projs)) {
+      for (const s of sList) {
+        try {
+          const sessionKey = formatSessionKey({
+            hostId,
+            harness: { pluginId, instanceId: 'default' },
+            nativeSessionId: s.id,
+          });
+          journal.registerSession(sessionKey, s.ownerId);
+        } catch (err) {}
+      }
     }
   }
+  console.log(`  Registered genuine sessions across active harnesses`);
+} catch (err) {
+  console.log('  Harness session scan note:', err.message);
 }
 
 const harness = {
@@ -143,6 +149,9 @@ const api = new LocalApi({
   supervisor,
   port: 8765,
   noAuth: true,
+  hostname: os.hostname(),
+  realSessions: realSessionsData,
+  turnsStore: realTurnsData,
 });
 
 await api.start();

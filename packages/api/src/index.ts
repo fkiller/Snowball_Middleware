@@ -1,4 +1,5 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
+import os from 'node:os';
 import { randomBytes, createHash } from 'node:crypto';
 import { CommandJournal, createControllerId, JournalFault, type CommandInput, type DeviceRegistry, type DiscoverySnapshot, type WorkspaceStore } from '@snowball/core';
 import { WorkspaceFiles } from './workspaces.js';
@@ -41,6 +42,9 @@ export interface LocalApiOptions {
   supervisor?: SupervisorAssets;
   workspaceStore?: WorkspaceStore;
   noAuth?: boolean;
+  hostname?: string;
+  realSessions?: unknown;
+  turnsStore?: unknown;
   /** Trusted native picker. The HTTP request never supplies a path or display name. */
   chooseWorkspace?: (signal: AbortSignal) => Promise<{ root: string; displayName: string } | null>;
 }
@@ -247,6 +251,9 @@ export class LocalApi {
       deviceSources: this.options.devices?.sourceStates() ?? [],
       deviceCandidates: this.options.devices?.listCandidates() ?? [],
       harness: this.options.harness?.describe() ?? null,
+      hostname: this.options.hostname || os.hostname(),
+      realSessions: this.options.realSessions ?? null,
+      turnsStore: this.options.turnsStore ?? null,
     };
   }
   private async route(req: IncomingMessage, res: ServerResponse): Promise<void> {

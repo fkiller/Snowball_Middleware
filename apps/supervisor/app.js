@@ -12,7 +12,7 @@ let operation;
 let generation = 0;
 
 // Breadcrumb & Hierarchy State (Host > Harness > Project > Session)
-let activeHost = 'dev-pc';
+let activeHost = 'MINIME-PC-AMD';
 let activeHarness = 'snowball.codex';
 let activeProject = 'Snowball Control';
 let activeSessionKey = null;
@@ -152,33 +152,33 @@ function getProjectsForHarness(harnessPluginId) {
 }
 
 function getSessionsForProject(harnessPluginId, projectName) {
+  // 1. Check if snapshot returned genuine sessions for this harness and project
+  if (snapshot?.realSessions?.[harnessPluginId]) {
+    const projs = snapshot.realSessions[harnessPluginId];
+    const normProj = (projectName || '').toLowerCase().replace(/[\s_-]/g, '');
+    for (const [pName, list] of Object.entries(projs)) {
+      if (pName.toLowerCase().replace(/[\s_-]/g, '') === normProj && list.length > 0) {
+        return list;
+      }
+    }
+  }
+
+  // 2. Find sessions registered in snapshot
   const sessions = snapshot?.sessions ?? [];
-  // Find sessions registered in snapshot
   const matched = sessions.filter(s => {
     const key = s.sessionKey || '';
     return key.includes(harnessPluginId) && (projectName ? key.toLowerCase().includes(projectName.toLowerCase().replace(/[\s_-]/g, '')) : true);
   });
   if (matched.length > 0) return matched;
 
-  // Provide realistic project sessions
+  // Fallback if not yet populated
   const cleanProj = (projectName || 'proj').toLowerCase().replace(/[\s_-]/g, '');
-  const prefix = harnessPluginId.includes('codex') ? 'codex' : (harnessPluginId.includes('opencode') ? 'oc' : 'ag');
-  
   return [
     {
-      sessionKey: `host_dev/${harnessPluginId}/default/${cleanProj}-s01`,
-      title: `${projectName} 세션 1`,
-      preview: '최근 대화 및 명령 수행 내역',
-      ownerId: 'owner-local',
+      sessionKey: `host_minime/${harnessPluginId}/default/${cleanProj}-s01`,
+      title: `${projectName} 작업 세션`,
       readOnly: false,
-      revision: 1
-    },
-    {
-      sessionKey: `host_dev/${harnessPluginId}/default/${cleanProj}-s02`,
-      title: `${projectName} 작업 분석`,
-      preview: '코드 검수 및 기능 테스트',
       ownerId: 'owner-local',
-      readOnly: false,
       revision: 0
     }
   ];
@@ -186,6 +186,7 @@ function getSessionsForProject(harnessPluginId, projectName) {
 
 // Ensure valid active hierarchy
 function ensureHierarchy() {
+  if (snapshot?.hostname) activeHost = snapshot.hostname;
   const harnesses = getAvailableHarnesses();
   if (!harnesses.some(h => h.providerId === activeHarness || h.id === activeHarness)) {
     activeHarness = harnesses[0]?.providerId || 'snowball.codex';
@@ -235,7 +236,7 @@ function renderBreadcrumbs() {
     header.className = 'dropdown-header';
     menu.append(header);
 
-    const item = node('button', `🖥️ ${activeHost} (이 컴퓨터 · 로컬)`);
+    const item = node('button', `🖥️ ${activeHost}`);
     item.className = 'dropdown-item selected';
     item.addEventListener('click', () => {
       activeDropdown = null;
@@ -271,9 +272,8 @@ function renderBreadcrumbs() {
       const pId = h.providerId || h.id;
       const hLabel = (h.providerId || '').replace('snowball.', '').toUpperCase() || h.id;
       const isSel = pId === activeHarness;
-      const item = node('button');
+      const item = node('button', `⚡ ${hLabel}`);
       item.className = `dropdown-item ${isSel ? 'selected' : ''}`;
-      item.innerHTML = `<span>⚡ ${hLabel}</span><span class="item-meta">${h.locator || ''}</span>`;
       item.addEventListener('click', () => {
         activeHarness = pId;
         activeDropdown = null;
@@ -309,9 +309,8 @@ function renderBreadcrumbs() {
     const projects = getProjectsForHarness(activeHarness);
     for (const p of projects) {
       const isSel = p.displayName === activeProject;
-      const item = node('button');
+      const item = node('button', `📁 ${p.displayName}`);
       item.className = `dropdown-item ${isSel ? 'selected' : ''}`;
-      item.innerHTML = `<span>📁 ${p.displayName}</span><span class="item-meta">${p.root ? p.root.slice(-24) : ''}</span>`;
       item.addEventListener('click', () => {
         activeProject = p.displayName;
         historyByScope[activeHarness] = activeProject;
@@ -351,9 +350,8 @@ function renderBreadcrumbs() {
     for (const s of sessions) {
       const isSel = s.sessionKey === activeSessionKey;
       const sTitle = s.title || s.sessionKey.split('/').pop() || s.sessionKey;
-      const item = node('button');
+      const item = node('button', `💬 ${sTitle}`);
       item.className = `dropdown-item ${isSel ? 'selected' : ''}`;
-      item.innerHTML = `<span>💬 ${sTitle}</span><span class="item-meta">${s.readOnly ? '조회전용' : '활성'}</span>`;
       item.addEventListener('click', () => {
         activeSessionKey = s.sessionKey;
         historyByScope[activeProject] = activeSessionKey;
@@ -368,7 +366,7 @@ function renderBreadcrumbs() {
     newItem.className = 'dropdown-item';
     newItem.style.color = 'var(--accent-green)';
     newItem.addEventListener('click', () => {
-      const newKey = `host_dev/${activeHarness}/default/${activeProject.toLowerCase().replace(/[\s_-]/g, '')}-s${Date.now().toString().slice(-4)}`;
+      const newKey = `host_minime/${activeHarness}/default/${activeProject.toLowerCase().replace(/[\s_-]/g, '')}-s${Date.now().toString().slice(-4)}`;
       activeSessionKey = newKey;
       historyByScope[activeProject] = activeSessionKey;
       sessionTurns[newKey] = [
@@ -488,7 +486,7 @@ function renderWorkspace() {
   const messagesEl = $('session-messages');
   if (messagesEl) {
     messagesEl.replaceChildren();
-    const turns = sessionTurns[curSession.sessionKey] || sessionTurns['default-codex-s01'] || [];
+    const turns = snapshot?.turnsStore?.[curSession.sessionKey] || sessionTurns[curSession.sessionKey] || [];
 
     if (turns.length === 0) {
       const empty = node('div');
@@ -879,6 +877,8 @@ function renderWizard() {
 
 // --- Main Render Dispatcher ---
 function render() {
+  const hostBadge = $('host-badge');
+  if (hostBadge) hostBadge.textContent = `${activeHost} · 로컬 제어`;
   const wsContainer = $('workspace-container');
   const wizContainer = $('wizard-container');
   const breadcrumbs = $('breadcrumb-bar');
