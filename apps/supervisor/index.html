@@ -1,5 +1,113 @@
 <!doctype html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Snowball · Local control</title><link rel="stylesheet" href="/supervisor/style.css"></head>
-<body><main><header><span class="brand">SNOWBALL</span><span class="badge">이 컴퓨터 · 로컬 제어</span></header>
-<nav aria-label="설정 단계" id="steps"></nav><section aria-labelledby="title"><p id="eyebrow"></p><h1 id="title">내 작업을 한곳에서</h1><p id="description"></p><div id="content"></div><p id="notice" role="status" aria-live="polite"></p><div id="actions"></div></section>
-<footer>장치와 음성 기능 없이도 시작할 수 있습니다. 연결이나 명령은 자동으로 실행하지 않습니다.</footer></main><script type="module" src="/supervisor/app.js"></script></body></html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Snowball · Local Control</title>
+  <link rel="stylesheet" href="/supervisor/style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div class="header-left">
+        <span class="brand">SNOWBALL</span>
+        <span class="badge" id="host-badge">이 컴퓨터 · 로컬 제어</span>
+      </div>
+      <div class="header-right">
+        <button id="btn-settings" class="secondary icon-btn" type="button" title="설정">⚙️ 설정</button>
+      </div>
+    </header>
+
+    <!-- 1. Breadcrumb Bar (Host > Harness > Project > Session) -->
+    <nav id="breadcrumb-bar" class="breadcrumb-container" aria-label="작업 탐색"></nav>
+
+    <!-- 2. Workspace View (MK20 Session Workspace) -->
+    <div id="workspace-container" class="workspace-layout">
+      <!-- Session Header & Metadata -->
+      <div id="session-header" class="session-meta-bar"></div>
+
+      <!-- Attention & Alerts (Decisions, In-doubt commands) -->
+      <div id="attention-container"></div>
+
+      <!-- Session Message Stream / Turn History -->
+      <div id="session-messages" class="session-messages-panel" role="log" aria-live="polite"></div>
+
+      <!-- Prompt & Voice Input Box -->
+      <div id="prompt-container" class="prompt-panel">
+        <div id="voice-draft-banner" class="voice-draft-banner" style="display:none;"></div>
+        <div class="prompt-input-row">
+          <textarea id="prompt-input" rows="3" placeholder="메시지를 입력하거나 음성으로 말하세요... (Enter: 전송, Shift+Enter: 줄바꿈)"></textarea>
+          <div class="prompt-actions">
+            <button id="btn-voice" class="secondary voice-btn" type="button" title="음성 입력">🎙️ 음성</button>
+            <button id="btn-send" class="send-btn" type="button" title="명령 전송">전송 ↵</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Setup Wizard (One-time onboarding / Rerun) -->
+    <div id="wizard-container" class="wizard-layout" style="display:none;">
+      <nav aria-label="설정 단계" id="steps"></nav>
+      <section aria-labelledby="title">
+        <p id="eyebrow"></p>
+        <h1 id="title">내 작업을 한곳에서</h1>
+        <p id="description"></p>
+        <div id="content"></div>
+        <p id="notice" role="status" aria-live="polite"></p>
+        <div id="actions"></div>
+      </section>
+    </div>
+
+    <!-- 4. Settings Modal -->
+    <div id="settings-modal" class="modal-backdrop" style="display:none;">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h2>⚙️ 설정</h2>
+          <button id="btn-close-settings" class="close-btn" type="button">✕</button>
+        </div>
+        <div class="modal-body">
+          <section class="settings-section">
+            <h3>시스템 설정</h3>
+            <label class="setting-row">
+              <input type="checkbox" id="setting-autostart">
+              <span>Windows 시작 시 자동 실행 (OS Autostart)</span>
+            </label>
+            <label class="setting-row">
+              <input type="checkbox" id="setting-tray" checked>
+              <span>백그라운드 시스템 트레이 상주</span>
+            </label>
+          </section>
+
+          <section class="settings-section">
+            <h3>음성 엔진 (Voice Engine)</h3>
+            <div class="setting-row">
+              <label for="setting-voice-engine">음성 인식 엔진:</label>
+              <select id="setting-voice-engine">
+                <option value="whisper">Local Whisper (내장 고음질 로컬 엔진)</option>
+                <option value="windows">Windows Native Speech API</option>
+                <option value="webspeech" selected>Web Speech API / Mock</option>
+              </select>
+            </div>
+          </section>
+
+          <section class="settings-section">
+            <h3>하드웨어 장치 (MK20)</h3>
+            <div id="settings-devices-list"></div>
+          </section>
+
+          <section class="settings-section">
+            <h3>Harness 관리 & 마법사</h3>
+            <div class="settings-actions">
+              <button id="btn-settings-rescan" class="secondary" type="button">Harness 다시 찾기</button>
+              <button id="btn-rerun-wizard" class="secondary" type="button">초기 설정 마법사 다시 실행</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <footer>장치와 음성 기능 없이도 시작할 수 있습니다. 연결이나 명령은 자동으로 실행하지 않습니다.</footer>
+  </main>
+  <script type="module" src="/supervisor/app.js"></script>
+</body>
+</html>

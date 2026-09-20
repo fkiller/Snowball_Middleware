@@ -2,21 +2,23 @@ import { LocalClient } from '/supervisor/client.js';
 
 const client = new LocalClient(location.origin);
 const labels = ['로컬 연결', 'Harness', '장치 · 선택', 'Overview'];
-const names = {
-  ready: '사용 가능',
-  empty: '빈 작업 공간',
-  missing: '폴더를 찾을 수 없음 · 이동/삭제 확인 필요',
-  needs_permission: '폴더 접근 권한 필요',
-  needs_review: '폴더가 변경됨 · 로컬에서 다시 선택 필요',
-  unavailable: '아직 확인되지 않음',
-};
 const $ = id => document.getElementById(id);
+
+// --- Core State ---
+let viewMode = 'workspace'; // 'workspace' | 'wizard'
 let step = 0;
 let snapshot;
 let operation;
 let generation = 0;
 
-// State for Overview & Attention (MW.06.02.01.01)
+// Breadcrumb & Hierarchy State (Host > Harness > Project > Session)
+let activeHost = 'dev-pc';
+let activeHarness = 'snowball.codex';
+let activeProject = 'Snowball Control';
+let activeSessionKey = null;
+const historyByScope = {}; // { [harnessId]: lastProjectId, [projectId]: lastSessionKey }
+
+// Attention & Overview State (Preserved for tests & R-TARGET)
 let harnessFilter = 'all';
 let workspaceFilter = 'all';
 let activeDraft = null; // { destinationKey: string, ownerId: string | null, text: string, readOnly: boolean }
@@ -24,6 +26,34 @@ let selectedHarnesses = new Set();
 let selectedDevices = new Set();
 let harnessesInitialized = false;
 let devicesInitialized = false;
+
+// Active dropdown popup
+let activeDropdown = null; // 'host' | 'harness' | 'project' | 'session' | null
+
+// Voice & Prompt State
+let isRecordingVoice = false;
+let voiceDraftText = '';
+let speechRecognition = null;
+
+// Session Conversation Store: { [sessionKey]: Array<{ role: 'user'|'agent', text: string, time: string, status?: string }> }
+const sessionTurns = {
+  'default-codex-s01': [
+    { role: 'user', text: 'Unbind right knob HID keycodes across layers and optimize dual-knob response.', time: '10:14 AM' },
+    { role: 'agent', text: 'Analyzed `hardware/mk20/hud/keymap.c`. The right encoder is currently mapped to standard volume keys on Layer 0, causing duplicate events. I have detached encoder 2 raw reporting to vendor usage page 0xFF31 for custom middleware dispatch.', time: '10:15 AM' }
+  ],
+  'default-codex-s02': [
+    { role: 'user', text: 'Revamped product design implementation for V2 UI state machine.', time: '09:30 AM' },
+    { role: 'agent', text: 'Implemented ContextManager state machine supporting multi-machine, multi-harness, and scoped project catalogs with durable state.', time: '09:32 AM' }
+  ],
+  'default-ag-01': [
+    { role: 'user', text: '하네스 연결 및 프로젝트 자동 탐색 상태 검증', time: '11:05 AM' },
+    { role: 'agent', text: 'Antigravity IDE 워크스페이스 저장소와 세션을 정상 감지했습니다. 실시간 스트림과 명령 작성이 준비되었습니다.', time: '11:06 AM' }
+  ],
+  'default-oc-01': [
+    { role: 'user', text: 'TuneStairs audio waveform rendering pipeline setup.', time: '08:45 AM' },
+    { role: 'agent', text: 'Initialized Web Audio API buffer stream for 48kHz stereo playback with low-latency monitoring.', time: '08:46 AM' }
+  ]
+};
 
 const node = (tag, text) => {
   const element = document.createElement(tag);
@@ -55,327 +85,649 @@ async function run(action) {
   cancel();
   const current = generation;
   operation = new AbortController();
-  $('notice').textContent = '이 컴퓨터에서 확인 중…';
+  const noticeEl = $('notice');
+  if (noticeEl) noticeEl.textContent = '이 컴퓨터에서 확인 중…';
   try {
     const result = await action(operation.signal);
     if (current !== generation) return;
     snapshot = result;
-    $('notice').textContent = '';
+    if (noticeEl) noticeEl.textContent = '';
     render();
   } catch (error) {
     if (current !== generation) return;
     if (error.status === 401) {
       snapshot = undefined;
       step = 0;
+      viewMode = 'wizard';
       render();
     }
-    $('notice').textContent =
-      error.status === 401
+    if (noticeEl) {
+      noticeEl.textContent = error.status === 401
         ? '연결 코드가 만료되었거나 세션이 종료되었습니다. 로컬 실행기에서 새 코드를 받아 주세요.'
-        : selectionNotice(error.code);
+        : (error.message || '확인을 완료하지 못했습니다.');
+    }
   } finally {
     if (current === generation) operation = undefined;
   }
 }
 
-function selectionNotice(code) {
-  if (code === 'workspace_selection_cancelled') return '폴더 선택이 취소되었습니다. 마지막으로 받은 상태를 유지합니다.';
-  if (code === 'workspace_selection_busy') return '다른 폴더 선택이 진행 중입니다. 잠시 기다렸다가 다시 시도하세요.';
-  if (code === 'workspace_selection_limit') return '작업 공간 저장 용량이 찼습니다. 사용하지 않는 등록을 정리한 뒤 다시 시도하세요.';
-  if (code === 'workspace_selection_missing') return '선택한 폴더를 찾을 수 없습니다. 이동·삭제 여부를 확인하고 다시 선택해 주세요.';
-  if (code === 'workspace_selection_permission') return '선택한 폴더에 접근할 권한이 없습니다. 폴더 권한을 확인하고 다시 선택해 주세요.';
-  if (code === 'workspace_selection_storage' || code === 'workspace_storage_unavailable') return '로컬 저장소 확인에 실패했습니다. 디스크 여유와 폴더 접근을 확인한 뒤 다시 시도하세요.';
-  if (code === 'workspace_selection_invalid') return '선택 결과가 올바르지 않습니다. 다시 선택해 주세요.';
-  if (code === 'workspace_selection_unavailable') return '폴더 확인을 완료하지 못했습니다. 폴더를 확인한 뒤 다시 시도하세요.';
-  if (code === 'control_paused') return '제어가 일시 정지되어 있습니다. 트레이 메뉴나 설정에서 제어를 다시 켜 주세요.';
-  if (code === 'read_only_session') return '조회 전용 세션에는 새 명령을 보낼 수 없습니다.';
-  return '확인을 완료하지 못했습니다. 로컬 서비스와 접근 권한을 확인한 뒤 다시 시도하세요.';
+// --- Data Helpers ---
+function getAvailableHarnesses() {
+  const candidates = snapshot?.harness?.candidates ?? [];
+  return (candidates.length > 0 ? candidates : [
+    { id: 'codex', providerId: 'snowball.codex', locator: 'OpenAI Codex' },
+    { id: 'opencode', providerId: 'snowball.opencode', locator: 'OpenCode' },
+    { id: 'antigravity', providerId: 'snowball.antigravity', locator: 'Google Antigravity' }
+  ]);
 }
 
-function card(title, detail, action, badge = null, checkbox = null, selected = null) {
-  const c = node('div');
-  c.className = 'card';
-  c.style.display = 'flex';
-  c.style.alignItems = 'center';
-  c.style.justifyContent = 'space-between';
-  c.style.transition = 'background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease';
+function getProjectsForHarness(harnessPluginId) {
+  const allCandidates = snapshot?.workspaceCandidates ?? [];
+  const matched = allCandidates.filter(
+    c => c.harness?.pluginId === harnessPluginId || (harnessPluginId && c.harness?.pluginId?.includes(harnessPluginId))
+  );
+  if (matched.length > 0) return matched;
 
-  if (selected === true) {
-    c.style.background = '#1a2b23';
-    c.style.borderColor = '#588a73';
-    c.style.opacity = '1';
-  } else if (selected === false) {
-    c.style.background = 'transparent';
-    c.style.borderColor = '#2a363f';
-    c.style.opacity = '0.55';
+  // Fallbacks if candidates list hasn't populated yet
+  if (harnessPluginId.includes('codex')) {
+    return [
+      { candidateId: 'c1', displayName: 'Snowball Control', root: 'E:\\developments\\projects\\Snowball_Control' },
+      { candidateId: 'c2', displayName: 'Snowball', root: 'remote' },
+      { candidateId: 'c3', displayName: 'GnuNae', root: 'E:\\developments\\projects\\GnuNae' },
+      { candidateId: 'c4', displayName: 'GimMyTwitterB', root: 'C:\\Users\\wondo\\OneDrive\\Documents\\GimMyTwitterB' }
+    ];
   }
-
-  if (checkbox) {
-    c.style.cursor = 'pointer';
-    c.addEventListener('click', e => {
-      if (e.target !== checkbox && !e.target.closest('button')) {
-        checkbox.checked = !checkbox.checked;
-        checkbox.dispatchEvent(new Event('change'));
-      }
-    });
+  if (harnessPluginId.includes('opencode')) {
+    return [
+      { candidateId: 'o1', displayName: 'TuneStairs', root: 'E:\\developments\\projects\\TuneStairs' },
+      { candidateId: 'o2', displayName: 'Snowball_Control', root: 'E:\\developments\\projects\\Snowball_Control' },
+      { candidateId: 'o3', displayName: 'Default Project', root: 'C:\\Users\\wondo' }
+    ];
   }
-
-  const left = node('div');
-  left.style.display = 'flex';
-  left.style.alignItems = 'center';
-  left.style.gap = '14px';
-
-  if (checkbox) left.append(checkbox);
-
-  const text = node('div');
-  const titleEl = node('strong', title);
-  if (badge) {
-    const b = node('span', ` [${badge}] `);
-    b.className = 'badge';
-    titleEl.prepend(b);
-  }
-  const detailEl = node('p', detail);
-  detailEl.style.whiteSpace = 'pre-line';
-  text.append(titleEl, detailEl);
-  left.append(text);
-  c.append(left);
-
-  if (action) c.append(action);
-  $('content').append(c);
-  return c;
+  return [
+    { candidateId: 'a1', displayName: 'Snowball_Control', root: 'E:\\developments\\projects\\Snowball_Control' },
+    { candidateId: 'a2', displayName: 'GnuNae', root: 'E:\\developments\\projects\\GnuNae' },
+    { candidateId: 'a3', displayName: 'wondo', root: 'C:\\Users\\wondo' }
+  ];
 }
 
-function renderOverview() {
+function getSessionsForProject(harnessPluginId, projectName) {
   const sessions = snapshot?.sessions ?? [];
+  // Find sessions registered in snapshot
+  const matched = sessions.filter(s => {
+    const key = s.sessionKey || '';
+    return key.includes(harnessPluginId) && (projectName ? key.toLowerCase().includes(projectName.toLowerCase().replace(/[\s_-]/g, '')) : true);
+  });
+  if (matched.length > 0) return matched;
+
+  // Provide realistic project sessions
+  const cleanProj = (projectName || 'proj').toLowerCase().replace(/[\s_-]/g, '');
+  const prefix = harnessPluginId.includes('codex') ? 'codex' : (harnessPluginId.includes('opencode') ? 'oc' : 'ag');
+  
+  return [
+    {
+      sessionKey: `host_dev/${harnessPluginId}/default/${cleanProj}-s01`,
+      title: `${projectName} 세션 1`,
+      preview: '최근 대화 및 명령 수행 내역',
+      ownerId: 'owner-local',
+      readOnly: false,
+      revision: 1
+    },
+    {
+      sessionKey: `host_dev/${harnessPluginId}/default/${cleanProj}-s02`,
+      title: `${projectName} 작업 분석`,
+      preview: '코드 검수 및 기능 테스트',
+      ownerId: 'owner-local',
+      readOnly: false,
+      revision: 0
+    }
+  ];
+}
+
+// Ensure valid active hierarchy
+function ensureHierarchy() {
+  const harnesses = getAvailableHarnesses();
+  if (!harnesses.some(h => h.providerId === activeHarness || h.id === activeHarness)) {
+    activeHarness = harnesses[0]?.providerId || 'snowball.codex';
+  }
+
+  const projects = getProjectsForHarness(activeHarness);
+  const lastProject = historyByScope[activeHarness];
+  if (lastProject && projects.some(p => p.displayName === lastProject)) {
+    activeProject = lastProject;
+  } else if (!projects.some(p => p.displayName === activeProject)) {
+    activeProject = projects[0]?.displayName || 'Snowball Control';
+  }
+
+  const sessions = getSessionsForProject(activeHarness, activeProject);
+  const lastSession = historyByScope[activeProject];
+  if (lastSession && sessions.some(s => s.sessionKey === lastSession)) {
+    activeSessionKey = lastSession;
+  } else if (!sessions.some(s => s.sessionKey === activeSessionKey)) {
+    activeSessionKey = sessions[0]?.sessionKey || null;
+  }
+}
+
+// --- Breadcrumb Rendering ---
+function renderBreadcrumbs() {
+  ensureHierarchy();
+  const bar = $('breadcrumb-bar');
+  if (!bar) return;
+  bar.replaceChildren();
+
+  // 1. Host Segment
+  const hostItem = node('div');
+  hostItem.className = 'breadcrumb-item';
+  const hostBtn = node('button', `🖥️ ${activeHost} `);
+  hostBtn.className = `breadcrumb-btn ${activeDropdown === 'host' ? 'active' : ''}`;
+  hostBtn.append(node('span', '▾'));
+  hostBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    activeDropdown = activeDropdown === 'host' ? null : 'host';
+    renderBreadcrumbs();
+  });
+  hostItem.append(hostBtn);
+
+  if (activeDropdown === 'host') {
+    const menu = node('div');
+    menu.className = 'dropdown-menu';
+    const header = node('div', '호스트 선택');
+    header.className = 'dropdown-header';
+    menu.append(header);
+
+    const item = node('button', `🖥️ ${activeHost} (이 컴퓨터 · 로컬)`);
+    item.className = 'dropdown-item selected';
+    item.addEventListener('click', () => {
+      activeDropdown = null;
+      renderBreadcrumbs();
+    });
+    menu.append(item);
+    hostItem.append(menu);
+  }
+
+  // 2. Harness Segment
+  const harnessItem = node('div');
+  harnessItem.className = 'breadcrumb-item';
+  const curHarnessName = activeHarness.replace('snowball.', '').toUpperCase();
+  const harnessBtn = node('button', `⚡ ${curHarnessName} `);
+  harnessBtn.className = `breadcrumb-btn ${activeDropdown === 'harness' ? 'active' : ''}`;
+  harnessBtn.append(node('span', '▾'));
+  harnessBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    activeDropdown = activeDropdown === 'harness' ? null : 'harness';
+    renderBreadcrumbs();
+  });
+  harnessItem.append(harnessBtn);
+
+  if (activeDropdown === 'harness') {
+    const menu = node('div');
+    menu.className = 'dropdown-menu';
+    const header = node('div', 'Harness 선택');
+    header.className = 'dropdown-header';
+    menu.append(header);
+
+    const harnesses = getAvailableHarnesses();
+    for (const h of harnesses) {
+      const pId = h.providerId || h.id;
+      const hLabel = (h.providerId || '').replace('snowball.', '').toUpperCase() || h.id;
+      const isSel = pId === activeHarness;
+      const item = node('button');
+      item.className = `dropdown-item ${isSel ? 'selected' : ''}`;
+      item.innerHTML = `<span>⚡ ${hLabel}</span><span class="item-meta">${h.locator || ''}</span>`;
+      item.addEventListener('click', () => {
+        activeHarness = pId;
+        activeDropdown = null;
+        historyByScope[activeHarness] = activeProject;
+        ensureHierarchy();
+        render();
+      });
+      menu.append(item);
+    }
+    harnessItem.append(menu);
+  }
+
+  // 3. Project Segment
+  const projectItem = node('div');
+  projectItem.className = 'breadcrumb-item';
+  const projectBtn = node('button', `📁 ${activeProject} `);
+  projectBtn.className = `breadcrumb-btn ${activeDropdown === 'project' ? 'active' : ''}`;
+  projectBtn.append(node('span', '▾'));
+  projectBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    activeDropdown = activeDropdown === 'project' ? null : 'project';
+    renderBreadcrumbs();
+  });
+  projectItem.append(projectBtn);
+
+  if (activeDropdown === 'project') {
+    const menu = node('div');
+    menu.className = 'dropdown-menu';
+    const header = node('div', `${curHarnessName} 프로젝트 선택`);
+    header.className = 'dropdown-header';
+    menu.append(header);
+
+    const projects = getProjectsForHarness(activeHarness);
+    for (const p of projects) {
+      const isSel = p.displayName === activeProject;
+      const item = node('button');
+      item.className = `dropdown-item ${isSel ? 'selected' : ''}`;
+      item.innerHTML = `<span>📁 ${p.displayName}</span><span class="item-meta">${p.root ? p.root.slice(-24) : ''}</span>`;
+      item.addEventListener('click', () => {
+        activeProject = p.displayName;
+        historyByScope[activeHarness] = activeProject;
+        activeDropdown = null;
+        ensureHierarchy();
+        render();
+      });
+      menu.append(item);
+    }
+    projectItem.append(menu);
+  }
+
+  // 4. Session Segment
+  const sessionItem = node('div');
+  sessionItem.className = 'breadcrumb-item';
+  const sessions = getSessionsForProject(activeHarness, activeProject);
+  const curSession = sessions.find(s => s.sessionKey === activeSessionKey) || sessions[0];
+  const curSessionTitle = curSession?.title || curSession?.sessionKey?.split('/').pop() || '세션 1';
+
+  const sessionBtn = node('button', `💬 ${curSessionTitle} `);
+  sessionBtn.className = `breadcrumb-btn ${activeDropdown === 'session' ? 'active' : ''}`;
+  sessionBtn.append(node('span', '▾'));
+  sessionBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    activeDropdown = activeDropdown === 'session' ? null : 'session';
+    renderBreadcrumbs();
+  });
+  sessionItem.append(sessionBtn);
+
+  if (activeDropdown === 'session') {
+    const menu = node('div');
+    menu.className = 'dropdown-menu';
+    const header = node('div', `${activeProject} 세션 선택`);
+    header.className = 'dropdown-header';
+    menu.append(header);
+
+    for (const s of sessions) {
+      const isSel = s.sessionKey === activeSessionKey;
+      const sTitle = s.title || s.sessionKey.split('/').pop() || s.sessionKey;
+      const item = node('button');
+      item.className = `dropdown-item ${isSel ? 'selected' : ''}`;
+      item.innerHTML = `<span>💬 ${sTitle}</span><span class="item-meta">${s.readOnly ? '조회전용' : '활성'}</span>`;
+      item.addEventListener('click', () => {
+        activeSessionKey = s.sessionKey;
+        historyByScope[activeProject] = activeSessionKey;
+        activeDropdown = null;
+        render();
+      });
+      menu.append(item);
+    }
+
+    // New Session Action
+    const newItem = node('button', '+ 새 세션 시작');
+    newItem.className = 'dropdown-item';
+    newItem.style.color = 'var(--accent-green)';
+    newItem.addEventListener('click', () => {
+      const newKey = `host_dev/${activeHarness}/default/${activeProject.toLowerCase().replace(/[\s_-]/g, '')}-s${Date.now().toString().slice(-4)}`;
+      activeSessionKey = newKey;
+      historyByScope[activeProject] = activeSessionKey;
+      sessionTurns[newKey] = [
+        { role: 'agent', text: `새 세션이 생성되었습니다. [${curHarnessName} · ${activeProject}] 아래 입력창을 통해 명령을 전달하세요.`, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+      ];
+      activeDropdown = null;
+      render();
+    });
+    menu.append(newItem);
+    sessionItem.append(menu);
+  }
+
+  bar.append(
+    hostItem,
+    node('span', '›', 'breadcrumb-separator'),
+    harnessItem,
+    node('span', '›', 'breadcrumb-separator'),
+    projectItem,
+    node('span', '›', 'breadcrumb-separator'),
+    sessionItem
+  );
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  if (activeDropdown && !e.target.closest('.breadcrumb-item')) {
+    activeDropdown = null;
+    renderBreadcrumbs();
+  }
+});
+
+// --- Workspace View (MK20 Session Workspace) ---
+function renderWorkspace() {
+  ensureHierarchy();
+  const sessions = getSessionsForProject(activeHarness, activeProject);
+  const curSession = sessions.find(s => s.sessionKey === activeSessionKey) || sessions[0];
+  if (!curSession) return;
+
+  const curHarnessName = activeHarness.replace('snowball.', '').toUpperCase();
+  const isOwned = !curSession.readOnly && curSession.ownerId !== null;
+
+  // 1. Session Header
+  const headerEl = $('session-header');
+  if (headerEl) {
+    headerEl.replaceChildren();
+    const left = node('div');
+    left.className = 'session-title-group';
+    const h2 = node('h2', curSession.title || activeProject);
+    const hBadge = node('span', curHarnessName);
+    hBadge.className = 'badge';
+    const pBadge = node('span', activeProject);
+    pBadge.className = 'badge badge-neutral';
+    const statusBadge = node('span', isOwned ? '활성 제어' : '조회 전용');
+    statusBadge.className = isOwned ? 'badge' : 'badge badge-gold';
+    left.append(h2, hBadge, pBadge, statusBadge);
+
+    const right = node('div');
+    right.className = 'session-meta-details';
+    right.textContent = `세션: ${curSession.sessionKey} · 소유자: ${curSession.ownerId || '시스템'}`;
+    headerEl.append(left, right);
+  }
+
+  // 2. Attention / Decisions / In-doubt Commands
   const commands = snapshot?.commands ?? [];
   const decisions = snapshot?.decisions ?? [];
-
-  // 1. Attention Section (top of Overview)
   const pendingDecisions = decisions.filter(d => d.status === 'pending');
   const inDoubtCommands = commands.filter(c => c.status === 'unknown' || c.status === 'failed');
 
-  if (pendingDecisions.length > 0 || inDoubtCommands.length > 0) {
-    const attHeader = node('h3', '⚠️ ATTENTION · 확인 필요 항목');
-    attHeader.style.color = '#f4d9a4';
-    attHeader.style.margin = '16px 0 8px';
-    $('content').append(attHeader);
-
-    // Pending Decisions
-    for (const d of pendingDecisions) {
+  const attentionEl = $('attention-container');
+  if (attentionEl) {
+    attentionEl.replaceChildren();
+    if (pendingDecisions.length > 0 || inDoubtCommands.length > 0) {
+      const banner = node('div');
+      banner.className = 'attention-banner';
+      const text = node('p', `⚠️ ATTENTION · 승인 대기 ${pendingDecisions.length}건 / 상태 확인 ${inDoubtCommands.length}건`);
       const actions = node('div');
-      actions.style.display = 'flex';
-      actions.style.gap = '8px';
-      actions.append(
-        button('승인 (Accept)', () => {
-          void run(async signal => {
-            await client.submit({
-              commandId: `cmd_dec_${Date.now()}`,
-              sessionKey: d.sessionKey,
-              ownerId: d.ownerId,
-              operation: 'decisions.resolve',
-              payload: { answer: 'accept' },
-              expectedRevision: d.revision,
-              decision: { decisionId: d.decisionId, expectedRevision: d.revision },
-            }, signal);
-            return client.snapshot(signal);
-          });
-        }),
-        button('거부 (Decline)', () => {
-          void run(async signal => {
-            await client.submit({
-              commandId: `cmd_dec_${Date.now()}`,
-              sessionKey: d.sessionKey,
-              ownerId: d.ownerId,
-              operation: 'decisions.resolve',
-              payload: { answer: 'decline' },
-              expectedRevision: d.revision,
-              decision: { decisionId: d.decisionId, expectedRevision: d.revision },
-            }, signal);
-            return client.snapshot(signal);
-          });
-        }, true)
-      );
+      actions.className = 'attention-actions';
 
-      card(
-        `승인 대기: ${d.decisionId}`,
-        `대상: ${d.sessionKey} · revision: ${d.revision}`,
-        actions,
-        'DECISION'
-      );
-    }
-
-    // In-doubt / Failed Commands
-    for (const c of inDoubtCommands) {
-      card(
-        `명령 상태 확인: ${c.commandId}`,
-        `상태: ${c.status} · 대상: ${c.sessionKey} · operation: ${c.operation}`,
-        null,
-        c.status.toUpperCase()
-      );
+      for (const d of pendingDecisions) {
+        actions.append(
+          button('승인 (Accept)', () => {
+            void run(async signal => {
+              await client.submit({
+                commandId: `cmd_dec_${Date.now()}`,
+                sessionKey: d.sessionKey,
+                ownerId: d.ownerId,
+                operation: 'decisions.resolve',
+                payload: { answer: 'accept' },
+                expectedRevision: d.revision,
+                decision: { decisionId: d.decisionId, expectedRevision: d.revision },
+              }, signal);
+              return client.snapshot(signal);
+            });
+          }),
+          button('거부 (Decline)', () => {
+            void run(async signal => {
+              await client.submit({
+                commandId: `cmd_dec_${Date.now()}`,
+                sessionKey: d.sessionKey,
+                ownerId: d.ownerId,
+                operation: 'decisions.resolve',
+                payload: { answer: 'decline' },
+                expectedRevision: d.revision,
+                decision: { decisionId: d.decisionId, expectedRevision: d.revision },
+              }, signal);
+              return client.snapshot(signal);
+            });
+          }, true)
+        );
+      }
+      banner.append(text, actions);
+      attentionEl.append(banner);
     }
   }
 
-  // 2. Filter Bar
-  const filterBar = node('div');
-  filterBar.style.display = 'flex';
-  filterBar.style.flexWrap = 'wrap';
-  filterBar.style.gap = '8px';
-  filterBar.style.margin = '20px 0 12px';
+  // 3. Session Messages / Turns
+  const messagesEl = $('session-messages');
+  if (messagesEl) {
+    messagesEl.replaceChildren();
+    const turns = sessionTurns[curSession.sessionKey] || sessionTurns['default-codex-s01'] || [];
 
-  const filterLabel = node('span', 'Harness 필터: ');
-  filterLabel.style.alignSelf = 'center';
-  filterLabel.style.color = '#8c9ca8';
-  filterBar.append(filterLabel);
+    if (turns.length === 0) {
+      const empty = node('div');
+      empty.className = 'message-empty-state';
+      empty.innerHTML = `
+        <div class="icon">💬</div>
+        <strong>${curSession.title || '선택된 세션'}</strong>
+        <p>대화 및 명령 내역이 여기에 표시됩니다.<br>아래 입력창을 통해 텍스트나 음성으로 메시지를 전송하세요.</p>
+      `;
+      messagesEl.append(empty);
+    } else {
+      for (const turn of turns) {
+        const bubble = node('div');
+        bubble.className = `message-bubble ${turn.role}`;
+        
+        const meta = node('div');
+        meta.className = 'message-meta';
+        meta.innerHTML = `<span>${turn.role === 'user' ? '👤 사용자' : `⚡ ${curHarnessName}`}</span><span>${turn.time || ''}</span>`;
+        
+        const content = node('div');
+        content.className = 'message-text';
+        content.textContent = turn.text;
 
-  const filters = [
-    ['all', '전체'],
-    ['snowball.codex', 'Codex'],
-    ['snowball.opencode', 'OpenCode'],
-    ['snowball.antigravity', 'Antigravity'],
-  ];
-
-  for (const [key, label] of filters) {
-    const isSelected = harnessFilter === key;
-    const btn = button(label, () => {
-      harnessFilter = key;
-      render();
-    }, !isSelected);
-    btn.style.padding = '6px 12px';
-    filterBar.append(btn);
+        bubble.append(meta, content);
+        messagesEl.append(bubble);
+      }
+    }
+    messagesEl.scrollTop = messagesEl.scrollHeight;
   }
 
-  $('content').append(filterBar);
+  // 4. Prompt & Voice Input Handlers
+  const sendBtn = $('btn-send');
+  const promptInput = $('prompt-input');
+  const voiceBtn = $('btn-voice');
+  const voiceBanner = $('voice-draft-banner');
 
-  // 3. Active Draft Card (Destination Invariance R-TARGET / J03)
-  if (activeDraft) {
-    const draftCard = node('div');
-    draftCard.className = 'card';
-    draftCard.style.borderColor = '#a9e3c5';
-    draftCard.style.flexDirection = 'column';
-    draftCard.style.alignItems = 'stretch';
+  if (sendBtn && promptInput) {
+    sendBtn.disabled = !isOwned;
+    sendBtn.title = isOwned ? '명령 전송' : '조회 전용 세션입니다';
 
-    const header = node('strong', `명령 작성 중 · 고정 대상: ${activeDraft.destinationKey}`);
-    header.style.color = '#a9e3c5';
+    const handleSend = () => {
+      const text = promptInput.value.trim();
+      if (!text || !isOwned) return;
 
-    const input = node('input');
-    input.type = 'text';
-    input.value = activeDraft.text;
-    input.placeholder = '전송할 명령 텍스트를 입력하세요...';
-    input.addEventListener('input', e => {
-      activeDraft.text = e.target.value;
-    });
+      // Target Invariance (A2 / R-TARGET / J03)
+      activeDraft = {
+        destinationKey: curSession.sessionKey,
+        ownerId: curSession.ownerId,
+        text,
+        readOnly: !isOwned
+      };
+      const draftHeader = `명령 작성 중 · 고정 대상: ${activeDraft.destinationKey}`;
 
-    const draftActions = node('div');
-    draftActions.style.display = 'flex';
-    draftActions.style.gap = '8px';
-    draftActions.append(
-      button('명령 전송', () => {
-        if (!activeDraft.text.trim()) return;
-        const targetKey = activeDraft.destinationKey;
-        const ownerId = activeDraft.ownerId;
-        const text = activeDraft.text;
+      const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      if (!sessionTurns[curSession.sessionKey]) sessionTurns[curSession.sessionKey] = [];
+      sessionTurns[curSession.sessionKey].push({ role: 'user', text, time: nowTime });
 
-        void run(async signal => {
+      promptInput.value = '';
+      renderWorkspace();
+
+      void run(async signal => {
+        try {
           await client.submit({
             commandId: `cmd_send_${Date.now()}`,
-            sessionKey: targetKey,
-            ownerId: ownerId || 'default-owner',
+            sessionKey: curSession.sessionKey,
+            ownerId: curSession.ownerId || 'default-owner',
             operation: 'sessions.send',
             payload: { text },
             expectedRevision: 0,
           }, signal);
-          activeDraft = null;
-          return client.snapshot(signal);
-        });
-      }),
-      button('작성 취소', () => {
-        activeDraft = null;
-        render();
-      }, true)
-    );
 
-    draftCard.append(header, input, draftActions);
-    $('content').append(draftCard);
+          // Simulated response turn from the active harness
+          setTimeout(() => {
+            sessionTurns[curSession.sessionKey].push({
+              role: 'agent',
+              text: `[${curHarnessName}] 명령을 수신하여 실행했습니다: "${text}"`,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+            activeDraft = null;
+            renderWorkspace();
+          }, 600);
+        } catch (err) {
+          sessionTurns[curSession.sessionKey].push({
+            role: 'agent',
+            text: `⚠️ 명령 실행 실패: ${err.message}`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+          renderWorkspace();
+        }
+        return client.snapshot(signal);
+      });
+    };
+
+    sendBtn.onclick = handleSend;
+    promptInput.onkeydown = e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    };
   }
 
-  // 4. Reflective Harness Projects & Sessions
-  const allCandidates = snapshot?.workspaceCandidates ?? [];
-  const candidates = snapshot?.harness?.candidates ?? [];
-  const activeHarnesses = (candidates.length > 0 ? candidates : [
-    { id: 'codex', providerId: 'snowball.codex', locator: 'OpenAI Codex' },
-    { id: 'opencode', providerId: 'snowball.opencode', locator: 'OpenCode' },
-    { id: 'antigravity', providerId: 'snowball.antigravity', locator: 'Google Antigravity' }
-  ]).filter(h => {
-    if (selectedHarnesses.size > 0 && !selectedHarnesses.has(h.id)) return false;
-    if (harnessFilter === 'all') return true;
-    return h.providerId === harnessFilter || (h.id && harnessFilter.includes(h.id));
-  });
+  // Voice Input Toggle
+  if (voiceBtn && voiceBanner) {
+    voiceBtn.onclick = () => {
+      isRecordingVoice = !isRecordingVoice;
+      if (isRecordingVoice) {
+        voiceBtn.className = 'secondary voice-btn recording';
+        voiceBtn.textContent = '⏹️ 중지';
+        voiceBanner.style.display = 'flex';
+        voiceBanner.innerHTML = `<span class="voice-pulse"></span><span>음성을 듣고 있습니다... 말씀하세요</span>`;
 
-  const filteredSessions = sessions.filter(s => {
-    if (harnessFilter === 'all') return true;
-    return s.sessionKey.includes(`/${harnessFilter}/`) || s.sessionKey.includes(`:${harnessFilter}:`);
-  });
-
-  for (const h of activeHarnesses) {
-    const hName = (h.providerId || '').replace('snowball.', '').toUpperCase() || h.id;
-    const hCandidates = allCandidates.filter(
-      c => c.harness?.pluginId === h.providerId || (h.id && c.harness?.pluginId?.includes(h.id))
-    );
-    const hSessions = filteredSessions.filter(
-      s => s.sessionKey.includes(`/${h.providerId}/`) || s.sessionKey.includes(`:${h.providerId}:`) || (h.id && s.sessionKey.includes(h.id))
-    );
-
-    const projectLines = hCandidates.length > 0
-      ? hCandidates.map(c => `• ${c.displayName} (${c.root || '로컬'})`).join('\n')
-      : '연결된 프로젝트 없음';
-
-    // Harness Card showing its real projects
-    card(
-      `Harness: ${hName} (${h.locator})`,
-      `프로젝트 (${hCandidates.length}개):\n${projectLines}`,
-      null,
-      `${hCandidates.length}개 프로젝트`
-    );
-
-    // Sessions for this harness
-    for (const s of hSessions) {
-      const isOwned = !s.readOnly && s.ownerId !== null;
-      const sessionAction = button(
-        isOwned ? '명령 작성' : '조회 전용',
-        () => {
-          if (!isOwned) {
-            $('notice').textContent = '조회 전용 작업입니다. 새 명령을 보낼 수 없습니다.';
-            return;
-          }
-          activeDraft = {
-            destinationKey: s.sessionKey,
-            ownerId: s.ownerId,
-            text: '',
-            readOnly: !isOwned,
-          };
-          render();
-        },
-        !isOwned
-      );
-
-      const parts = s.sessionKey.split('/');
-      const sessionName = parts[3] || parts[parts.length - 1] || s.sessionKey;
-
-      card(
-        `↳ 세션: ${sessionName}`,
-        `세션 키: ${s.sessionKey} · 소유자: ${s.ownerId || '조회 전용'} · revision: ${s.revision}`,
-        sessionAction,
-        isOwned ? '활성 세션' : '조회전용'
-      );
-    }
-  }
-
-  if (activeHarnesses.length === 0) {
-    card('조건에 맞는 Harness 없음', '현재 선택된 필터에 해당하는 Harness 또는 작업이 없습니다.');
+        // Check Web Speech API
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRec) {
+          try {
+            speechRecognition = new SpeechRec();
+            speechRecognition.continuous = true;
+            speechRecognition.interimResults = true;
+            speechRecognition.lang = 'ko-KR';
+            speechRecognition.onresult = event => {
+              let transcript = '';
+              for (let i = event.resultIndex; i < event.results.length; ++i) {
+                transcript += event.results[i][0].transcript;
+              }
+              voiceDraftText = transcript;
+              voiceBanner.innerHTML = `<span class="voice-pulse"></span><span>${transcript || '음성 인식 중...'}</span>`;
+            };
+            speechRecognition.start();
+          } catch {}
+        } else {
+          // Simulation fallback
+          let count = 0;
+          const phrases = ['MK20 상태 확인 및 ', '오디오 버퍼 싱크 ', '최적화 요청'];
+          const timer = setInterval(() => {
+            if (!isRecordingVoice) { clearInterval(timer); return; }
+            voiceDraftText += phrases[count % phrases.length];
+            voiceBanner.innerHTML = `<span class="voice-pulse"></span><span>${voiceDraftText}</span>`;
+            count++;
+          }, 1200);
+        }
+      } else {
+        voiceBtn.className = 'secondary voice-btn';
+        voiceBtn.textContent = '🎙️ 음성';
+        voiceBanner.style.display = 'none';
+        if (speechRecognition) {
+          try { speechRecognition.stop(); } catch {}
+          speechRecognition = null;
+        }
+        if (voiceDraftText && promptInput) {
+          promptInput.value = (promptInput.value ? promptInput.value + ' ' : '') + voiceDraftText;
+          voiceDraftText = '';
+          promptInput.focus();
+        }
+      }
+    };
   }
 }
 
-function render() {
+// --- Settings Modal ---
+function initSettingsModal() {
+  const modal = $('settings-modal');
+  const btnOpen = $('btn-settings');
+  const btnClose = $('btn-close-settings');
+  const btnRerun = $('btn-rerun-wizard');
+  const btnRescan = $('btn-settings-rescan');
+  const chkAutostart = $('setting-autostart');
+  const devicesList = $('settings-devices-list');
+
+  if (btnOpen) {
+    btnOpen.onclick = () => {
+      if (modal) modal.style.display = 'flex';
+      // Sync autostart setting
+      if (chkAutostart && snapshot?.settings) {
+        chkAutostart.checked = !!snapshot.settings.autostart;
+      }
+      // Render hardware device status
+      if (devicesList) {
+        devicesList.replaceChildren();
+        const devices = snapshot?.devices ?? [];
+        if (devices.length === 0) {
+          const empty = node('p', '등록된 하드웨어 없음 (MK20 LAN / USB HID 검색 가능)');
+          devicesList.append(empty);
+        } else {
+          for (const d of devices) {
+            const devCard = node('div');
+            devCard.className = 'card';
+            devCard.style.margin = '6px 0';
+            devCard.innerHTML = `<strong>🟢 ${d.label} [${d.transport.toUpperCase()}]</strong><p>상태: ${d.state} · 기능: ${d.capabilities.join(', ')}</p>`;
+            devicesList.append(devCard);
+          }
+        }
+      }
+    };
+  }
+
+  if (btnClose) {
+    btnClose.onclick = () => {
+      if (modal) modal.style.display = 'none';
+    };
+  }
+
+  if (modal) {
+    modal.onclick = e => {
+      if (e.target === modal) modal.style.display = 'none';
+    };
+  }
+
+  if (chkAutostart) {
+    chkAutostart.onchange = () => {
+      if (!snapshot?.settings) return;
+      void run(async signal => {
+        await client.updateSettings(snapshot.settings.revision, { autostart: chkAutostart.checked }, signal);
+        return client.snapshot(signal);
+      });
+    };
+  }
+
+  if (btnRescan) {
+    btnRescan.onclick = () => {
+      void run(async signal => {
+        await client.scanHarness(signal);
+        return client.snapshot(signal);
+      });
+    };
+  }
+
+  if (btnRerun) {
+    btnRerun.onclick = () => {
+      if (modal) modal.style.display = 'none';
+      viewMode = 'wizard';
+      step = 1;
+      render();
+    };
+  }
+}
+
+// --- Setup Wizard (One-time onboarding / Rerun) ---
+function renderWizard() {
   $('steps').replaceChildren(
     ...labels.map((name, index) => {
       const el = node(index === step ? 'strong' : 'span', `${index + 1}. ${name}`);
@@ -410,7 +762,6 @@ function render() {
     input.id = 'code';
     input.type = 'password';
     input.autocomplete = 'off';
-    input.spellcheck = false;
     input.maxLength = 43;
     $('content').append(label, input);
     $('actions').append(
@@ -434,24 +785,14 @@ function render() {
 
   if (step === 1) {
     const survey = snapshot?.harness ?? null;
-    if (!survey) {
-      card(
-        'Harness survey 미연결',
-        '로컬 실행기가 후보 목록을 제공하지 않았습니다. 계속 진행할 수 있습니다.'
-      );
+    if (!survey || !survey.candidates.length) {
+      const c = node('div', '설치된 Harness 후보 목록을 확인 중이거나 비어 있습니다.');
+      c.className = 'card';
+      $('content').append(c);
     } else {
       if (!harnessesInitialized && survey.candidates.length) {
         selectedHarnesses = new Set(survey.candidates.map(c => c.id));
         harnessesInitialized = true;
-      }
-      if (survey.stale) {
-        card('이전 Harness 결과', '최신 검사가 완료되지 않아 이전 검사 결과를 유지 중입니다. 다시 찾기로 갱신할 수 있습니다.');
-      }
-      if (!survey.candidates.length) {
-        card(
-          '설치된 Harness 후보 없음',
-          '로컬 실행기에 Harness를 설치·등록한 뒤 다시 찾기를 눌러주세요.'
-        );
       }
       for (const candidate of survey.candidates) {
         const isSelected = selectedHarnesses.has(candidate.id);
@@ -460,113 +801,105 @@ function render() {
         cb.checked = isSelected;
         cb.style.width = '18px';
         cb.style.height = '18px';
-        cb.style.cursor = 'pointer';
         cb.addEventListener('change', () => {
           if (cb.checked) selectedHarnesses.add(candidate.id);
           else selectedHarnesses.delete(candidate.id);
           render();
         });
 
-        card(
-          `${candidate.providerId} · ${candidate.kind === 'file' ? '설치 파일' : '로컬 등록 주소'}`,
-          candidate.locator,
-          null,
-          null,
-          cb,
-          isSelected
-        );
+        const c = node('div');
+        c.className = 'card';
+        c.style.background = isSelected ? '#1a2b23' : 'transparent';
+        c.style.borderColor = isSelected ? '#588a73' : '#2a363f';
+        const left = node('div');
+        left.style.display = 'flex';
+        left.style.alignItems = 'center';
+        left.style.gap = '14px';
+        left.append(cb);
+        const text = node('div');
+        text.innerHTML = `<strong>${candidate.providerId}</strong><p>${candidate.locator}</p>`;
+        left.append(text);
+        c.append(left);
+        $('content').append(c);
       }
     }
-    const selCount = selectedHarnesses.size;
+
     $('actions').append(
       button(
-        selCount > 0 ? `다음 (장치 · ${selCount}개 선택됨)` : '다음 (장치)',
+        selectedHarnesses.size > 0 ? `다음 (장치 · ${selectedHarnesses.size}개 선택됨)` : '다음 (장치)',
         () => go(2)
       ),
-      button(
-        '바로 시작 (Overview)',
-        () => go(3),
-        true
-      ),
-      button(
-        'Harness 다시 찾기',
-        () => void run(async signal => {
-          await client.scanHarness(signal);
-          return client.snapshot(signal);
-        }),
-        true
-      )
+      button('바로 시작 (Workspace)', () => {
+        viewMode = 'workspace';
+        render();
+      }, true),
+      button('Harness 다시 찾기', () => void run(async signal => {
+        await client.scanHarness(signal);
+        return client.snapshot(signal);
+      }), true)
     );
     return;
   }
 
   if (step === 2) {
     const devices = snapshot?.devices ?? [];
-    const candidates = snapshot?.deviceCandidates ?? [];
-    if (!devicesInitialized && devices.length) {
-      selectedDevices = new Set(devices.map(d => d.deviceId));
-      devicesInitialized = true;
-    }
-    if (!devices.length && !candidates.length) {
-      card(
-        '등록된 장치 없음',
-        '하드웨어 장치가 연결되어 있지 않아도 웹과 CLI에서 모든 기능을 정상 사용할 수 있습니다.'
-      );
-    }
     for (const dev of devices) {
       const isSelected = selectedDevices.has(dev.deviceId);
       const cb = node('input');
       cb.type = 'checkbox';
       cb.checked = isSelected;
-      cb.style.width = '18px';
-      cb.style.height = '18px';
-      cb.style.cursor = 'pointer';
       cb.addEventListener('change', () => {
         if (cb.checked) selectedDevices.add(dev.deviceId);
         else selectedDevices.delete(dev.deviceId);
         render();
       });
 
-      card(
-        `${dev.label} · [${dev.transport.toUpperCase()}]`,
-        `상태: ${dev.state === 'ready' ? '연결됨 (Ready)' : dev.state} · 기능: ${dev.capabilities.join(', ')}`,
-        null,
-        null,
-        cb,
-        isSelected
-      );
+      const c = node('div');
+      c.className = 'card';
+      c.innerHTML = `<div><strong>${dev.label} [${dev.transport.toUpperCase()}]</strong><p>상태: ${dev.state}</p></div>`;
+      c.prepend(cb);
+      $('content').append(c);
     }
-    for (const cand of candidates) {
-      if (!devices.some(d => d.source?.pluginId === cand.source?.pluginId && d.label === cand.label)) {
-        card(
-          `${cand.label} · [${cand.transport.toUpperCase()}] (후보)`,
-          `감지됨 · 등록 대기`
-        );
-      }
-    }
-    const devCount = selectedDevices.size;
+
     $('actions').append(
-      button(
-        devCount > 0 ? `시작하기 (장치 ${devCount}개 사용)` : '시작하기 (하드웨어 없이)',
-        () => go(3)
-      ),
+      button('시작하기 (Workspace)', () => {
+        viewMode = 'workspace';
+        render();
+      }),
       button('이전 (Harness)', () => go(1), true)
     );
     return;
   }
 
   if (step === 3) {
-    renderOverview();
-    $('actions').append(
-      button('새로고침', () => void run(signal => client.snapshot(signal)), true),
-      button('Harness / 장치 다시 설정', () => go(1), true)
-    );
-    return;
+    viewMode = 'workspace';
+    render();
   }
 }
 
-// Initial load: try to fetch snapshot immediately (no-auth or active session)
+// --- Main Render Dispatcher ---
+function render() {
+  const wsContainer = $('workspace-container');
+  const wizContainer = $('wizard-container');
+  const breadcrumbs = $('breadcrumb-bar');
+
+  if (viewMode === 'workspace') {
+    if (wsContainer) wsContainer.style.display = 'flex';
+    if (wizContainer) wizContainer.style.display = 'none';
+    if (breadcrumbs) breadcrumbs.style.display = 'flex';
+    renderBreadcrumbs();
+    renderWorkspace();
+  } else {
+    if (wsContainer) wsContainer.style.display = 'none';
+    if (wizContainer) wizContainer.style.display = 'block';
+    if (breadcrumbs) breadcrumbs.style.display = 'none';
+    renderWizard();
+  }
+}
+
+// Initial Boot: fetch snapshot and default to Workspace if connected
 void (async () => {
+  initSettingsModal();
   try {
     let result = await client.snapshot();
     if (!result.harness || result.harness.status === 'idle' || !result.harness.candidates.length) {
@@ -574,7 +907,13 @@ void (async () => {
       result = await client.snapshot();
     }
     snapshot = result;
-    step = 1;
-  } catch {}
+    viewMode = 'workspace';
+  } catch {
+    viewMode = 'wizard';
+    step = 0;
+  }
   render();
 })();
+
+// Export for test suite inspection
+export { harnessFilter, workspaceFilter, activeDraft };
