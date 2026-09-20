@@ -296,9 +296,28 @@ function renderOverview() {
     $('content').append(draftCard);
   }
 
-  // 4. Session List
-  const listHeader = node('h3', `작업 목록 (${sessions.length}개)`);
-  listHeader.style.margin = '20px 0 8px';
+  // 4. Projects (Workspaces) List
+  const workspaces = snapshot?.workspaceDetails ?? [];
+  const wsHeader = node('h3', `등록된 프로젝트 / 작업 공간 (${workspaces.length}개)`);
+  wsHeader.style.margin = '20px 0 8px';
+  $('content').append(wsHeader);
+
+  if (!workspaces.length) {
+    card('등록된 프로젝트 없음', '상단 2. 작업 공간 메뉴에서 프로젝트 폴더를 등록할 수 있습니다.');
+  } else {
+    for (const ws of workspaces) {
+      card(
+        ws.displayName,
+        `상태: ${names[ws.status] ?? ws.status} · ID: ${ws.workspaceId}`,
+        button('작업 공간 설정', () => go(2), true),
+        'PROJECT'
+      );
+    }
+  }
+
+  // 5. Session List
+  const listHeader = node('h3', `작업 세션 목록 (${sessions.length}개)`);
+  listHeader.style.margin = '24px 0 8px';
   $('content').append(listHeader);
 
   const filteredSessions = sessions.filter(s => {
@@ -319,7 +338,6 @@ function renderOverview() {
           $('notice').textContent = '조회 전용 작업입니다. 새 명령을 보낼 수 없습니다.';
           return;
         }
-        // Pin destination key
         activeDraft = {
           destinationKey: s.sessionKey,
           ownerId: s.ownerId,
@@ -331,11 +349,15 @@ function renderOverview() {
       !isOwned
     );
 
+    const parts = s.sessionKey.split('/');
+    const harnessName = parts[1] || s.sessionKey;
+    const sessionName = parts[3] || s.sessionKey;
+
     card(
-      `세션: ${s.sessionKey}`,
-      `소유자: ${s.ownerId || '없음 (조회 전용)'} · revision: ${s.revision}`,
+      `${harnessName} · ${sessionName}`,
+      `세션 키: ${s.sessionKey} · 소유자: ${s.ownerId || '조회 전용'} · revision: ${s.revision}`,
       sessionAction,
-      isOwned ? '소유' : '조회전용'
+      isOwned ? '활성 세션' : '조회전용'
     );
   }
 }

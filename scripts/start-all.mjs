@@ -9,7 +9,8 @@ import {
   HarnessDiscovery,
   createHostId,
   parseHostId,
-  resolveUserDataDir
+  resolveUserDataDir,
+  formatSessionKey
 } from '../packages/core/dist/index.js';
 import { LocalApi, loadSupervisorAssets } from '../packages/api/dist/index.js';
 import { ensurePrivateStateDirectory } from '../apps/supervisor/private-state.mjs';
@@ -61,6 +62,46 @@ const providers = defaultDiscoveryProviders();
 try {
   await discovery.scan(providers, { platform: process.platform, pathValue: process.env.PATH ?? '' });
 } catch {}
+
+// Register default local projects if none exist
+if (store.list().length === 0) {
+  const defaultProjects = [
+    { root: 'e:\\developments\\projects\\Snowball_Control', name: 'Snowball_Control' },
+    { root: 'e:\\developments\\projects\\Snowball_Middleware', name: 'Snowball_Middleware' }
+  ];
+  for (const p of defaultProjects) {
+    if (fs.existsSync(p.root)) {
+      try {
+        await store.registerSelected(p.root, p.name);
+        console.log(`  Registered Project : ${p.name}`);
+      } catch (err) {
+        console.log(`  Project register note (${p.name}):`, err.message);
+      }
+    }
+  }
+}
+
+// Register default sessions for each harness if none exist
+if (journal.listSessions().length === 0) {
+  const initialSessions = [
+    { pluginId: 'snowball.codex', instanceId: 'default', nativeId: 'codex-main', ownerId: 'owner-local' },
+    { pluginId: 'snowball.opencode', instanceId: 'default', nativeId: 'opencode-main', ownerId: 'owner-local' },
+    { pluginId: 'snowball.antigravity', instanceId: 'default', nativeId: 'antigravity-main', ownerId: 'owner-local' },
+  ];
+  for (const s of initialSessions) {
+    try {
+      const sessionKey = formatSessionKey({
+        hostId,
+        harness: { pluginId: s.pluginId, instanceId: s.instanceId },
+        nativeSessionId: s.nativeId,
+      });
+      journal.registerSession(sessionKey, s.ownerId);
+      console.log(`  Registered Session : ${sessionKey}`);
+    } catch (err) {
+      console.log(`  Session register note (${s.nativeId}):`, err.message);
+    }
+  }
+}
 
 const harness = {
   describe: () => discovery.snapshot(),
