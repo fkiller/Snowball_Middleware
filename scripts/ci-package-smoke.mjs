@@ -19,3 +19,18 @@ const smoke = execFileSync(process.execPath, [fileURLToPath(new URL('./verify-pa
   cwd: root, encoding: 'utf8', windowsHide: true, maxBuffer: 2 * 1024 * 1024, timeout: 60000,
 });
 console.log(smoke.trim());
+let artifactPath = packageDir;
+if (process.platform === 'darwin') {
+  const app = path.join(packageDir, 'Snowball Middleware.app');
+  const archive = path.join(path.dirname(packageDir), `SnowballMiddleware-macos-${process.arch}.zip`);
+  execFileSync('ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', app, archive], { cwd: root, stdio: 'pipe', timeout: 120000 });
+  if (!fs.statSync(archive).isFile()) throw new Error('macOS app archive missing');
+  const extracted = fs.mkdtempSync(path.join(root, 'artifacts', 'mac-roundtrip-'));
+  execFileSync('ditto', ['-x', '-k', archive, extracted], { cwd: root, stdio: 'pipe', timeout: 120000 });
+  const roundtrip = execFileSync(process.execPath, [fileURLToPath(new URL('./verify-packaged-desktop.mjs', import.meta.url)), extracted], {
+    cwd: root, encoding: 'utf8', windowsHide: true, maxBuffer: 2 * 1024 * 1024, timeout: 60000,
+  });
+  console.log(roundtrip.trim());
+  artifactPath = archive;
+}
+if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `artifact_path=${artifactPath}\n`);
