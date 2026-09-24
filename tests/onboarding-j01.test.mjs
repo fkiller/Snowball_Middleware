@@ -33,14 +33,8 @@ test('J01 onboarding journey: local status -> harness survey -> workspace select
 
   const client = new LocalClient(runtime.origin);
 
-  // Unauthenticated requests must fail with 401
-  await assert.rejects(client.snapshot(), error => error.status === 401);
-
-  // Bootstrap with one-use code
-  const grant = runtime.issueBootstrap();
-  const session = await client.bootstrap(grant.code);
-  assert.ok(session.controllerId);
-  assert.ok(session.expiresAt);
+  // User policy: local onboarding never requires a PIN.
+  assert.equal((await client.snapshot()).accessMode, 'local-no-auth');
 
   // Step 1: Local status
   const initialSnapshot = await client.snapshot();
@@ -84,9 +78,9 @@ test('J01 onboarding journey: local status -> harness survey -> workspace select
   const fileContent = await client.readFile(registeredWs.workspaceId, 'hello.txt');
   assert.deepEqual(fileContent, { text: 'local file content' });
 
-  // Logout returns to unauthenticated state
+  // Releasing local controller context does not introduce a login requirement.
   await client.logout();
-  await assert.rejects(client.snapshot(), error => error.status === 401);
+  assert.equal((await client.snapshot()).accessMode, 'local-no-auth');
 
   // Restart runtime on new port, verify durable state restoration
   await runtime.close();
@@ -98,8 +92,7 @@ test('J01 onboarding journey: local status -> harness survey -> workspace select
   runtimes.push(restarted);
 
   const newClient = new LocalClient(restarted.origin);
-  const newGrant = restarted.issueBootstrap();
-  await newClient.bootstrap(newGrant.code);
+  assert.equal((await newClient.snapshot()).accessMode, 'local-no-auth');
 
   const restoredSnapshot = await newClient.snapshot();
   assert.equal(restoredSnapshot.workspaces.length, 1);
@@ -107,7 +100,7 @@ test('J01 onboarding journey: local status -> harness survey -> workspace select
   assert.equal(pickerCalls, 1, 'Picker should not have been called again on restart');
 });
 
-test('A2 acceptance: zero external network access (Internet-off) and no control claim without auth', async t => {
+test('A2 acceptance: zero external network access (Internet-off) and discovery alone makes no control claim', async t => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'snowball-a2-'));
   const dataDir = path.join(temp, 'state');
   const runtimes = [];
@@ -127,7 +120,7 @@ test('A2 acceptance: zero external network access (Internet-off) and no control 
   assert.equal(url.hostname, '127.0.0.1');
 
   const client = new LocalClient(runtime.origin);
-  await client.bootstrap(runtime.issueBootstrap().code);
+  assert.equal((await client.snapshot()).accessMode, 'local-no-auth');
 
   const snapshot = await client.snapshot();
   if (snapshot.harness) {

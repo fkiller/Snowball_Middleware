@@ -92,7 +92,9 @@ export async function runBinaryProbe(spec: BinaryProbeSpec, approvedDigests: Rea
   try { selected = specCopy(spec); if (approvedDigests.get(selected.id) !== binaryProbeDigest(selected)) return result('untrusted'); }
   catch { return result('untrusted'); }
   const timeout = options.timeoutMs ?? 3000;
-  if (!Number.isInteger(timeout) || timeout < 10 || timeout > 5000) return result('untrusted');
+  // Explicit, reviewed probes may need longer to hash large executables on a
+  // busy disk. The normal three-second discovery default remains unchanged.
+  if (!Number.isInteger(timeout) || timeout < 10 || timeout > 12000) return result('untrusted');
   if (options.signal?.aborted) return result('cancelled');
   if (active >= 4) return result('busy');
   active++;

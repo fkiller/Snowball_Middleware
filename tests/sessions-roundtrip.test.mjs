@@ -15,6 +15,7 @@ const hostId = `host_${'c'.repeat(32)}`;
 const actorId = `ctl_${'d'.repeat(16)}`;
 
 class MockHarnessAdapter extends EventEmitter {
+  status(){return {instanceId:'test',connected:true};}
   ownerId = 'mock-harness-owner-1';
   calls = [];
   createdCount = 0;
@@ -110,7 +111,7 @@ async function fixture(t) {
   return { dir, journal, service, adapter };
 }
 
-test('MW.05.02.01.01.A1: full local harness vertical slice round-trip (create -> send -> events -> decision -> interrupt/recovery) with zero devices', async t => {
+test('MW.05.02.01.01.A1: fixture local harness vertical slice round-trip (create -> send -> events -> decision -> interrupt/recovery) with zero devices', async t => {
   const { service, adapter } = await fixture(t);
 
   // 1. Create session via SessionService
@@ -121,7 +122,7 @@ test('MW.05.02.01.01.A1: full local harness vertical slice round-trip (create ->
   const session = service.getSession(sessionKey);
   assert.ok(session);
   assert.equal(session.readOnly, false);
-  assert.equal(session.status, 'idle');
+  assert.equal(service.getSession(sessionKey).status, 'idle');
 
   // 2. Send prompt -> enqueues to journal
   const events = [];
@@ -141,7 +142,7 @@ test('MW.05.02.01.01.A1: full local harness vertical slice round-trip (create ->
   await new Promise(r => setTimeout(r, 50));
   assert.ok(events.some(e => e.kind === 'turn/started'));
   assert.ok(events.some(e => e.kind === 'item/agentMessage/delta'));
-  assert.equal(session.status, 'busy');
+  assert.equal(service.getSession(sessionKey).status, 'busy');
 
   // 4. Simulate a decision required from harness (e.g. command execution approval)
   let decisionReceived;

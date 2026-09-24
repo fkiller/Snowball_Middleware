@@ -1,0 +1,9 @@
+# MW.03.02.01.02 — owned OpenCode observer, 2026-09-24
+
+Windows x64, installed OpenCode 1.18.31. `apps/supervisor/opencode-owned.mjs` launches an exact canonical executable/SHA-256 without a shell, with private HOME/XDG/APPDATA directories, an ambient-environment allowlist, 127.0.0.1 random port and internal random Basic password. Startup checks the owned process announcement, authenticated health/version and anonymous 401. Child exit revokes observation. Existing TUI sessions are not imported into the isolated store.
+
+`scripts/verify-owned-opencode.mjs` connected the production launcher to a fresh isolated store and read zero prior sessions. A separate `scripts/verify-opencode-isolation.mjs` run created/listed/read/aborted only a new disposable verification session. `/config/providers` returned eight live model IDs; the adapter exposes those IDs via `harness.models` with no invented effort values. The final packaged loopback API returned OpenCode connected, `canListModels=true`, `canAttach=false`, `canCreate=false`, and eight native catalog entries.
+
+An opt-in structured parts/model send, with tools disabled and only a newly created disposable verification session, returned a native APIError HTTP 403: `OpenCode's free tier can only be used from within OpenCode`. No successful response/completion or permission outcome was proved. No existing user task was commanded. `harness.create` and `harness.execute` remain absent from the OpenCode manifest. A1 is still open; this is observation/catalog evidence only.
+
+Focused OpenCode tests 7/7 passed; full middleware suite on Node 24: 226 total, 222 pass, 0 fail, 4 physical skips. The private standalone OpenCode repository and release are listed in `docs/middleware/PLUGIN_DEVELOPMENT.md`; Windows and macOS CI each passed source and fresh-release-install tests. These CI jobs do not prove real OpenCode provider control on macOS.

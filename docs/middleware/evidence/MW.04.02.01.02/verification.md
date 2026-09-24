@@ -1,3 +1,5 @@
+> **2026-09-21 review:** historical evidence below does not establish current task completion. Current status: blocked. See [the integrity audit](../../AUDIT.md) and PLAN.json for reopened checks, fixture limits and next actions.
+
 # Verification Evidence: MW.04.02.01.02 (MK20 plugin 추출과 인증 pairing 계약)
 
 ## Task Information

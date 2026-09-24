@@ -80,6 +80,7 @@ class MockSpeechProvider extends EventEmitter {
 }
 
 class MockHarnessAdapter extends EventEmitter {
+  status(){return {instanceId:'voice-test',connected:true};}
   ownerId = 'mock-owner-voice';
   calls = [];
 

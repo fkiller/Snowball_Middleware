@@ -1,17 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HidDiscovery, loadNativeBackend } from '../packages/device-hid/dist/index.js';
-import { reviewedProfiles } from '../packages/device-hid/dist/profiles.js';
+import { mk20QmkProfile } from '../packages/device-hid/dist/profiles.js';
+// Explicit lab test only; this does not enroll a production report profile.
+const labProfiles = [mk20QmkProfile];
 
-test('MW.04.01.01.02.A1: real physical MK20 QMK HID enumeration and safe-test lifecycle', async t => {
-  assert.ok(reviewedProfiles.length > 0, 'reviewedProfiles must not be empty');
-  const mk20Profile = reviewedProfiles.find(p => p.id === 'mk20-qmk-controller');
+test('MW.04.01.01.02.A1: real physical MK20 QMK HID enumeration and safe-test lifecycle', { skip: process.env.SNOWBALL_TEST_HID !== '1' }, async t => {
+  assert.ok(labProfiles.length > 0, 'labProfiles must not be empty');
+  const mk20Profile = labProfiles.find(p => p.id === 'mk20-qmk-controller');
   assert.ok(mk20Profile, 'mk20-qmk-controller profile must be registered');
   assert.equal(mk20Profile.vendorId, 0x4250);
   assert.equal(mk20Profile.productId, 0x426f);
 
   const backend = loadNativeBackend();
-  const discovery = new HidDiscovery(backend, reviewedProfiles);
+  const discovery = new HidDiscovery(backend, labProfiles);
   t.after(async () => { await discovery.close(); });
 
   const scan = await discovery.scan();
@@ -41,7 +43,7 @@ test('MW.04.01.01.02.A1: real physical MK20 QMK HID enumeration and safe-test li
 });
 
 test('MW.04.01.01.02.A2: typing/mouse collections are strictly excluded from HID catalog', async () => {
-  const mk20Profile = reviewedProfiles.find(p => p.id === 'mk20-qmk-controller');
+  const mk20Profile = labProfiles.find(p => p.id === 'mk20-qmk-controller');
   for (const selector of mk20Profile.selectors) {
     // Ensure vendor usage page (0xFF00 - 0xFFFF)
     assert.ok(selector.usagePage >= 0xff00 && selector.usagePage <= 0xffff, 'Must be vendor usage page');

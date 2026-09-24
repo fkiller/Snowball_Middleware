@@ -1,0 +1,27 @@
+name: Desktop package checks
+on: [push, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  package:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run build
+      - run: npm run install:desktop
+      - id: package
+        run: node scripts/ci-package-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.package.outputs.package_dir != ''
+        with:
+          name: middleware-${{ runner.os }}-${{ runner.arch }}
+          path: ${{ steps.package.outputs.package_dir }}
+          retention-days: 7

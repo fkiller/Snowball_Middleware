@@ -171,7 +171,7 @@ test('MW.09.01.01.01.A1: Unregistered host, spoofed signature, expired credentia
   );
 });
 
-test('MW.09.01.01.01.A2: Mac↔Windows actual pairing/cancellation/unpairing leaves local PC control independent', async t => {
+test('MW.09.01.01.01.A2: same-process platform-labelled fixture pairing/cancellation/unpairing leaves local PC control independent', async t => {
   // Setup Windows host with local session & journal
   const winHostId = 'host_11111111111111111111111111111111';
   const winRegistry = new LanHostRegistry({
@@ -204,6 +204,7 @@ test('MW.09.01.01.01.A2: Mac↔Windows actual pairing/cancellation/unpairing lea
 
   // Register an owned local harness adapter on Windows
   class LocalHarnessAdapter extends EventEmitter {
+    status(){return {instanceId:'win-instance',connected:true};}
     ownerId = 'win-owner-1';
     async createSession(root, options = {}) {
       const sessionKey = formatSessionKey({
@@ -280,32 +281,13 @@ test('MW.09.01.01.01.A2: Mac↔Windows actual pairing/cancellation/unpairing lea
   assert.equal(initialSessions.length, 1);
   assert.equal(initialSessions[0].title, 'Windows Critical Task');
 
-  // --- Step 2: Mutual Pairing via HTTP Handshake ---
-  // Mac initiates pairing to Windows
-  const initRes = await request(winOrigin, 'POST', '/peer/pair/initiate', {}, {
-    address: '127.0.0.1',
-    port: 8001,
+  // Trusted-local fixture enrollment only. HTTP cannot create or disclose a PIN.
+  const initRes = await request(winOrigin, 'POST', '/peer/pair/initiate', {}, {});
+  assert.equal(initRes.status, 403);
+  const enrollment = winRegistry.initiatePairing();
+  winRegistry.verifyPairing(enrollment.pairingId, enrollment.pin, {
+    ...macRegistry.getLocalHost(), address: '127.0.0.1', port: 8001,
   });
-  assert.equal(initRes.status, 200);
-  const { pairingId, pin } = initRes.json;
-  assert.ok(pairingId);
-  assert.ok(pin);
-
-  // Mac verifies pairing with Windows
-  const verifyRes = await request(winOrigin, 'POST', '/peer/pair/verify', {}, {
-    pairingId,
-    pin,
-    host: {
-      hostId: macHostId,
-      name: macRegistry.name,
-      platform: macRegistry.platform,
-      publicKey: macRegistry.getLocalHost().publicKey,
-      address: '127.0.0.1',
-      port: 8001,
-    },
-  });
-  assert.equal(verifyRes.status, 200);
-  assert.equal(verifyRes.json?.success, true);
 
   // Also pair Windows on Mac
   const macPairing = macRegistry.initiatePairing();

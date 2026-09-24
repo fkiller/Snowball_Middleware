@@ -36,6 +36,8 @@ export function parseManifest(value: unknown): PluginManifest {
   for (const capability of value.capabilities) {
     required(record(capability) && typeof capability.operation === 'string' && operationPattern.test(capability.operation) && !capability.operation.startsWith('plugin.'), 'invalid operation');
     required(capability.access === 'observe' || capability.access === 'control', 'capability access invalid');
+    const prefix = value.kind === 'hardware' ? 'devices.' : value.kind === 'harness' ? 'harness.' : 'speech.';
+    required(capability.operation.startsWith(prefix), 'operation outside plugin kind scope');
     required(!operations.has(capability.operation), 'duplicate operation');
     operations.add(capability.operation);
   }
@@ -68,3 +70,6 @@ export class PluginFault extends Error {
     super(message); this.name = 'PluginFault';
   }
 }
+
+export * from './identity.js';
+export * from './dispatch.js';

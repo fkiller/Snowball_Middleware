@@ -1,12 +1,12 @@
 # Middleware execution plan — local control first
 
-상태: 구현 시작. 소스 export/scaffold 및 plugin protocol 기반 완료. 현재 상태는 PLAN.json의 증거가 기준이다. 2026-09-17.
+상태: 2026-09-24 재감사·구현 중 (PLAN revision 41). 실제 상태는 PLAN.json의 L5 증거와 CONTROL_REALITY.md, HANDOFF.md를 따른다. Windows 실제 Codex 제어, 읽기 전용 네이티브 연결 복원/해제, unsigned portable tray 및 per-user installer 설치·실행·제거는 검증됐지만 G2/G3 출시는 미완료다. harness 플러그인 3종의 별도 비공개 release/Windows·macOS CI는 통과했고 공개 라이선스는 미정이다. MK20 QMK HID는 현재 Windows에서 감지되고 안전한 vendor-interface 열기/닫기가 검증됐다. 별도 본체 CDC는 미감지이고 버튼 보고서와 인증 페어링은 아직 검증되지 않았다.
 
 이 저장소 `Snowball_Middleware`의 PLAN.json만 편집한다. 원본 Snowball_Control의 원장은 이곳을 가리키는 redirect다.
 
 ## 작업 선택 정책 — 2026-09-17 사용자 지시
 
-선행 조건이 완료된 task만 후보로 삼는다. 후보 중 `priority.designDemand`(설계 판단 요구, 1–5), 이어서 `priority.implementationDifficulty`(구현 난도, 1–5) 내림차순으로 선택한다. 동률은 안정 ID 순이다. 진행 중인 atomic 작업은 먼저 안전하게 마무리한다. 번호 순서나 쉬운 UI부터 수행하지 않는다. 기본 우선 경로는 추출/scaffold → plugin 계약 → identity/context → durable command/recovery → 인증 API다. `--next`가 이 순서를 반영한다.
+선행 조건이 완료된 task만 후보로 삼는다. 후보 중 `priority.designDemand`(설계 판단 요구, 1–5), 이어서 `priority.implementationDifficulty`(구현 난도, 1–5) 내림차순으로 선택한다. 동률은 안정 ID 순이다. 진행 중인 atomic 작업은 먼저 안전하게 마무리한다. 번호 순서나 쉬운 UI부터 수행하지 않는다. 기본 우선 경로는 추출/scaffold → plugin 계약 → identity/context → durable command/recovery → loopback 제어 API다. `--next`가 이 순서를 반영한다.
 
 ## 시작점과 문서 우선순위
 
@@ -34,11 +34,20 @@
 | R-RECOVER | 중단 후 증거와 상태로 복구, 불명 전달은 재송신 금지 | reconnect가 unknown prompt/approval을 자동 replay |
 | R-PLUGIN | core는 hardware/harness 구현에 의존하지 않음 | Core에서 K16/ADB/Codex RPC 사용 |
 | R-OPTIONAL | hardware/voice/인터넷 없이 core 설정·조회 UI 사용 가능 | 장치 pairing이나 모델 다운로드가 첫 화면 진입 필수 |
+| R-EXEC | 표시되는 모델·effort·설정·동작은 실제 backend와 검증 증거 필요 | 고정 목록·모의 성공을 실제 제어로 표시 |
 | R-PRIVACY | 로컬 credentials/state, 필요한 범위만 탐색 | 홈 전체 재귀 스캔, 다른 사용자 credential 복사, 자동 로그 업로드 |
 
 로컬 제어는 모든 harness의 추론이 오프라인이라는 뜻이 아니다. cloud-backed harness는 그 자체의 네트워크·계정이 필요할 수 있다. Snowball 제어/설정/상태 표시가 별도 cloud에 의존하지 않게 한다. Internet 차단 검수에서 local 상태/오류 표시를 확인하고, cloud 모델의 새 응답까지 성공한다고 주장하지 않는다.
 
 LAN device pairing은 MK20 등 물리 장치를 위한 별도 로컬 연결 경로다. LAN의 다른 실행 PC 집계는 다음 확장 gate다. WAN relay, 중앙 계정 동기화, SaaS orchestration은 현재 scope 밖이다. 기존 다중 PC 요구는 보존하되 단일 PC MVP의 선행 조건으로 두지 않는다.
+
+## User-confirmed local control contract — 2026-09-21
+
+- Default local Web UI uses noAuth: no login, PIN, pairing code or repeated authorization. It binds only 127.0.0.1; Host/Origin/browser checks stay in force. Optional token mode is operator-selected, not the normal journey.
+- MK20/device pairing is separate from Web UI access. Do not add a Web PIN to repair a device protocol.
+- Connected, explicitly selected harness sessions must accept commands. Discovery alone is observation; explicit attachment establishes the route. Do not treat permanently disabling commands as plugin isolation.
+- Plugin isolation means precise operation/event/session scope and no exceptional core privileges. Current process separation is not OS confinement against malicious same-user plugins; report this limitation honestly.
+- Every model/effort, voice, settings and session action requires actual backend behavior and evidence. Removing a fake fallback makes the state honest; it does not complete the missing MVP feature.
 
 ## Depth 구조와 propagation
 
@@ -93,8 +102,8 @@ L2~L5의 읽기용 전체 트리는 [TASK_TREE.md](TASK_TREE.md), 상세 단계/
 - 플랫폼별 검수는 각각 기록한다. Windows pass를 macOS pass로 전파하지 않는다.
 - 비율보다 충족 gate/완료 leaf/남은 acceptance를 보고한다. UI 배지와 mocks는 실제 capability 증거가 아니다.
 - 작업을 멈추기 전 PLAN.json checkpoint와 HANDOFF를 함께 갱신한다. 갑작스러운 중단 시 둘이 어긋날 수 있으므로 다음 실행자는 Git/files/evidence로 대조한다.
-- 기존 AGENTS quota guard를 지킨다. quota provider 실패 시 숫자를 추정하지 않고 이용 가능한 실제 usage만 사용한다.
+- 이번 작업의 사용자 지시가 quota guard보다 우선이다. 중단 시에는 검증 가능한 상태와 정확한 다음 동작을 HANDOFF에 기록한다.
 
-## 현재 확인한 discovery 결함
+## 추출 당시 reference/legacy-host의 discovery 결함 (현재 제품 상태는 AUDIT.md 참조)
 
 `CodexHarness.isAvailable()`은 항상 true. Codex binary discovery는 Windows 경로 첫 후보 또는 PATH fallback이며 version/owner 선택이 없다. OpenCode는 HTTP 401을 available로 취급하고 autoSpawn 기본 true이므로 discovery와 실제 시작을 분리해야 한다. Antigravity는 디렉터리/실행 파일 존재로 availability를 판정한다. MK20 UDP는 등록된 장치 identity 대신 기본 IP/마지막 발신자에 의존한다. 이 관찰은 구현 task의 입력 근거이지 현재 파일을 이번 계획 작업에서 고쳤다는 뜻이 아니다.

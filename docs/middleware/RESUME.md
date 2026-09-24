@@ -9,7 +9,7 @@
 5. `node docs/middleware/validate-plan.mjs --next`로 재개 우선 작업과 선행 조건이 만족된 task를 본다. 보고된 ready task를 자동 실행하기 전에 실제 증거와 task checkpoint를 대조한다.
 6. task의 L0→L3 조상 요구와 L5 checks를 읽고, steps[0] 또는 checkpoint.nextAction부터 실행한다. 이전 agent 이름/모델을 이유로 설계를 재작성하지 않는다.
 
-현재 재개 task: **MW.06.01.01.01** (실패/skip 가능한 local onboarding). Workspace 등록/복구 경계 완료(3384d90). Generic probe 완료. Codex reference plugin은 Windows 빈 credential home 연결/정리까지만 실검증됐고 실제 로그인 제어/decision proof/macOS gate는 blocked다. HANDOFF.md의 새 next action을 따른다.
+현재 재개 task: **MW.05.02.01.01**. 2026-09-24 기준 PLAN revision 41과 AUDIT.md, CONTROL_REALITY.md, HANDOFF.md 최상단을 따른다. Windows 최종 설치본은 실제 설치·tray 실행·제거와 96/96 해시 검증을 통과했다. 현재 사용자 데이터에서 등록 프로젝트 2개, 연결 harness 2개(Codex 제어, OpenCode 조회 전용), MK20 QMK USB 후보 1개와 제어 장치 0개를 API로 확인했다. OpenCode 실제 모델 8개가 표시되지만 새 검증 세션의 무료 provider send는 HTTP 403으로 거부되어 제어를 비활성으로 둔다. harness 플러그인 3개는 fkiller 비공개 repo/release로 배포되었고 Windows/macOS CI와 빈 프로젝트 설치 검증이 통과했다. MK20 본체 CDC·입력 보고서·인증 pairing, macOS desktop install, Windows 서명, Codex Desktop 동시 소유권과 정확한 승인 답변 수신은 여전히 별도 검증 조건이다. 기존 사용자 작업에는 명령을 보내지 않았다.
 
 원장의 기존 입력 경로 `host/src`, `host/tests`는 이제 `reference/legacy-host/src`, `reference/legacy-host/tests`에서 읽는다. 하드웨어 입력은 sibling `../Snowball_Control/hardware`에 남아 있다. 새 구현은 `packages/`에만 추가하고 reference 파일을 수정하지 않는다. 다음 작업부터 dependency 완료 여부와 designDemand/difficulty 우선순위를 `--next`로 확인한다.
 
@@ -70,15 +70,4 @@ in_progress와 checkpoint가 오래됐으면 Git diff/파일/실제 프로세스
 
 ## 6. 현재 checkpoint
 
-- PLAN revision 14, MW.06.01.01.01 in_progress; 11/28 tasks done, 23/56 checks pass.
-- b205056: agent-context UI isolation finding (Session 1 non-interactive
-  desktop, notepad handle 0); user-confirmed bootstrap/Harness-null/
-  Workspace-empty screens; stuck-select behaves as predicted; TopMost reverted.
-- Full 127/127 holds from f22db9f (no product diff since; not rerun).
-  Listener 200, snapshot 401, mint 200/43-char/60s verified via TEMP probes.
-- Native dialog clicks blocked on interactive-session vehicle (user runs no
-  scripts). Harness wiring, Internet-off, auth recovery, A1/A2 still pending.
-- codexbar returns Authentication required; no percentage invented. Check fresh
-  usage before large work.
-- Demo runtime self-cleans in ~30 min (loopback, disposable state). Read HANDOFF
-  top and task evidence for exact next action and constraints.
+PLAN revision 41, resume MW.05.02.01.01. The current Windows package and unsigned per-user installer passed clean install, tray, noAuth loopback, 96/96 hash verification and uninstall. The live runtime restored two ready projects, controllable Codex and read-only OpenCode; native model catalogs returned five Codex models with real efforts and eight OpenCode models with no invented efforts. OpenCode free-provider structured send to a new disposable session returned 403, so control remains disabled. Three private harness repositories/releases passed Windows/macOS source and fresh-tarball-install CI; licensing is still undecided. MK20 QMK USB is present, but product CDC, input report mapping and pairing remain unverified. The exact next action for this task is visible native Codex picker/disconnect/reset and concurrent Desktop ownership verification using only new verification tasks. Read CONTROL_REALITY.md, OPENCODE_OWNERSHIP.md and HANDOFF.md for the task gates; do not redo completed wiring or command pre-existing user tasks.

@@ -1,3 +1,7 @@
+> **2026-09-22 continuation:** Windows actual create/restart/resume/model/effort/output/completion/interrupt passed. User chose current CLI/default login. See [native evidence](native-20260922.md). Older pending-login/no-inference statements below are historical. Exact decisions, Desktop co-ownership and macOS remain open.
+
+> **2026-09-21 review:** historical evidence below does not establish current task completion. Current status: blocked. See [the integrity audit](../../AUDIT.md) and PLAN.json for reopened checks, fixture limits and next actions.
+
 # MW.03.02.01.01 — experimental owned Codex plugin; acceptance blocked
 
 2026-09-19 UTC (2026-09-18 local), Windows x64 Node 20.19.6.

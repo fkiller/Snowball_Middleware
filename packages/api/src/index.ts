@@ -1,7 +1,7 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import os from 'node:os';
 import { randomBytes, createHash } from 'node:crypto';
-import { CommandJournal, createControllerId, JournalFault, type CommandInput, type DeviceRegistry, type DiscoverySnapshot, type WorkspaceStore } from '@snowball/core';
+import { CommandJournal, SessionFault, type SessionService, type SessionCreateStore, createControllerId, JournalFault, type CommandInput, type DeviceRegistry, type DiscoverySnapshot, type WorkspaceStore } from '@snowball/core';
 import { WorkspaceFiles } from './workspaces.js';
 import type { SupervisorAssets } from './supervisor.js';
 export { loadSupervisorAssets, type SupervisorAssets } from './supervisor.js';
@@ -38,15 +38,27 @@ interface Stream { response: ServerResponse; session: Session }
 interface Event { cursor: string; data: string }
 export interface LocalApiOptions {
   journal: CommandJournal; workspaces?: WorkspaceFiles; devices?: DeviceRegistry; harness?: HarnessSurvey; port?: number;
+  sessionService?: SessionService;
+  createStore?: SessionCreateStore;
+  /** Trusted composition callback, never supplied by a plugin or HTTP request. */
+  onCommandQueued?: (sessionKey: string) => void;
+  initialSettings?: Partial<Pick<LocalSettings, 'autostart' | 'language' | 'controlPaused' | 'notifications'>>;
+  applySettings?: (next: LocalSettings, previous: LocalSettings) => Promise<void>;
+  desktopCapabilities?: { tray: boolean; autostart: boolean; codexSelection?: boolean };
   sessionTtlMs?: number; eventCapacity?: number; now?: () => number;
   supervisor?: SupervisorAssets;
   workspaceStore?: WorkspaceStore;
+  /** Local UI has no login/PIN; network boundaries still apply. */
   noAuth?: boolean;
   hostname?: string;
   realSessions?: unknown;
   turnsStore?: unknown;
   /** Trusted native picker. The HTTP request never supplies a path or display name. */
   chooseWorkspace?: (signal: AbortSignal) => Promise<{ root: string; displayName: string } | null>;
+  /** Native tray selection and reviewed provider enrollment; HTTP only triggers the picker. */
+  connectCodex?: (signal: AbortSignal) => Promise<string>;
+  disconnectCodex?: (instanceId: string, signal: AbortSignal) => Promise<string>;
+  resetCodex?: (signal: AbortSignal) => Promise<boolean>;
 }
 /**
  * Reviewed harness candidate survey supplied by the trusted runtime.
@@ -64,6 +76,8 @@ export interface HarnessSurvey {
 export class LocalApi {
   private readonly server: http.Server;
   private readonly sessions = new Map<string, Session>();
+  private readonly localSessions = new Map<string, Session>();
+  private readonly localControllerId = createControllerId();
   private readonly grants = new Map<string, number>();
   private readonly streams = new Set<Stream>();
   private readonly events: Event[] = [];
@@ -77,6 +91,9 @@ export class LocalApi {
   private readonly unsubscribe: () => void;
   private readonly unsubscribeDevices?: () => void;
   private readonly unsubscribeWorkspaces?: () => void;
+  private readonly serviceListeners: Array<() => void> = [];
+  private readonly creatingSessions = new Set<string>();
+  private settingsBusy = false;
   private readonly workspaceChecks = new Set<string>();
   private harnessScanning = false;
   private selection?: { controllerId: string; abort: AbortController };
@@ -85,15 +102,7 @@ export class LocalApi {
   private attemptWindow = 0;
   private closed = false;
   private starting = false;
-  private readonly defaultSession: Session;
   constructor(private readonly options: LocalApiOptions) {
-    this.defaultSession = {
-      controllerId: 'ctrl_local_user',
-      csrfHash: '',
-      expiresAt: Number.MAX_SAFE_INTEGER,
-      requests: 0,
-      window: 0,
-    };
     this.now = options.now ?? Date.now;
     this.settings = {
       revision: 1,
@@ -101,6 +110,7 @@ export class LocalApi {
       language: 'ko',
       controlPaused: false,
       notifications: true,
+      ...options.initialSettings,
       updatedAt: new Date(this.now()).toISOString(),
     };
     if (options.workspaceStore) {
@@ -121,6 +131,12 @@ export class LocalApi {
     this.unsubscribe = options.journal.subscribe(() => this.changed());
     this.unsubscribeDevices = options.devices?.subscribe(() => this.changed());
     this.unsubscribeWorkspaces = this.options.workspaces?.subscribe(() => this.changed());
+    if (options.sessionService) {
+      for (const event of ['sessionEvent', 'adapterOffline', 'ownerLost', 'adapterDisabled', 'adapterEnabled', 'adapterRemoved', 'adapterReconnected', 'adapterAdded']) {
+        const listener = () => this.changed(); options.sessionService.on(event, listener);
+        this.serviceListeners.push(() => options.sessionService!.off(event, listener));
+      }
+    }
   }
   get origin(): string { if (!this.originValue) throw new Error('API not listening'); return this.originValue; }
   get cursor(): string { return `${this.epoch}:${this.sequence}`; }
@@ -149,11 +165,13 @@ export class LocalApi {
     this.grants.set(digest(code), expiresAt); return { code, expiresAt };
   }
   revokeController(controllerId: string): void {
+    this.localSessions.delete(controllerId);
     if (this.selection?.controllerId === controllerId) this.selection.abort.abort();
     for (const [hash, session] of this.sessions) if (session.controllerId === controllerId) this.sessions.delete(hash);
     for (const stream of this.streams) if (stream.session.controllerId === controllerId) { stream.response.end(); this.streams.delete(stream); }
   }
   private prune(): void {
+    for (const [id, session] of this.localSessions) if (session.expiresAt <= this.now()) this.localSessions.delete(id);
     for (const [hash, expiry] of this.grants) if (expiry <= this.now()) this.grants.delete(hash);
     for (const [hash, session] of this.sessions) if (session.expiresAt <= this.now()) this.sessions.delete(hash);
     for (const stream of this.streams) if (stream.session.expiresAt <= this.now()) { stream.response.end(); this.streams.delete(stream); }
@@ -190,7 +208,7 @@ export class LocalApi {
   private boundary(req: IncomingMessage): void {
     const duplicates = new Map<string, number>();
     for (let i = 0; i < req.rawHeaders.length; i += 2) { const name = req.rawHeaders[i]!.toLowerCase(); duplicates.set(name, (duplicates.get(name) ?? 0) + 1); }
-    if (['host', 'origin', 'authorization', 'x-snowball-csrf', 'content-type'].some(k => (duplicates.get(k) ?? 0) > 1)) fail(400, 'duplicate_header');
+    if (['host', 'origin', 'authorization', 'x-snowball-csrf', 'x-snowball-controller', 'content-type'].some(k => (duplicates.get(k) ?? 0) > 1)) fail(400, 'duplicate_header');
     if (req.headers.host !== this.origin.slice(7)) fail(403, 'host_denied');
     if (req.headers.origin !== undefined && req.headers.origin !== this.origin) fail(403, 'origin_denied');
     if (req.headers['sec-fetch-site'] !== undefined && !['same-origin', 'none'].includes(String(req.headers['sec-fetch-site']))) fail(403, 'origin_denied');
@@ -200,11 +218,18 @@ export class LocalApi {
   }
   private authenticate(req: IncomingMessage): Session {
     if (this.options.noAuth) {
-      if (req.headers.authorization && /^Bearer [A-Za-z0-9_-]{43}$/.test(req.headers.authorization)) {
-        const s = this.sessions.get(digest(req.headers.authorization.slice(7)));
-        if (s && s.expiresAt > this.now()) return s;
+      const controllerId = req.headers['x-snowball-controller'] ?? this.localControllerId;
+      if (typeof controllerId !== 'string' || !/^ctl_[a-f0-9]{16}$/.test(controllerId)) fail(400, 'invalid_controller');
+      this.prune();
+      let local = this.localSessions.get(controllerId);
+      if (!local) {
+        if (this.localSessions.size >= 64) fail(429, 'session_capacity');
+        local = { controllerId, csrfHash: '', expiresAt: this.now() + this.ttl, requests: 0, window: this.now() };
+        this.localSessions.set(controllerId, local);
       }
-      return this.defaultSession;
+      if (this.now() - local.window >= 60_000) { local.window = this.now(); local.requests = 0; }
+      if (++local.requests > 600) fail(429, 'rate_limited');
+      return local;
     }
     const auth = req.headers.authorization;
     if (!auth || !/^Bearer [A-Za-z0-9_-]{43}$/.test(auth)) fail(401, 'unauthorized');
@@ -216,7 +241,7 @@ export class LocalApi {
     return session;
   }
   private stillAuthorized(req: IncomingMessage, session: Session): void {
-    if (this.options.noAuth && session === this.defaultSession) return;
+    if (this.options.noAuth && this.localSessions.get(session.controllerId) === session && session.expiresAt > this.now()) return;
     if (session.expiresAt <= this.now() || this.sessions.get(digest(req.headers.authorization!.slice(7))) !== session) fail(401, 'unauthorized');
   }
   private async body(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -237,15 +262,27 @@ export class LocalApi {
     } finally { if (timer) clearTimeout(timer); }
   }
   private snapshot(): unknown {
+    const sessionDetails = (this.options.sessionService?.snapshotSessions() ?? []).map(session => {
+      const workspaceId = session.workspaceId ?? this.options.workspaces?.workspaceIdForExactRoot(session.cwd);
+      return { ...session, ...(workspaceId ? { workspaceId } : {}) };
+    });
     return {
+      accessMode: this.options.noAuth ? 'local-no-auth' : 'token',
       cursor: this.cursor,
       settings: structuredClone(this.settings),
+      desktopCapabilities: this.options.desktopCapabilities ?? { tray: false, autostart: false },
       sessions: this.options.journal.listSessions(),
+      sessionDetails,
+      sessionMessages: this.options.sessionService?.snapshotMessages() ?? {},
+      connectedHarnesses: this.options.sessionService?.snapshotAdapters() ?? [],
       commands: this.options.journal.listCommands().map(c => ({ commandId: c.input.commandId, actorId: c.input.actorId, sessionKey: c.input.sessionKey, ownerId: c.input.ownerId, operation: c.input.operation, status: c.status, revision: c.revision, order: c.order, updatedAt: c.updatedAt })),
-      decisions: this.options.journal.listDecisions().map(d => ({ decisionId: d.decisionId, sessionKey: d.sessionKey, ownerId: d.ownerId, status: d.status, revision: d.revision, ...(d.expiresAt !== undefined ? { expiresAt: d.expiresAt } : {}) })),
+      decisions: this.options.journal.listDecisions().map(d => ({ decisionId: d.decisionId, sessionKey: d.sessionKey, ownerId: d.ownerId, status: d.status, revision: d.revision, allowedAnswers: [...d.allowedAnswers], ...(d.expiresAt !== undefined ? { expiresAt: d.expiresAt } : {}) })),
       workspaces: this.options.workspaces?.list() ?? [],
       workspaceDetails: this.options.workspaces?.describe() ?? [],
-      workspaceCandidates: this.options.workspaces?.listCandidates() ?? [],
+      workspaceCandidates: (this.options.workspaces?.listCandidates() ?? []).map(candidate => {
+        const workspaceId = this.options.workspaces?.workspaceIdForExactRoot(candidate.root);
+        return { ...candidate, ...(workspaceId ? { workspaceId } : {}) };
+      }),
       workspaceSelectionAvailable: !!(this.options.workspaceStore && this.options.chooseWorkspace),
       devices: this.options.devices?.list() ?? [],
       deviceSources: this.options.devices?.sourceStates() ?? [],
@@ -359,6 +396,59 @@ export class LocalApi {
       this.stillAuthorized(req, session);
       this.send(res, 200, result); return;
     }
+    if (url.pathname === '/v1/harness/connect-codex' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).length) fail(400, 'invalid_request');
+      if (!this.options.connectCodex) fail(404, 'native_connection_unavailable');
+      const abort = new AbortController();
+      const disconnected = () => abort.abort(); res.once('close', disconnected);
+      try {
+        let instanceId;
+        try { instanceId = await this.options.connectCodex(abort.signal); }
+        catch (error) {
+          const code = (error as { message?: string } | null)?.message;
+          if (code === 'selection_cancelled') fail(409, code);
+          if (code === 'connection_busy' || code === 'connection_limit') fail(429, code);
+          if (code === 'already_connected') fail(409, code);
+          if (code === 'connection_unavailable') fail(503, code);
+          fail(503, 'connection_failed');
+        }
+        this.stillAuthorized(req, session);
+        this.send(res, 200, { instanceId, snapshot: this.snapshot() }); return;
+      } finally { res.off('close', disconnected); }
+    }
+    if (url.pathname === '/v1/harness/disconnect-codex' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).length !== 1 || typeof body.instanceId !== 'string' || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(body.instanceId)) fail(400, 'invalid_instance');
+      if (!this.options.disconnectCodex) fail(404, 'native_connection_unavailable');
+      const abort = new AbortController(); const disconnected = () => abort.abort(); res.once('close', disconnected);
+      try {
+        try { await this.options.disconnectCodex(body.instanceId, abort.signal); }
+        catch (error) {
+          const code = (error as { message?: string } | null)?.message;
+          if (code === 'selection_cancelled' || code === 'connection_missing') fail(409, code);
+          if (code === 'connection_busy') fail(429, code);
+          fail(503, 'connection_failed');
+        }
+        this.stillAuthorized(req, session); this.send(res, 200, { snapshot: this.snapshot() }); return;
+      } finally { res.off('close', disconnected); }
+    }
+    if (url.pathname === '/v1/harness/reset-codex' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).length) fail(400, 'invalid_request');
+      if (!this.options.resetCodex) fail(404, 'native_connection_unavailable');
+      const abort = new AbortController(); const disconnected = () => abort.abort(); res.once('close', disconnected);
+      try {
+        try { await this.options.resetCodex(abort.signal); }
+        catch (error) {
+          const code = (error as { message?: string } | null)?.message;
+          if (code === 'selection_cancelled') fail(409, code);
+          if (code === 'connection_busy') fail(429, code);
+          fail(503, 'connection_failed');
+        }
+        this.stillAuthorized(req, session); this.send(res, 200, { snapshot: this.snapshot() }); return;
+      } finally { res.off('close', disconnected); }
+    }
     if (url.pathname === '/v1/snapshot' && req.method === 'GET') { this.send(res, 200, this.snapshot()); return; }
     if (url.pathname === '/v1/settings' && req.method === 'GET') {
       this.send(res, 200, { settings: structuredClone(this.settings) }); return;
@@ -377,11 +467,75 @@ export class LocalApi {
       if ('notifications' in patch && typeof patch.notifications !== 'boolean') fail(400, 'invalid_setting_value');
       if ('language' in patch && !['ko', 'en'].includes(String(patch.language))) fail(400, 'invalid_setting_value');
 
-      Object.assign(this.settings, patch);
-      this.settings.revision++;
-      this.settings.updatedAt = new Date(this.now()).toISOString();
+      if ('autostart' in patch && patch.autostart !== this.settings.autostart && !this.options.desktopCapabilities?.autostart) fail(409, 'autostart_unavailable');
+      if (this.settingsBusy) fail(409, 'settings_busy');
+      const next = { ...this.settings, ...patch, revision: this.settings.revision + 1, updatedAt: new Date(this.now()).toISOString() } as LocalSettings;
+      this.settingsBusy = true;
+      try {
+        await this.options.applySettings?.(next, structuredClone(this.settings));
+        Object.assign(this.settings, next);
+      } catch { fail(503, 'settings_apply_failed'); }
+      finally { this.settingsBusy = false; }
       this.changed();
       this.send(res, 200, { settings: structuredClone(this.settings) }); return;
+    }
+    if (url.pathname === '/v1/sessions/create' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (this.settings.controlPaused) fail(409, 'control_paused');
+      const service = this.options.sessionService; const store = this.options.workspaceStore;
+      if (!service || !store) fail(503, 'harness_runtime_unavailable');
+      if (Object.keys(body).some(k => !['requestId', 'pluginId', 'instanceId', 'workspaceId', 'title', 'model'].includes(k)) || typeof body.requestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(body.requestId) || typeof body.pluginId !== 'string' || typeof body.instanceId !== 'string' || typeof body.workspaceId !== 'string' || body.title !== undefined && (typeof body.title !== 'string' || body.title.length > 128) || body.model !== undefined && typeof body.model !== 'string') fail(400, 'invalid_request');
+      const binding = service.snapshotAdapters().find(a => a.pluginId === body.pluginId && a.instanceId === body.instanceId);
+      if (!binding || !binding.connected || !binding.canCreate || binding.disabled) fail(409, 'create_unavailable');
+      const creates = this.options.createStore; if (!creates) fail(503, 'create_storage_unavailable');
+      if (this.creatingSessions.has(session.controllerId)) fail(409, 'create_in_progress');
+      this.creatingSessions.add(session.controllerId);
+      let beganNativeAttempt = false;
+      try {
+        const workspace = await store.assertReadable(body.workspaceId);
+        this.stillAuthorized(req, session);
+        if (this.settings.controlPaused) fail(409, 'control_paused');
+        const fingerprint = digest(JSON.stringify([body.pluginId, body.instanceId, workspace.canonical, body.workspaceId, body.title ?? '', body.model ?? '']));
+        const prior = creates.get(body.requestId);
+        if (prior && prior.fingerprint !== fingerprint) fail(409, 'create_request_mismatch');
+        if (prior?.status === 'confirmed') {
+          const current = service.getSession(prior.sessionKey!);
+          this.send(res, 200, { requestId: body.requestId, sessionKey: prior.sessionKey, ownerId: current?.ownerId ?? null, restoredReadOnly: current?.readOnly ?? true, snapshot: this.snapshot() }); return;
+        }
+        if (prior) fail(409, 'session_creation_unconfirmed');
+        creates.begin(body.requestId, fingerprint);
+        beganNativeAttempt = true;
+        const created = await service.createSession(body.pluginId, workspace.canonical, { ...(typeof body.title === 'string' ? { title: body.title } : {}), ...(typeof body.model === 'string' ? { model: body.model } : {}), workspaceId: body.workspaceId }, body.instanceId);
+        creates.confirm(body.requestId, fingerprint, created.sessionKey);
+        this.changed(); this.send(res, 200, { ...created, requestId: body.requestId, restoredReadOnly: false, snapshot: this.snapshot() });
+      } catch (error) { if (error instanceof ApiFault) throw error; if (beganNativeAttempt) fail(503, 'session_creation_unconfirmed'); if (error instanceof SessionFault) fail(409, error.code); fail(503, 'create_preflight_failed'); }
+      finally { this.creatingSessions.delete(session.controllerId); }
+      return;
+    }
+    if (url.pathname === '/v1/sessions/create-status' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).length !== 1 || typeof body.requestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(body.requestId)) fail(400, 'invalid_request');
+      const intent = this.options.createStore?.get(body.requestId);
+      if (!intent) fail(404, 'create_request_not_found');
+      this.send(res, 200, { requestId: body.requestId, status: intent.status === 'pending' ? 'unconfirmed' : 'confirmed', ...(intent.sessionKey ? { sessionKey: intent.sessionKey } : {}) }); return;
+    }
+    if (['/v1/harness/sessions', '/v1/harness/models', '/v1/sessions/attach'].includes(url.pathname) && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      const service = this.options.sessionService; if (!service) fail(503, 'harness_runtime_unavailable');
+      try {
+        if (url.pathname === '/v1/harness/sessions') {
+          if (Object.keys(body).some(k => k !== 'pluginId') || typeof body.pluginId !== 'string') fail(400, 'invalid_request');
+          await service.listSessions(body.pluginId); this.changed(); this.send(res, 200, this.snapshot());
+        } else if (url.pathname === '/v1/harness/models') {
+          if (Object.keys(body).some(k => !['pluginId', 'instanceId'].includes(k)) || typeof body.pluginId !== 'string' || typeof body.instanceId !== 'string') fail(400, 'invalid_request');
+          this.send(res, 200, { models: await service.listModels(body.pluginId, body.instanceId) });
+        } else {
+          if (this.settings.controlPaused) fail(409, 'control_paused');
+          if (Object.keys(body).some(k => k !== 'sessionKey') || typeof body.sessionKey !== 'string') fail(400, 'invalid_request');
+          await service.attachSession(body.sessionKey); this.changed(); this.send(res, 200, this.snapshot());
+        }
+      } catch (error) { if (error instanceof ApiFault) throw error; if (error instanceof SessionFault) fail(409, error.code); fail(503, 'harness_operation_failed'); }
+      return;
     }
     if (url.pathname === '/v1/commands' && req.method === 'POST') {
       const body = await this.body(req);
@@ -393,6 +547,7 @@ export class LocalApi {
         if (prior && prior.input.actorId !== session.controllerId) fail(403, 'command_owner_denied');
       }
       const result = this.options.journal.enqueue({ ...body, actorId: session.controllerId } as CommandInput);
+      if (!result.replayed) this.options.onCommandQueued?.(result.command.input.sessionKey);
       this.send(res, result.replayed ? 200 : 202, result); return;
     }
     if (url.pathname === '/v1/logout' && req.method === 'POST') {
@@ -434,8 +589,9 @@ export class LocalApi {
     if (this.closed) return; this.closed = true;
     this.selection?.abort.abort();
     this.unsubscribe(); this.unsubscribeDevices?.(); this.unsubscribeWorkspaces?.(); if (this.heartbeat) clearInterval(this.heartbeat);
+    for (const dispose of this.serviceListeners) dispose();
     for (const stream of this.streams) stream.response.destroy(); this.streams.clear();
-    this.grants.clear(); this.sessions.clear();
+    this.grants.clear(); this.sessions.clear(); this.localSessions.clear();
     if (this.server.listening) await new Promise<void>((resolve, reject) => { this.server.close(error => error ? reject(error) : resolve()); this.server.closeAllConnections(); });
   }
 }

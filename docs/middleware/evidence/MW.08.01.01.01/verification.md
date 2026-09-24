@@ -1,3 +1,5 @@
+> **2026-09-21 review:** historical evidence below does not establish current task completion. Current status: blocked. See [the integrity audit](../../AUDIT.md) and PLAN.json for reopened checks, fixture limits and next actions.
+
 # MW.08.01.01.01 — Mac/Windows clean install과 사용자 세션 lifecycle
 
 Task status: BLOCKED on macOS environment; A2 PASS, A1 partial (Windows x64 pass, macOS blocked).

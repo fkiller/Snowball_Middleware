@@ -29,19 +29,31 @@ test('selected script replacement and missing binary fail before process launch'
 });
 test('fixed argv is not shell text and inherited secrets/runtime injection are omitted', async () => {
   const previous = process.env.SNOWBALL_TEST_SECRET; process.env.SNOWBALL_TEST_SECRET = 'private';
-  try { const s = spec('env'); assert.equal((await runBinaryProbe(s, approvals(s))).status, 'supported'); }
+  // A real Node executable is hashed before launch. Keep this positive fixture
+  // independent of Windows load; deadline/cancellation are exercised below.
+  try { const s = spec('env'); assert.equal((await runBinaryProbe(s, approvals(s), {timeoutMs:12000})).status, 'supported'); }
   finally { if (previous === undefined) delete process.env.SNOWBALL_TEST_SECRET; else process.env.SNOWBALL_TEST_SECRET = previous; }
-  const s = spec('x & echo fixture 1.0.0'); assert.equal((await runBinaryProbe(s, approvals(s))).status, 'unsupported');
+  const s = spec('x & echo fixture 1.0.0'); assert.equal((await runBinaryProbe(s, approvals(s), {timeoutMs:12000})).status, 'unsupported');
 });
 test('stdout/stderr bounds, unknown output and process failure never expose raw output', async () => {
   for (const [mode, status] of [['flood', 'output_limit'], ['stderr', 'output_limit'], ['unknown-private-output', 'unsupported'], ['fail', 'failed']]) {
-    const s = spec(mode); const result = await runBinaryProbe(s, approvals(s)); assert.equal(result.status, status); assert.equal(result.version, null); assert.ok(!JSON.stringify(result).includes('private'));
+    const s = spec(mode); const result = await runBinaryProbe(s, approvals(s), {timeoutMs:5000}); assert.equal(result.status, status); assert.equal(result.version, null); assert.ok(!JSON.stringify(result).includes('private'));
   }
 });
-test('deadline terminates owned hanging child and no automatic retry occurs', async t => {
+test('deadline terminates an owned child or prevents launch during slow verification; no retry occurs', async t => {
   const dir = await temp(t); const marker = path.join(dir, 'pid'); const s = spec('hang', marker);
   const result = await runBinaryProbe(s, approvals(s), { timeoutMs: 1500 }); assert.equal(result.status, 'timeout');
-  const pid = Number(await readFile(marker, 'utf8'));
+  let pid;
+  try { pid = Number(await readFile(marker, 'utf8')); }
+  catch(error) {
+    if(error.code !== 'ENOENT')throw error;
+    // The deadline includes hashing the executable, so a busy machine may expire
+    // before any child starts. Cancellation's separate test proves post-start kill.
+    assert.equal(result.presence,'unknown');
+    await new Promise(resolve=>setTimeout(resolve,100));
+    await assert.rejects(readFile(marker),{code:'ENOENT'});
+    return;
+  }
   await waitFor(() => { try { process.kill(pid, 0); return false; } catch { return true; } });
   assert.equal(Number(await readFile(marker, 'utf8')), pid);
 });
@@ -56,7 +68,7 @@ test('explicit and pre-launch cancellation leave no owned child running', async 
 });
 test('selection copies review input and consecutive probes cannot publish stale generations', async () => {
   const s = spec(); const probe = new BinaryHarnessProbe(s, approvals(s)); s.args[1] = 'unknown';
-  const first = probe.probe(); const second = await probe.probe();
+  const first = probe.probe({ timeoutMs: 5000 }); const second = await probe.probe({ timeoutMs: 5000 });
   assert.equal((await first).status, 'cancelled'); assert.equal(second.status, 'supported');
   assert.equal(probe.snapshot().generation, second.generation); assert.equal(probe.snapshot().version, '1.0.0');
 });

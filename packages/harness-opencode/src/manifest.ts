@@ -14,8 +14,8 @@ export async function opencodeManifest() {
     platforms: ['win32', 'darwin', 'linux'],
     architectures: ['x64', 'arm64'],
     capabilities: [
-      ...['status', 'list', 'read', 'refreshAuth'].map(name => ({ operation: `harness.${name}`, access: 'observe' as const })),
-      ...['connect', 'create', 'execute', 'disconnect'].map(name => ({ operation: `harness.${name}`, access: 'control' as const })),
+      ...['status', 'list', 'read', 'models', 'refreshAuth'].map(name => ({ operation: `harness.${name}`, access: 'observe' as const })),
+      ...['connect', 'disconnect'].map(name => ({ operation: `harness.${name}`, access: 'control' as const })),
     ],
     permissions: ['opencode-server'],
     configSchema: {
@@ -23,6 +23,7 @@ export async function opencodeManifest() {
       properties: {
         baseUrl: { type: 'string' },
         authPassword: { type: 'string' },
+        authUsername: { type: 'string' },
       },
       additionalProperties: false,
     },

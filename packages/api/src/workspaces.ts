@@ -20,6 +20,11 @@ export class WorkspaceFiles {
   }
   list(): { workspaceId: string }[] { return this.registry.list().map(({ workspaceId }) => ({ workspaceId })); }
   describe(): WorkspaceSummary[] { return this.registry.list().map(summarize); }
+  /** Associate an observed native cwd without exposing registered roots or granting access. */
+  workspaceIdForExactRoot(cwd: string): string | undefined {
+    if (!cwd) return undefined;
+    return this.registry.list().find(entry => entry.canonical === cwd || entry.root === cwd)?.workspaceId;
+  }
   listCandidates(): ProjectCandidate[] { return this.registry.listCandidates?.() ?? []; }
   subscribe(listener: () => void): () => void { return this.registry.subscribe(listener); }
   async recheck(workspaceId: string): Promise<WorkspaceSummary> { return summarize(await this.registry.refresh(workspaceId)); }

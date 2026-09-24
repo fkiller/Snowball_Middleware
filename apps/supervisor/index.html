@@ -12,11 +12,14 @@
       <div class="header-left">
         <span class="brand">SNOWBALL</span>
         <span class="badge" id="host-badge">이 컴퓨터 · 로컬 제어</span>
+        <span class="badge badge-neutral" id="device-badge">MK20 탐색 중</span>
       </div>
       <div class="header-right">
         <button id="btn-settings" class="secondary icon-btn" type="button" title="설정">⚙️ 설정</button>
       </div>
     </header>
+
+    <section id="overview-container" class="overview" aria-label="전체 작업 현황"></section>
 
     <!-- 1. Breadcrumb Bar (Host > Harness > Project > Session) -->
     <nav id="breadcrumb-bar" class="breadcrumb-container" aria-label="작업 탐색"></nav>
@@ -34,7 +37,7 @@
 
       <!-- Prompt & Voice Input Box -->
       <div id="prompt-container" class="prompt-panel">
-        <div id="voice-draft-banner" class="voice-draft-banner" style="display:none;"></div>
+        <div id="voice-draft-banner" class="voice-draft-banner" hidden></div>
         <div class="prompt-input-row">
           <textarea id="prompt-input" rows="3" placeholder="메시지를 입력하거나 음성으로 말하세요... (Enter: 전송, Shift+Enter: 줄바꿈)"></textarea>
           <div class="prompt-actions">
@@ -46,7 +49,7 @@
     </div>
 
     <!-- 3. Setup Wizard (One-time onboarding / Rerun) -->
-    <div id="wizard-container" class="wizard-layout" style="display:none;">
+    <div id="wizard-container" class="wizard-layout" hidden>
       <nav aria-label="설정 단계" id="steps"></nav>
       <section aria-labelledby="title">
         <p id="eyebrow"></p>
@@ -59,7 +62,7 @@
     </div>
 
     <!-- 4. Settings Modal -->
-    <div id="settings-modal" class="modal-backdrop" style="display:none;">
+    <div id="settings-modal" class="modal-backdrop" hidden>
       <div class="modal-dialog">
         <div class="modal-header">
           <h2>⚙️ 설정</h2>
@@ -69,23 +72,28 @@
           <section class="settings-section">
             <h3>시스템 설정</h3>
             <label class="setting-row">
-              <input type="checkbox" id="setting-autostart">
-              <span>Windows 시작 시 자동 실행 (OS Autostart)</span>
+              <input type="checkbox" id="setting-autostart" disabled>
+              <span>OS 로그인 시 자동 실행</span>
             </label>
             <label class="setting-row">
-              <input type="checkbox" id="setting-tray" checked>
-              <span>백그라운드 시스템 트레이 상주</span>
+              <input type="checkbox" id="setting-tray" disabled>
+              <span>시스템 트레이 실행 상태</span>
             </label>
           </section>
+          <section class="settings-section">
+            <h3>트레이 표시 및 알림</h3>
+            <label class="setting-row">트레이 언어 <select id="setting-language" disabled><option value="ko">한국어</option><option value="en">English</option></select></label>
+            <label class="setting-row"><input type="checkbox" id="setting-notifications" disabled>새 승인 요청·명령 오류의 OS 알림</label>
+            <p>트레이 실행 중에 적용됩니다. Web 화면 언어는 한국어입니다.</p>
+          </section>
+
 
           <section class="settings-section">
             <h3>음성 엔진 (Voice Engine)</h3>
             <div class="setting-row">
               <label for="setting-voice-engine">음성 인식 엔진:</label>
-              <select id="setting-voice-engine">
-                <option value="whisper">Local Whisper (내장 고음질 로컬 엔진)</option>
-                <option value="windows">Windows Native Speech API</option>
-                <option value="webspeech" selected>Web Speech API / Mock</option>
+              <select id="setting-voice-engine" disabled>
+                <option value="webspeech" selected>브라우저 음성 인식 (지원 시)</option>
               </select>
             </div>
           </section>

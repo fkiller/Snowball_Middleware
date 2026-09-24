@@ -2,27 +2,8 @@ import { createHash } from 'node:crypto';
 import { parseControllerId, parseSessionKey } from './identity.js';
 import { JournalFault } from './durable-log.js';
 
-export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
-export type CommandStatus = 'queued' | 'dispatched' | 'acknowledged' | 'completed' | 'failed' | 'unknown' | 'cancelled';
-export type DecisionStatus = 'pending' | 'claimed' | 'needs_review' | 'unknown' | 'resolved' | 'expired';
-export interface CommandInput {
-  commandId: string; actorId: string; sessionKey: string; ownerId: string;
-  expectedRevision: number; operation: string; payload: Json;
-  decision?: { decisionId: string; expectedRevision: number };
-  expiresAt?: number;
-}
-export interface CommandRecord {
-  input: CommandInput; fingerprint: string; status: CommandStatus; revision: number;
-  order: number; createdAt: number; updatedAt: number; reason?: string; correlationId?: string;
-}
-export interface SessionRecord { sessionKey: string; ownerId: string; revision: number }
-export interface DecisionInput {
-  decisionId: string; sessionKey: string; ownerId: string; nativeRequestId: string | number;
-  nativeRevision: string; allowedAnswers: string[]; expiresAt?: number;
-}
-export interface DecisionRecord extends DecisionInput {
-  status: DecisionStatus; revision: number; updatedAt: number; claimCommandId?: string;
-}
+import type { Json, CommandStatus, DecisionStatus, CommandInput, CommandRecord, SessionRecord, DecisionInput, DecisionRecord } from '@snowball/plugin-sdk';
+export type { Json, CommandStatus, DecisionStatus, CommandInput, CommandRecord, SessionRecord, DecisionInput, DecisionRecord } from '@snowball/plugin-sdk';
 export interface JournalTransaction {
   schema: 1; hostId: string; sessions: SessionRecord[]; commands: CommandRecord[]; decisions: DecisionRecord[];
 }

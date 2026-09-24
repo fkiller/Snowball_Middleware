@@ -1,3 +1,5 @@
+> **2026-09-21 review:** historical evidence below does not establish current task completion. Current status: blocked. See [the integrity audit](../../AUDIT.md) and PLAN.json for reopened checks, fixture limits and next actions.
+
 # Verification Evidence: MW.08.02.01.02 (로컬 제품 통합 검수와 support matrix)
 
 ## Task Information

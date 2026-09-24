@@ -86,7 +86,9 @@ export class CodexStdio extends EventEmitter implements RpcPort {
       let start = 0;
       while (start < chunk.length) {
         const end = chunk.indexOf(10, start); const stop = end < 0 ? chunk.length : end;
-        if (this.#frame.length + stop - start > 262144) throw new Error();
+        // Native thread metadata can legitimately include large previews. Keep
+        // this finite and separate from the 64 KiB normalized plugin boundary.
+        if (this.#frame.length + stop - start > 4 * 1024 * 1024) throw new Error();
         this.#frame = Buffer.concat([this.#frame, chunk.subarray(start, stop)]); start = stop + (end < 0 ? 0 : 1);
         if (end < 0) break;
         const value: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(this.#frame)); this.#frame = Buffer.alloc(0);

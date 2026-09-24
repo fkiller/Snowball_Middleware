@@ -1,13 +1,16 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
-import { formatSessionKey, parseSessionKey, type DispatchPort, type DispatchReceipt, type CommandRecord, type DecisionRecord } from '@snowball/core';
+import { formatSessionKey, parseSessionKey, type DispatchPort, type DispatchReceipt, type CommandRecord, type DecisionRecord } from '@snowball/plugin-sdk';
 export { opencodeManifest } from './manifest.js';
+
+const OBSERVED_SERVER_VERSION = '1.18.31';
 
 export interface OpenCodeBinding {
   hostId: string;
   instanceId: string;
   baseUrl?: string;
   authPassword?: string;
+  authUsername?: string;
 }
 
 export class OpenCodeFault extends Error {
@@ -17,12 +20,27 @@ export class OpenCodeFault extends Error {
   }
 }
 
+async function boundedJson(response: Response, maximum: number): Promise<unknown> {
+  if (!/^application\/json(?:\s*;|$)/i.test(response.headers.get('content-type') ?? '') || !response.body) throw new OpenCodeFault('invalid_response');
+  const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read(); if (done) break;
+      size += value.byteLength; if (size > maximum) throw new OpenCodeFault('response_limit');
+      chunks.push(value);
+    }
+  } finally { await reader.cancel().catch(() => {}); }
+  try { return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks))); }
+  catch { throw new OpenCodeFault('invalid_response'); }
+}
+
 export class OpenCodeOwnedAdapter extends EventEmitter implements DispatchPort {
   readonly ownerId = `opencode-owner:${randomUUID()}`;
   readonly #binding: OpenCodeBinding;
   readonly #baseUrl: string;
   readonly #authPassword?: string;
   #ready = false;
+  #version?: string;
   #auth: 'unknown' | 'needs_auth' | 'available' | 'not_required' = 'unknown';
   #owned = new Set<string>();
   #turns = new Map<string, string>();
@@ -31,14 +49,16 @@ export class OpenCodeOwnedAdapter extends EventEmitter implements DispatchPort {
   constructor(binding: OpenCodeBinding) {
     super();
     this.#binding = structuredClone(binding);
-    this.#baseUrl = (binding.baseUrl || 'http://127.0.0.1:4096').replace(/\/+$/, '');
+    const url = new URL(binding.baseUrl || 'http://127.0.0.1:4096');
+    if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw new OpenCodeFault('local_endpoint_required');
+    this.#baseUrl = url.origin;
     this.#authPassword = binding.authPassword;
   }
 
   private get headers(): Record<string, string> {
     const h: Record<string, string> = { 'Content-Type': 'application/json' };
     if (this.#authPassword) {
-      h['Authorization'] = `Bearer ${this.#authPassword}`;
+      h['Authorization'] = `Basic ${Buffer.from(`${this.#binding.authUsername ?? 'opencode'}:${this.#authPassword}`).toString('base64')}`;
     }
     return h;
   }
@@ -60,7 +80,10 @@ export class OpenCodeOwnedAdapter extends EventEmitter implements DispatchPort {
       surface: 'http-sse' as const,
       credentialSource: 'opencode-server' as const,
       existingDesktopControl: false,
+      readOnly: true,
+      controlReason: 'owner_protocol_unverified',
       ownedSessionCount: this.#owned.size,
+      providerVersion: this.#version ?? null,
       baseUrl: this.#baseUrl,
     };
   }
@@ -68,68 +91,63 @@ export class OpenCodeOwnedAdapter extends EventEmitter implements DispatchPort {
   async initialize(): Promise<void> {
     if (this.#ready) throw new OpenCodeFault('already_connected');
     await this.refreshAuth();
-    this.#ready = true;
-    this.startSse();
+    // SSE normalization requires a pinned provider schema; no invented turn events.
   }
 
   async refreshAuth(): Promise<void> {
+    this.#ready = false; this.#version = undefined;
     try {
       const res = await fetch(`${this.#baseUrl}/global/health`, {
+        redirect: 'error',
         headers: this.headers,
         signal: AbortSignal.timeout(3000),
       });
       if (res.status === 401) {
         this.#auth = 'needs_auth';
       } else if (res.ok) {
+        const health = await boundedJson(res, 16 * 1024) as { healthy?: boolean; version?: string };
+        if (health?.healthy !== true || typeof health.version !== 'string' || !/^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(health.version)) throw new OpenCodeFault('invalid_health');
+        if (health.version !== OBSERVED_SERVER_VERSION) throw new OpenCodeFault('unsupported_version');
         this.#auth = this.#authPassword ? 'available' : 'not_required';
+        await this.fetchSessions();
+        this.#version = health.version; this.#ready = true;
       } else {
         this.#auth = 'unknown';
       }
-    } catch {
+    } catch (error) {
+      this.#ready = false;
+      if (error instanceof OpenCodeFault && error.code === 'needs_auth') { this.#auth = 'needs_auth'; return; }
       this.#auth = 'unknown';
+      if (error instanceof OpenCodeFault) throw error;
       throw new OpenCodeFault('server_unreachable');
     }
   }
 
   private checkReady(): void {
-    if (!this.#ready) throw new OpenCodeFault('not_connected');
+    if (!this.#ready || !['available', 'not_required'].includes(this.#auth)) throw new OpenCodeFault('not_connected');
+  }
+
+  private async fetchSessions(): Promise<Array<{ id: string; directory?: string }>> {
+    const res = await fetch(`${this.#baseUrl}/session`, { redirect: 'error', headers: this.headers, signal: AbortSignal.timeout(5000) });
+    if (res.status === 401) { this.#auth = 'needs_auth'; this.#ready = false; throw new OpenCodeFault('needs_auth'); }
+    if (!res.ok) throw new OpenCodeFault('list_sessions_failed');
+    const list = await boundedJson(res, 1024 * 1024);
+    if (!Array.isArray(list) || list.length > 256) throw new OpenCodeFault('invalid_session_list');
+    const ids = new Set<string>();
+    for (const item of list) {
+      if (!item || typeof item !== 'object' || typeof item.id !== 'string' || item.id.length < 1 || item.id.length > 128 || /[\x00-\x1f\x7f/\\]/.test(item.id) || ids.has(item.id) || item.directory !== undefined && (typeof item.directory !== 'string' || item.directory.length > 4096)) throw new OpenCodeFault('invalid_session_list');
+      ids.add(item.id);
+    }
+    return list as Array<{ id: string; directory?: string }>;
   }
 
   async createSession(root: string, options: { title?: string } = {}): Promise<{ sessionKey: string; ownerId: string }> {
-    this.checkReady();
-    if (this.#auth === 'needs_auth' || this.#auth === 'unknown') throw new OpenCodeFault('needs_auth');
-
-    const res = await fetch(`${this.#baseUrl}/session`, {
-      method: 'POST',
-      headers: this.headers,
-      body: JSON.stringify({ directory: root, title: options.title || 'Snowball Session' }),
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (!res.ok) {
-      if (res.status === 401) throw new OpenCodeFault('needs_auth');
-      throw new OpenCodeFault('create_session_failed');
-    }
-
-    const data = (await res.json()) as { id?: string };
-    if (!data || typeof data.id !== 'string') {
-      throw new OpenCodeFault('invalid_session_response');
-    }
-
-    this.#owned.add(data.id);
-    return { sessionKey: this.sessionKey(data.id), ownerId: this.ownerId };
+    throw new OpenCodeFault('owner_protocol_unverified');
   }
 
   async listSessions(): Promise<{ nativeId: string; sessionKey: string; ownerId: string | null; readOnly: boolean; cwd: string }[]> {
     this.checkReady();
-    const res = await fetch(`${this.#baseUrl}/session`, {
-      headers: this.headers,
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (!res.ok) throw new OpenCodeFault('list_sessions_failed');
-    const list = (await res.json()) as Array<{ id: string; directory?: string }>;
-    if (!Array.isArray(list)) throw new OpenCodeFault('invalid_session_list');
+    const list = await this.fetchSessions();
 
     return list.map(s => ({
       nativeId: s.id,
@@ -142,157 +160,57 @@ export class OpenCodeOwnedAdapter extends EventEmitter implements DispatchPort {
 
   async readSession(nativeId: string): Promise<{ nativeId: string; readOnly: boolean }> {
     this.checkReady();
+    if (typeof nativeId !== 'string' || nativeId.length < 1 || nativeId.length > 128 || /[\x00-\x1f\x7f/\\]/.test(nativeId)) throw new OpenCodeFault('invalid_session_id');
     const res = await fetch(`${this.#baseUrl}/session/${encodeURIComponent(nativeId)}`, {
-      headers: this.headers,
+      redirect: 'error', headers: this.headers,
       signal: AbortSignal.timeout(5000),
     });
+    if (res.status === 401) { this.#auth = 'needs_auth'; this.#ready = false; throw new OpenCodeFault('needs_auth'); }
     if (!res.ok) throw new OpenCodeFault('read_session_failed');
+    const item = await boundedJson(res, 128 * 1024) as { id?: string };
+    if (item?.id !== nativeId) throw new OpenCodeFault('invalid_session');
     return { nativeId, readOnly: !this.#owned.has(nativeId) };
+  }
+
+  /** Live provider catalog. OpenCode variants are not claimed to be Codex efforts. */
+  async listModels(): Promise<Array<{ model: string; displayName: string; efforts: string[]; defaultEffort: null }>> {
+    this.checkReady();
+    const res = await fetch(`${this.#baseUrl}/config/providers`, {
+      redirect: 'error', headers: this.headers, signal: AbortSignal.timeout(5000),
+    });
+    if (res.status === 401) { this.#auth = 'needs_auth'; this.#ready = false; throw new OpenCodeFault('needs_auth'); }
+    if (!res.ok) throw new OpenCodeFault('model_catalog_failed');
+    const catalog = await boundedJson(res, 2 * 1024 * 1024) as { providers?: unknown };
+    if (!catalog || !Array.isArray(catalog.providers) || catalog.providers.length > 32) throw new OpenCodeFault('invalid_model_catalog');
+    const models: Array<{ model: string; displayName: string; efforts: string[]; defaultEffort: null }> = [];
+    const seen = new Set<string>();
+    for (const provider of catalog.providers) {
+      const p = provider as Record<string, unknown>;
+      if (!p || typeof p !== 'object' || typeof p.id !== 'string' || !/^[A-Za-z0-9._-]{1,128}$/.test(p.id) || !p.models || typeof p.models !== 'object' || Array.isArray(p.models)) throw new OpenCodeFault('invalid_model_catalog');
+      const entries = Object.entries(p.models);
+      if (entries.length > 256) throw new OpenCodeFault('invalid_model_catalog');
+      for (const [nativeId, detail] of entries) {
+        const d = detail as Record<string, unknown>;
+        if (!/^[A-Za-z0-9._:/-]{1,256}$/.test(nativeId) || !d || typeof d !== 'object' || d.id !== nativeId || d.providerID !== p.id || typeof d.name !== 'string' || d.name.length > 256) throw new OpenCodeFault('invalid_model_catalog');
+        const model = `${p.id}/${nativeId}`;
+        if (seen.has(model) || models.length >= 512) throw new OpenCodeFault('invalid_model_catalog');
+        seen.add(model);
+        models.push({ model, displayName: d.name, efforts: [], defaultEffort: null });
+      }
+    }
+    return models;
   }
 
   async execute(
     envelope: { command: CommandRecord; decision?: DecisionRecord },
     signal: AbortSignal
   ): Promise<DispatchReceipt> {
-    const input = envelope.command.input;
-    const no = (reason: string): DispatchReceipt => ({ status: 'not_sent', reason });
-    if (!this.#ready || signal.aborted) return no('not_connected_or_cancelled');
-
-    const target = parseSessionKey(input.sessionKey);
-    if (
-      input.ownerId !== this.ownerId ||
-      target.hostId !== this.#binding.hostId ||
-      target.harness.instanceId !== this.#binding.instanceId ||
-      target.harness.pluginId !== 'snowball.opencode' ||
-      !this.#owned.has(target.nativeSessionId)
-    ) {
-      return no('owner_mismatch');
-    }
-
-    const sessionId = target.nativeSessionId;
-    const payload = input.payload as Record<string, unknown>;
-
-    if (input.operation === 'sessions.send') {
-      if (typeof payload?.text !== 'string' || !payload.text.trim()) return no('invalid_message');
-      try {
-        const res = await fetch(`${this.#baseUrl}/session/${encodeURIComponent(sessionId)}/message`, {
-          method: 'POST',
-          headers: this.headers,
-          body: JSON.stringify({ text: payload.text }),
-          signal,
-        });
-        if (!res.ok) return no('send_failed');
-        const data = (await res.json()) as { messageId?: string; id?: string };
-        const correlationId = data?.messageId || data?.id || randomUUID();
-        this.#turns.set(sessionId, correlationId);
-        return { status: 'acknowledged', correlationId };
-      } catch (err: any) {
-        if (signal.aborted) return no('cancelled');
-        throw new OpenCodeFault('send_failed', 'unknown');
-      }
-    }
-
-    if (input.operation === 'sessions.interrupt') {
-      try {
-        const res = await fetch(`${this.#baseUrl}/session/${encodeURIComponent(sessionId)}/abort`, {
-          method: 'POST',
-          headers: this.headers,
-          signal,
-        });
-        if (!res.ok) return no('interrupt_failed');
-        this.#turns.delete(sessionId);
-        return { status: 'acknowledged', correlationId: String(payload?.turnId || sessionId) };
-      } catch {
-        return no('interrupt_failed');
-      }
-    }
-
-    if (input.operation === 'decisions.resolve') {
-      const decision = envelope.decision;
-      if (!decision || decision.ownerId !== this.ownerId || typeof payload?.answer !== 'string') {
-        return no('invalid_decision');
-      }
-      try {
-        const res = await fetch(`${this.#baseUrl}/session/${encodeURIComponent(sessionId)}/decision`, {
-          method: 'POST',
-          headers: this.headers,
-          body: JSON.stringify({ decisionId: decision.decisionId, answer: payload.answer }),
-          signal,
-        });
-        if (!res.ok) return no('decision_failed');
-        return { status: 'acknowledged', correlationId: decision.decisionId };
-      } catch {
-        throw new OpenCodeFault('decision_delivery_unknown', 'unknown');
-      }
-    }
-
-    return no('unsupported_operation');
-  }
-
-  private startSse(): void {
-    if (this.#sseController) this.#sseController.abort();
-    this.#sseController = new AbortController();
-    const signal = this.#sseController.signal;
-
-    void (async () => {
-      try {
-        const res = await fetch(`${this.#baseUrl}/event`, {
-          headers: { ...this.headers, Accept: 'text/event-stream' },
-          signal,
-        });
-        if (!res.ok || !res.body) {
-          this.emit('offline', { ownerId: this.ownerId });
-          return;
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (!signal.aborted) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n\n');
-          buffer = lines.pop() || '';
-
-          for (const block of lines) {
-            if (!block.trim()) continue;
-            let eventType = 'message';
-            let dataStr = '';
-            for (const line of block.split('\n')) {
-              if (line.startsWith('event:')) eventType = line.slice(6).trim();
-              if (line.startsWith('data:')) dataStr = line.slice(5).trim();
-            }
-
-            try {
-              const data = JSON.parse(dataStr);
-              if (data?.sessionId) {
-                // If turn started from external owner on our owned session, revoke ownership
-                if (eventType === 'turn/started' && this.#owned.has(data.sessionId) && this.#turns.get(data.sessionId) !== data.turnId) {
-                  this.#owned.delete(data.sessionId);
-                  this.emit('ownerLost', { sessionKey: this.sessionKey(data.sessionId), ownerId: this.ownerId, reason: 'external_turn' });
-                }
-                this.emit('event', {
-                  sessionKey: this.sessionKey(data.sessionId),
-                  ownerId: this.ownerId,
-                  kind: eventType,
-                  text: data.text,
-                });
-              }
-            } catch {}
-          }
-        }
-      } catch {
-        if (!signal.aborted) {
-          this.emit('offline', { ownerId: this.ownerId });
-        }
-      }
-    })();
+    return { status: 'not_sent', reason: 'owner_protocol_unverified' };
   }
 
   async stop(): Promise<void> {
     this.#ready = false;
+    this.#version = undefined;
     this.#auth = 'unknown';
     if (this.#sseController) {
       this.#sseController.abort();

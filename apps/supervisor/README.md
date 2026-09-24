@@ -1,24 +1,11 @@
-# Local Supervisor — development onboarding
+# Local Supervisor
 
-Build with npm run build, then run npm run start:local in an interactive terminal.
-Optional --native-picker enables the OS directory chooser only when the browser
-explicitly asks. Optional --data-dir ABSOLUTE_PATH selects a private development
-state directory; existing weak/foreign permissions fail without being rewritten.
-Optional --codex-executable ABSOLUTE_PATH configures read-only candidate metadata,
-not execution approval. No automatic probe, login, harness start, or LAN discovery.
+Build with npm run build, then run npm run start:local. Normal startup prints a loopback URL and requires no login or PIN. Optional --require-auth explicitly selects memory-token mode and its interactive terminal bootstrap. This does not change separate MK20/device pairing.
 
-The terminal privately displays a one-use 60-second connection code; Enter issues
-another. Redirected stdin/stdout are refused. Ctrl+C closes this runtime only.
-Bootstrap remains memory-only; no credential URL/browser-storage persistence.
-Default data location follows resolveUserDataDir. Host identity and two separate
-locked logs (commands/workspaces) persist. Startup never steals an old process lock.
+The native folder picker is enabled by default; --no-native-picker disables it. --data-dir ABSOLUTE_PATH selects private local state. --codex-executable ABSOLUTE_PATH selects discovery metadata only; --codex-control-config ABSOLUTE_JSON_PATH explicitly starts the reviewed Codex worker using its pinned executable and selected credential home. See docs/middleware/CONTROL_REALITY.md. Discovery never automatically starts or logs into a provider.
 
-runtime.mjs composes the existing API/journal/store. Workspace selection supplies
-no HTTP path, persists before publication, and cancels on revocation/disconnect.
-private-state.mjs creates/verifies Windows SID ACL or POSIX UID/mode boundaries.
-Native dialog implementations are experimental: real UI cancellation and macOS
-verification are pending. Tests/browser use an explicitly injected temporary picker.
+runtime.mjs composes the journal, workspace store, settings persistence, SessionService, selected PluginHost adapter and semantic HTTP API. New tasks take registered workspace IDs rather than raw HTTP paths. Model/effort choices come from the native provider catalog. Commands remain bound to immutable owner/session/revision. SSE refreshes native status, bounded agent deltas and journal outcomes. The live projection is not a full historical transcript.
 
-This is not an installed tray/service or complete MVP. Harness registration/auth/probe
-UI, device setup, native dialog verification, OS offline checks, richer supervision,
-packaging/update remain. See PLAN.json and evidence/MW.06.01.01.01/verification.md.
+Settings survive restart. Autostart requires the real desktop port; command pause applies at admission. The Electron native tray launcher is in apps/desktop. Web noAuth is local-only; Host/Origin and bounded controller contexts remain enforced. Optional token-mode credentials are never stored in browser storage or URLs.
+
+Windows real Codex create/restart/resume/model/effort/response/interrupt was verified on 2026-09-22 using only own verification tasks. The 2026-09-23 native tray/onboarding connection flow selects and reviews the CLI, existing login home and working directory without browser paths, then registers a new instance; native-confirmed disconnect/reset actions are also present. The development CLI still needs explicit JSON configuration. Real default-login CLI read-only enroll/restore/disconnect passed without commands to existing tasks, but visible OS dialog interaction has not been validated. Complete transcript/reconnect behavior, physical device/voice integration, macOS and signed installers remain unfinished. See the authoritative plan and CONTROL_REALITY.md.

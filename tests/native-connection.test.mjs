@@ -1,0 +1,56 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { CommandJournal } from '../packages/core/dist/index.js';
+import { LocalApi } from '../packages/api/dist/index.js';
+import { LocalClient } from '../packages/client-sdk/dist/index.js';
+import { appendCodexConnection, loadCodexConnections, removeCodexConnection, resetCodexConnections } from '../apps/desktop/codex-connections.mjs';
+
+test('native connection selections are private, bounded and restore with exact instance IDs', t => {
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-codex-connections-'));
+  t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+  const initial=loadCodexConnections(dir);
+  assert.deepEqual(initial,{version:1,connections:[]});
+  const launch={executable:path.join(dir,'codex.exe'),sha256:'a'.repeat(64),version:'0.153.4',codexHome:dir,workingDirectory:dir};
+  const saved=appendCodexConnection(dir,initial,launch,'local-test');
+  assert.equal(saved.instanceId,'local-test');
+  assert.deepEqual(loadCodexConnections(dir),saved.config);
+  assert.throws(()=>appendCodexConnection(dir,saved.config,launch,'local-test'),/already exists/);
+  const file=path.join(dir,'connections','codex.v1.json');
+  assert.ok(fs.statSync(file).size<16384);
+  assert.equal(removeCodexConnection(dir,'local-test').connections.length,0);
+  assert.throws(()=>removeCodexConnection(dir,'local-test'),/connection_missing/);
+  appendCodexConnection(dir,loadCodexConnections(dir),launch,'local-test');
+  fs.writeFileSync(file,'{bad-json');
+  assert.throws(()=>loadCodexConnections(dir));
+  assert.deepEqual(resetCodexConnections(dir),{version:1,connections:[]});
+  assert.deepEqual(loadCodexConnections(dir),{version:1,connections:[]});
+  if(process.platform!=='win32')assert.equal(fs.statSync(file).mode&0o077,0);
+  if(process.platform==='win32')execFileSync(path.join(process.env.SystemRoot,'System32','icacls.exe'),[file,'/grant','*S-1-1-0:(R)'],{windowsHide:true,stdio:'pipe'});
+  else fs.chmodSync(file,0o644);
+  assert.throws(()=>loadCodexConnections(dir),/private|accessible/i);
+});
+
+test('loopback browser can trigger only pathless native connection; cancellation is not success', async t => {
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-native-connection-api-'));
+  const journal=new CommandJournal({hostId:`host_${'a'.repeat(32)}`,directory:path.join(dir,'commands')});
+  let called=0;
+  let removed,reset=0;
+  const api=new LocalApi({journal,noAuth:true,desktopCapabilities:{tray:true,autostart:true,codexSelection:true},connectCodex:async()=>{called++;if(called===1)return 'local-verified';throw new Error('selection_cancelled');},disconnectCodex:async id=>{removed=id;return id;},resetCodex:async()=>{reset++;return true;}});
+  await api.start();t.after(async()=>{await api.close();journal.close();fs.rmSync(dir,{recursive:true,force:true});});
+  const client=new LocalClient(api.origin);
+  assert.equal((await client.connectCodex()).instanceId,'local-verified');
+  await assert.rejects(client.connectCodex(),error=>error.status===409&&error.code==='selection_cancelled');
+  assert.equal(called,2);
+  const injected=await fetch(api.origin+'/v1/harness/connect-codex',{method:'POST',headers:{Origin:api.origin,'Content-Type':'application/json'},body:JSON.stringify({executable:'C:/unreviewed.exe'})});
+  assert.equal(injected.status,400);assert.equal(called,2);
+  const foreign=await fetch(api.origin+'/v1/harness/connect-codex',{method:'POST',headers:{Origin:'https://other.example','Content-Type':'application/json'},body:'{}'});
+  assert.equal(foreign.status,403);assert.equal(called,2);
+  await client.disconnectCodex('local-verified');assert.equal(removed,'local-verified');
+  await client.resetCodex();assert.equal(reset,1);
+  const malformed=await fetch(api.origin+'/v1/harness/disconnect-codex',{method:'POST',headers:{Origin:api.origin,'Content-Type':'application/json'},body:JSON.stringify({instanceId:'../other'})});
+  assert.equal(malformed.status,400);assert.equal(removed,'local-verified');
+});

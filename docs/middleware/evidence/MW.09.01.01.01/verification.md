@@ -1,3 +1,5 @@
+> **2026-09-21 review:** historical evidence below does not establish current task completion. Current status: blocked. See [the integrity audit](../../AUDIT.md) and PLAN.json for reopened checks, fixture limits and next actions.
+
 # Verification Evidence: MW.09.01.01.01 (선택적 LAN Host pairing과 해제)
 
 ## Task Information

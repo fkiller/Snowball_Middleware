@@ -14,6 +14,7 @@ const hostId = `host_${'a'.repeat(32)}`;
 const actorId = `ctl_${'b'.repeat(16)}`;
 
 class MockHarnessAdapter extends EventEmitter {
+  status(){return {instanceId:'inst-1',connected:true};}
   constructor(ownerId = 'owner-proc-1') {
     super();
     this.ownerId = ownerId;

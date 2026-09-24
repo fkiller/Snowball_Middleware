@@ -3,6 +3,14 @@
 상태: 구현할 계약. 실제 연결/플랫폼 지원을 검증했다는 의미가 아니다.
 모든 시나리오는 PLAN.json L4 task에 연결되며 L5에서 증거를 기록한다.
 
+## User-confirmed local control contract — 2026-09-21
+
+- Default local Web UI uses noAuth: no login, PIN, pairing code or repeated authorization. It binds only 127.0.0.1; Host/Origin/browser checks stay in force. Optional token mode is operator-selected, not the normal journey.
+- MK20/device pairing is separate from Web UI access. Do not add a Web PIN to repair a device protocol.
+- Connected, explicitly selected harness sessions must accept commands. Discovery alone is observation; explicit attachment establishes the route. Do not treat permanently disabling commands as plugin isolation.
+- Plugin isolation means precise operation/event/session scope and no exceptional core privileges. Current process separation is not OS confinement against malicious same-user plugins; report this limitation honestly.
+- Every model/effort, voice, settings and session action requires actual backend behavior and evidence. Removing a fake fallback makes the state honest; it does not complete the missing MVP feature.
+
 ## 공통 사용자 경험 / 상태 모델
 
 Settings → Connections에서 Harnesses / Controllers를 분리한다. 최초 설치의 작은 wizard와 이후 Settings는 같은 상태/API를 사용한다. 작업은 뒤로/건너뛰기/취소 가능하고 등록되지 않은 후보와 저장된 연결을 구분한다. 실패 카드에는 원인, 관찰 시각, 다음 가능한 행동이 항상 있다. 후보가 없어도 Supervisor는 열린다.

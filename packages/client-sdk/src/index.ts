@@ -1,5 +1,5 @@
-import type { CommandInput, CommandRecord, DecisionRecord, SessionRecord, DeviceRegistry, DeviceCandidate, DiscoverySnapshot } from '@snowball/core';
-import type { WorkspaceStatus } from '@snowball/core';
+import type { SessionSummary, CommandInput, CommandRecord, DecisionRecord, SessionRecord, DeviceRegistry, DeviceCandidate, DiscoverySnapshot } from '@snowball/core';
+import type { WorkspaceStatus, ProjectCandidate } from '@snowball/core';
 export interface WorkspaceSummary { workspaceId: string; projectId: string; displayName: string; status: WorkspaceStatus }
 
 export interface LocalSettings {
@@ -13,9 +13,18 @@ export interface LocalSettings {
 
 export interface Credentials { token: string; csrfToken: string; controllerId: string; expiresAt: number }
 export interface Snapshot {
+  accessMode?: 'local-no-auth' | 'token';
+  desktopCapabilities?: {tray: boolean; autostart: boolean; codexSelection?: boolean};
+  sessionDetails?: SessionSummary[];
+  connectedHarnesses?: {pluginId: string; instanceId: string | null; disabled: boolean; connected: boolean; auth: string; sessionListTruncated: boolean; canAttach: boolean; canCreate: boolean; canListModels: boolean}[];
+  sessionMessages?: Record<string, {role: 'agent'; text: string; turnId: string; receivedAt: number; truncated: boolean}[]>;
+  hostname?: string;
+  workspaceCandidates?: (ProjectCandidate & { workspaceId?: string })[];
+  realSessions?: Record<string, unknown> | null;
+  turnsStore?: Record<string, unknown> | null;
   cursor: string; sessions: SessionRecord[];
   commands: { commandId: string; actorId: string; sessionKey: string; ownerId: string; operation: string; status: CommandRecord['status']; revision: number; order: number; updatedAt: number }[];
-  decisions: Pick<DecisionRecord, 'decisionId' | 'sessionKey' | 'ownerId' | 'status' | 'revision' | 'expiresAt'>[];
+  decisions: Pick<DecisionRecord, 'decisionId' | 'sessionKey' | 'ownerId' | 'status' | 'revision' | 'expiresAt' | 'allowedAnswers'>[];
   workspaces: { workspaceId: string }[];
   workspaceDetails: WorkspaceSummary[];
   workspaceSelectionAvailable: boolean;
@@ -32,6 +41,7 @@ export class ClientFault extends Error {
 /** Memory-only credentials. Never automatically retry a mutation after a network failure. */
 export class LocalClient {
   private credentials?: Credentials;
+  private readonly localControllerId = `ctl_${Array.from(globalThis.crypto.getRandomValues(new Uint8Array(8)), b => b.toString(16).padStart(2, '0')).join('')}`;
   // Browser fetch requires its Window receiver; Node accepts the unbound call and
   // would otherwise hide this failure until real browser onboarding.
   constructor(readonly origin: string, private readonly transport: typeof fetch = globalThis.fetch.bind(globalThis)) {
@@ -39,7 +49,7 @@ export class LocalClient {
     if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.origin !== origin || !url.port) throw new Error('Exact loopback origin required');
   }
   private headers(mutation = false): Record<string, string> {
-    return { Origin: this.origin, ...(this.credentials ? { Authorization: `Bearer ${this.credentials.token}` } : {}), ...(mutation ? { 'Content-Type': 'application/json', ...(this.credentials ? { 'X-Snowball-CSRF': this.credentials.csrfToken } : {}) } : {}) };
+    return { Origin: this.origin, 'X-Snowball-Controller': this.localControllerId, ...(this.credentials ? { Authorization: `Bearer ${this.credentials.token}` } : {}), ...(mutation ? { 'Content-Type': 'application/json', ...(this.credentials ? { 'X-Snowball-CSRF': this.credentials.csrfToken } : {}) } : {}) };
   }
   private async request<T>(route: string, body?: unknown, signal?: AbortSignal): Promise<T> {
     const response = await this.transport(this.origin + route, { method: body === undefined ? 'GET' : 'POST', headers: this.headers(body !== undefined), ...(body !== undefined ? { body: JSON.stringify(body) } : {}), signal, credentials: 'omit', cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer' });
@@ -54,6 +64,12 @@ export class LocalClient {
   snapshot(signal?: AbortSignal): Promise<Snapshot> { return this.request('/v1/snapshot', undefined, signal); }
   /** Explicit user-triggered metadata rescan. Runs no probes and grants nothing. */
   scanHarness(signal?: AbortSignal): Promise<DiscoverySnapshot> { return this.request('/v1/harness/scan', {}, signal); }
+  /** Opens the local native picker; no executable path crosses this API. */
+  connectCodex(signal?: AbortSignal): Promise<{ instanceId: string; snapshot: Snapshot }> { return this.request('/v1/harness/connect-codex', {}, signal); }
+  /** Native-confirmed removal of one middleware-owned Codex instance. */
+  disconnectCodex(instanceId: string, signal?: AbortSignal): Promise<{ snapshot: Snapshot }> { return this.request('/v1/harness/disconnect-codex', { instanceId }, signal); }
+  /** Native-confirmed repair of saved connection references; task history remains. */
+  resetCodex(signal?: AbortSignal): Promise<{ snapshot: Snapshot }> { return this.request('/v1/harness/reset-codex', {}, signal); }
   recheckWorkspace(workspaceId: string, signal?: AbortSignal): Promise<WorkspaceSummary> { return this.request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/recheck`, {}, signal); }
   selectWorkspace(signal?: AbortSignal): Promise<{ selected: false } | { selected: true; workspaceId: string }> { return this.request('/v1/workspaces/select', {}, signal); }
   settings(signal?: AbortSignal): Promise<{ settings: LocalSettings }> { return this.request('/v1/settings', undefined, signal); }
@@ -72,6 +88,11 @@ export class LocalClient {
     if (!response.ok) throw new ClientFault(response.status, result.error ?? 'request_failed');
     return result;
   }
+  refreshSessions(pluginId: string, signal?: AbortSignal): Promise<Snapshot> { return this.request('/v1/harness/sessions', { pluginId }, signal); }
+  models(pluginId: string, instanceId: string, signal?: AbortSignal): Promise<{models: {model: string; displayName: string; efforts: string[]; defaultEffort: string | null}[]}> { return this.request('/v1/harness/models', { pluginId, instanceId }, signal); }
+  attachSession(sessionKey: string, signal?: AbortSignal): Promise<Snapshot> { return this.request('/v1/sessions/attach', { sessionKey }, signal); }
+  createSession(input: {requestId: string; pluginId: string; instanceId: string; workspaceId: string; title?: string; model?: string}, signal?: AbortSignal): Promise<{requestId: string; sessionKey: string; ownerId: string | null; restoredReadOnly: boolean; snapshot: Snapshot}> { return this.request('/v1/sessions/create', input, signal); }
+  createStatus(requestId: string, signal?: AbortSignal): Promise<{requestId: string; status: 'unconfirmed' | 'confirmed'; sessionKey?: string}> { return this.request('/v1/sessions/create-status', {requestId}, signal); }
   submit(command: Omit<CommandInput, 'actorId'>, signal?: AbortSignal): Promise<{ command: CommandRecord; replayed: boolean }> { return this.request('/v1/commands', command, signal); }
   command(commandId: string, signal?: AbortSignal): Promise<CommandRecord> { return this.request(`/v1/commands/${encodeURIComponent(commandId)}`, undefined, signal); }
   decision(decisionId: string, signal?: AbortSignal): Promise<DecisionRecord> { return this.request(`/v1/decisions/${encodeURIComponent(decisionId)}`, undefined, signal); }

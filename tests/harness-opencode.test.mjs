@@ -2,342 +2,109 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { OpenCodeOwnedAdapter, opencodeManifest } from '../packages/harness-opencode/dist/index.js';
-import { formatSessionKey } from '../packages/core/dist/index.js';
-
-const hostId = `host_${'b'.repeat(32)}`;
-const instanceId = 'opencode-test';
-
-class MockOpenCodeServer {
-  server;
-  port = 0;
-  sessions = [{ id: 'existing-1', directory: '/home/user/project' }];
-  messages = [];
-  aborted = [];
-  decisions = [];
-  sseStreams = new Set();
-  requirePassword = false;
-  password = 'secret-password';
-
-  async start() {
-    this.server = http.createServer((req, res) => {
-      const url = new URL(req.url, `http://127.0.0.1:${this.port}`);
-
-      // Check auth if password required
-      if (this.requirePassword) {
-        const auth = req.headers['authorization'];
-        if (auth !== `Bearer ${this.password}`) {
-          res.writeHead(401, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'unauthorized' }));
-          return;
-        }
-      }
-
-      if (url.pathname === '/global/health') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok' }));
-        return;
-      }
-
-      if (url.pathname === '/session' && req.method === 'GET') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(this.sessions));
-        return;
-      }
-
-      if (url.pathname === '/session' && req.method === 'POST') {
-        let body = '';
-        req.on('data', chunk => { body += chunk; });
-        req.on('end', () => {
-          const parsed = JSON.parse(body || '{}');
-          const newSession = { id: `session-${this.sessions.length + 1}`, directory: parsed.directory || '/test' };
-          this.sessions.push(newSession);
-          res.writeHead(201, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(newSession));
-        });
-        return;
-      }
-
-      const matchMsg = /^\/session\/([^/]+)\/message$/.exec(url.pathname);
-      if (matchMsg && req.method === 'POST') {
-        let body = '';
-        req.on('data', chunk => { body += chunk; });
-        req.on('end', () => {
-          const parsed = JSON.parse(body || '{}');
-          const msg = { sessionId: matchMsg[1], text: parsed.text, messageId: `msg-${Date.now()}` };
-          this.messages.push(msg);
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ messageId: msg.messageId }));
-        });
-        return;
-      }
-
-      const matchAbort = /^\/session\/([^/]+)\/abort$/.exec(url.pathname);
-      if (matchAbort && req.method === 'POST') {
-        this.aborted.push(matchAbort[1]);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true }));
-        return;
-      }
-
-      const matchDec = /^\/session\/([^/]+)\/decision$/.exec(url.pathname);
-      if (matchDec && req.method === 'POST') {
-        let body = '';
-        req.on('data', chunk => { body += chunk; });
-        req.on('end', () => {
-          const parsed = JSON.parse(body || '{}');
-          this.decisions.push({ sessionId: matchDec[1], ...parsed });
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ ok: true }));
-        });
-        return;
-      }
-
-      const matchRead = /^\/session\/([^/]+)$/.exec(url.pathname);
-      if (matchRead && req.method === 'GET') {
-        const found = this.sessions.find(s => s.id === matchRead[1]);
-        if (found) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify(found));
-        } else {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'not_found' }));
-        }
-        return;
-      }
-
-      if (url.pathname === '/event' && req.method === 'GET') {
-        res.writeHead(200, {
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          Connection: 'keep-alive',
-        });
-        this.sseStreams.add(res);
-        req.on('close', () => this.sseStreams.delete(res));
-        return;
-      }
-
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'not_found' }));
-    });
-
-    await new Promise(r => this.server.listen(0, '127.0.0.1', r));
-    this.port = this.server.address().port;
-  }
-
-  broadcast(event, data) {
-    const text = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    for (const res of this.sseStreams) {
-      res.write(text);
-    }
-  }
-
-  async stop() {
-    for (const res of this.sseStreams) res.end();
-    this.sseStreams.clear();
-    if (this.server?.listening) {
-      await new Promise(r => this.server.close(r));
-    }
-  }
+const binding = { hostId: 'host_' + 'b'.repeat(32), instanceId: 'test' };
+async function fixture(t, handler) {
+  const server = http.createServer(handler);
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  t.after(() => { server.closeAllConnections(); return new Promise(r => server.close(r)); });
+  return 'http://127.0.0.1:' + server.address().port;
 }
-
-test('MW.03.02.01.02: OpenCode manifest publishes observe and control capabilities', async () => {
+test('OpenCode uses documented Basic auth and health schema; existing sessions stay read-only', async t => {
+  let mutations = 0;
+  const baseUrl = await fixture(t, (req,res) => {
+    assert.equal(req.headers.authorization, 'Basic ' + Buffer.from('opencode:secret').toString('base64'));
+    if (req.method !== 'GET') mutations++;
+    res.setHeader('Content-Type','application/json');
+    res.end(JSON.stringify(req.url === '/global/health' ? { healthy:true, version:'1.18.31' } : [{ id:'existing',directory:'/project' }]));
+  });
+  const adapter = new OpenCodeOwnedAdapter({...binding,baseUrl,authPassword:'secret'});
+  t.after(() => adapter.stop()); await adapter.initialize();
+  assert.equal(adapter.status().connected,true);
+  assert.equal(adapter.status().readOnly,true);
+  assert.equal((await adapter.listSessions())[0].readOnly,true);
+  await assert.rejects(adapter.createSession('/project'),{code:'owner_protocol_unverified'});
+  for (const operation of ['sessions.send','sessions.interrupt','decisions.resolve']) {
+    const receipt = await adapter.execute({command:{input:{operation}}},new AbortController().signal);
+    assert.equal(receipt.status,'not_sent');
+  }
+  assert.equal(mutations,0);
   const manifest = await opencodeManifest();
-  assert.equal(manifest.id, 'snowball.opencode');
-  assert.equal(manifest.kind, 'harness');
-
-  const observeOps = manifest.capabilities.filter(c => c.access === 'observe').map(c => c.operation);
-  const controlOps = manifest.capabilities.filter(c => c.access === 'control').map(c => c.operation);
-
-  assert.ok(observeOps.includes('harness.status'));
-  assert.ok(observeOps.includes('harness.list'));
-  assert.ok(observeOps.includes('harness.read'));
-  assert.ok(observeOps.includes('harness.refreshAuth'));
-
-  assert.ok(controlOps.includes('harness.connect'));
-  assert.ok(controlOps.includes('harness.create'));
-  assert.ok(controlOps.includes('harness.execute'));
-  assert.ok(controlOps.includes('harness.disconnect'));
+  assert.ok(!manifest.capabilities.some(c=>['harness.create','harness.execute'].includes(c.operation)));
+});
+test('OpenCode 401 is not connected and an unrelated HTTP 200 is not healthy',async t=>{
+  for (const [status,body] of [[401,{}],[200,{status:'ok'}]]) {
+    const baseUrl=await fixture(t,(_req,res)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(body));});
+    const adapter=new OpenCodeOwnedAdapter({...binding,baseUrl});
+    try { await adapter.initialize(); } catch {}
+    assert.equal(adapter.status().connected,false);
+    await assert.rejects(adapter.listSessions(),{code:'not_connected'});
+  }
+});
+test('unreviewed OpenCode server versions cannot appear connected',async t=>{
+  const baseUrl=await fixture(t,(_req,res)=>{res.setHeader('Content-Type','application/json');res.end(JSON.stringify({healthy:true,version:'1.18.32'}));});
+  const adapter=new OpenCodeOwnedAdapter({...binding,baseUrl});
+  await assert.rejects(adapter.initialize(),{code:'unsupported_version'});
+  assert.equal(adapter.status().connected,false);
+  await assert.rejects(adapter.listSessions(),{code:'not_connected'});
+});
+test('OpenCode rejects remote endpoints, embedded credentials and redirects without forwarding secrets', async t=>{
+  for (const baseUrl of ['http://192.168.1.1:4096','https://127.0.0.1','http://u:p@127.0.0.1','http://127.0.0.1/path']) assert.throws(()=>new OpenCodeOwnedAdapter({...binding,baseUrl}),{code:'local_endpoint_required'});
+  let contacted=0;
+  const target=await fixture(t,(_req,res)=>{contacted++;res.end('{}');});
+  const baseUrl=await fixture(t,(_req,res)=>{res.writeHead(302,{Location:target});res.end();});
+  const adapter=new OpenCodeOwnedAdapter({...binding,baseUrl,authPassword:'secret'});
+  await assert.rejects(adapter.initialize()); assert.equal(contacted,0);
 });
 
-test('MW.03.02.01.02.A1: OpenCode auth detection, session lifecycle (create, list, read) and session identity', async t => {
-  const server = new MockOpenCodeServer();
-  await server.start();
-  t.after(() => server.stop());
-
-  const adapter = new OpenCodeOwnedAdapter({
-    hostId,
-    instanceId,
-    baseUrl: `http://127.0.0.1:${server.port}`,
-  });
-  await adapter.initialize();
-  t.after(() => adapter.stop());
-
-  const status = adapter.status();
-  assert.equal(status.connected, true);
-  assert.equal(status.auth, 'not_required');
-  assert.equal(status.surface, 'http-sse');
-
-  // List existing sessions before creation: all existing sessions should be read-only
-  const initialSessions = await adapter.listSessions();
-  assert.equal(initialSessions.length, 1);
-  assert.equal(initialSessions[0].nativeId, 'existing-1');
-  assert.equal(initialSessions[0].readOnly, true);
-  assert.equal(initialSessions[0].ownerId, null);
-
-  // Create a new owned session
-  const created = await adapter.createSession('/workspace/project-alpha');
-  assert.ok(created.sessionKey);
-  assert.equal(created.ownerId, adapter.ownerId);
-
-  // List sessions again: created session must be owned, existing session remains read-only
-  const updatedSessions = await adapter.listSessions();
-  assert.equal(updatedSessions.length, 2);
-  const owned = updatedSessions.find(s => s.nativeId === 'session-2');
-  assert.ok(owned);
-  assert.equal(owned.readOnly, false);
-  assert.equal(owned.ownerId, adapter.ownerId);
-  assert.equal(owned.sessionKey, created.sessionKey);
-
-  // Read session
-  const read = await adapter.readSession('session-2');
-  assert.equal(read.nativeId, 'session-2');
-  assert.equal(read.readOnly, false);
+test('OpenCode health alone cannot claim connection; redirected or oversized session lists fail closed', async t=>{
+  let targetCalls=0;
+  const target=await fixture(t,(_req,res)=>{targetCalls++;res.end('[]');});
+  for(const kind of ['redirect','oversized','duplicate']){
+    const baseUrl=await fixture(t,(req,res)=>{
+      if(req.url==='/global/health'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({healthy:true,version:'1.18.31'}));return;}
+      if(kind==='redirect'){res.writeHead(302,{Location:target});res.end();return;}
+      res.setHeader('Content-Type','application/json');
+      res.end(kind==='oversized'?' '.repeat(1024*1024+1):JSON.stringify([{id:'same'},{id:'same'}]));
+    });
+    const adapter=new OpenCodeOwnedAdapter({...binding,baseUrl,authPassword:'secret'});
+    await assert.rejects(adapter.initialize());
+    assert.equal(adapter.status().connected,false);
+    await assert.rejects(adapter.listSessions(),{code:'not_connected'});
+  }
+  assert.equal(targetCalls,0);
 });
 
-test('MW.03.02.01.02.A1: OpenCode command dispatch (send, interrupt, decision) and owner protection', async t => {
-  const server = new MockOpenCodeServer();
-  await server.start();
-  t.after(() => server.stop());
-
-  const adapter = new OpenCodeOwnedAdapter({
-    hostId,
-    instanceId,
-    baseUrl: `http://127.0.0.1:${server.port}`,
+test('OpenCode read rejects redirects and mismatched identities; later 401 revokes ready state',async t=>{
+  let targetCalls=0;
+  const target=await fixture(t,(_req,res)=>{targetCalls++;res.end('{}');});
+  let mode='redirect';
+  const baseUrl=await fixture(t,(req,res)=>{
+    if(req.url==='/global/health'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({healthy:true,version:'1.18.31'}));return;}
+    if(req.url==='/session'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify([{id:'existing'}]));return;}
+    if(mode==='redirect'){res.writeHead(302,{Location:target});res.end();return;}
+    if(mode==='mismatch'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({id:'different'}));return;}
+    res.writeHead(401);res.end();
   });
-  await adapter.initialize();
-  t.after(() => adapter.stop());
-
-  const created = await adapter.createSession('/workspace/project-beta');
-  const signal = new AbortController().signal;
-
-  // 1. Send message
-  const sendEnvelope = {
-    command: {
-      input: {
-        commandId: 'cmd-send-1',
-        actorId: 'ctl_test',
-        ownerId: adapter.ownerId,
-        sessionKey: created.sessionKey,
-        operation: 'sessions.send',
-        payload: { text: 'Hello from Snowball' },
-        expectedRevision: 0,
-      },
-    },
-  };
-  const sendReceipt = await adapter.execute(sendEnvelope, signal);
-  assert.equal(sendReceipt.status, 'acknowledged');
-  assert.ok(sendReceipt.correlationId);
-  assert.equal(server.messages.length, 1);
-  assert.equal(server.messages[0].text, 'Hello from Snowball');
-
-  // 2. Interrupt turn
-  const interruptEnvelope = {
-    command: {
-      input: {
-        commandId: 'cmd-int-1',
-        actorId: 'ctl_test',
-        ownerId: adapter.ownerId,
-        sessionKey: created.sessionKey,
-        operation: 'sessions.interrupt',
-        payload: { turnId: sendReceipt.correlationId },
-        expectedRevision: 1,
-      },
-    },
-  };
-  const intReceipt = await adapter.execute(interruptEnvelope, signal);
-  assert.equal(intReceipt.status, 'acknowledged');
-  assert.equal(server.aborted.length, 1);
-
-  // 3. Resolve decision
-  const decisionEnvelope = {
-    command: {
-      input: {
-        commandId: 'cmd-dec-1',
-        actorId: 'ctl_test',
-        ownerId: adapter.ownerId,
-        sessionKey: created.sessionKey,
-        operation: 'decisions.resolve',
-        payload: { answer: 'accept' },
-        expectedRevision: 2,
-      },
-    },
-    decision: {
-      decisionId: 'dec-1',
-      sessionKey: created.sessionKey,
-      ownerId: adapter.ownerId,
-      status: 'pending',
-      revision: 0,
-      updatedAt: Date.now(),
-    },
-  };
-  const decReceipt = await adapter.execute(decisionEnvelope, signal);
-  assert.equal(decReceipt.status, 'acknowledged');
-  assert.equal(server.decisions.length, 1);
-  assert.equal(server.decisions[0].answer, 'accept');
-
-  // 4. Wrong owner or unowned session rejected
-  const wrongOwnerEnvelope = structuredClone(sendEnvelope);
-  wrongOwnerEnvelope.command.input.ownerId = 'other-owner';
-  const wrongReceipt = await adapter.execute(wrongOwnerEnvelope, signal);
-  assert.equal(wrongReceipt.status, 'not_sent');
-  assert.equal(wrongReceipt.reason, 'owner_mismatch');
+  const adapter=new OpenCodeOwnedAdapter({...binding,baseUrl,authPassword:'secret'});
+  t.after(()=>adapter.stop());await adapter.initialize();
+  await assert.rejects(adapter.readSession('existing'));
+  assert.equal(targetCalls,0);
+  mode='mismatch';await assert.rejects(adapter.readSession('existing'),{code:'invalid_session'});
+  mode='expired';await assert.rejects(adapter.readSession('existing'),{code:'needs_auth'});
+  assert.equal(adapter.status().connected,false);assert.equal(adapter.status().auth,'needs_auth');
 });
 
-test('MW.03.02.01.02.A1: OpenCode external turn revokes local ownership via SSE', async t => {
-  const server = new MockOpenCodeServer();
-  await server.start();
-  t.after(() => server.stop());
-
-  const adapter = new OpenCodeOwnedAdapter({
-    hostId,
-    instanceId,
-    baseUrl: `http://127.0.0.1:${server.port}`,
+test('OpenCode model catalog comes from the native provider endpoint without invented effort values',async t=>{
+  const baseUrl=await fixture(t,(req,res)=>{
+    res.setHeader('Content-Type','application/json');
+    if(req.url==='/global/health')res.end(JSON.stringify({healthy:true,version:'1.18.31'}));
+    else if(req.url==='/session')res.end('[]');
+    else if(req.url==='/config/providers')res.end(JSON.stringify({providers:[{id:'provider',models:{'model-v1':{id:'model-v1',providerID:'provider',name:'Real model',variants:{high:{}}}}}],default:{}}));
+    else{res.writeHead(404);res.end('{}');}
   });
-  await adapter.initialize();
-  t.after(() => adapter.stop());
-
-  const created = await adapter.createSession('/workspace/project-gamma');
-  let ownerLostEvent;
-  adapter.once('ownerLost', ev => { ownerLostEvent = ev; });
-
-  // Wait briefly for SSE stream to establish
-  await new Promise(r => setTimeout(r, 100));
-
-  // Server broadcasts that a foreign turn started on our session
-  server.broadcast('turn/started', { sessionId: 'session-2', turnId: 'foreign-turn-999' });
-
-  // Wait for event to propagate
-  await new Promise(r => setTimeout(r, 150));
-
-  assert.ok(ownerLostEvent);
-  assert.equal(ownerLostEvent.sessionKey, created.sessionKey);
-  assert.equal(ownerLostEvent.reason, 'external_turn');
-
-  // After ownership lost, sending must fail with owner_mismatch
-  const envelope = {
-    command: {
-      input: {
-        commandId: 'cmd-after-lost',
-        actorId: 'ctl_test',
-        ownerId: adapter.ownerId,
-        sessionKey: created.sessionKey,
-        operation: 'sessions.send',
-        payload: { text: 'should not send' },
-        expectedRevision: 0,
-      },
-    },
-  };
-  const receipt = await adapter.execute(envelope, new AbortController().signal);
-  assert.equal(receipt.status, 'not_sent');
-  assert.equal(receipt.reason, 'owner_mismatch');
+  const adapter=new OpenCodeOwnedAdapter({...binding,baseUrl});
+  t.after(()=>adapter.stop());await adapter.initialize();
+  assert.deepEqual(await adapter.listModels(),[{model:'provider/model-v1',displayName:'Real model',efforts:[],defaultEffort:null}]);
+  const manifest=await opencodeManifest();
+  assert.ok(manifest.capabilities.some(c=>c.operation==='harness.models'&&c.access==='observe'));
 });

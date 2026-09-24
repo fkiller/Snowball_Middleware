@@ -1,3 +1,5 @@
+> **2026-09-21 review:** historical evidence below does not establish current task completion. Current status: needs_review. See [the integrity audit](../../AUDIT.md) and PLAN.json for reopened checks, fixture limits and next actions.
+
 # MW.07.02.01.01 — Review/명시 Send와 음성 lifecycle 복구 검증
 
 - **Date**: 2026-09-19

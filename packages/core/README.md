@@ -11,5 +11,5 @@ independent controller context, volatile connection leases and versioned offline
 restore. See `docs/ADR-004-DEVICE-REGISTRY.md`. The API/SDK are separate packages.
 Next: physical HID discovery/identification; no real hardware backend is implied.
 Core imports
-only `node:` builtins; it never imports reference/legacy-host or a concrete
+`node:` builtins and the public, data-only identity/dispatch SDK; it never imports reference/legacy-host or a concrete
 hardware/harness implementation.

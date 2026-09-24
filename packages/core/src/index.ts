@@ -85,8 +85,11 @@ export {
   SessionFault,
   type SessionSummary,
   type SessionServiceOptions,
+  type SessionMetadataPort,
   type HarnessAdapter,
 } from './sessions.js';
+export { SessionMetadataStore, type StoredSessionMetadata } from './session-metadata.js';
+export { SessionCreateStore, type CreateIntent } from './session-creates.js';
 export {
   VoiceDraftManager,
   VoiceDraftFault,

@@ -57,6 +57,8 @@ export class PluginHost extends EventEmitter {
       if (digest !== m.integrity.entrySha256) throw new PluginFault('untrusted', 'Entrypoint integrity mismatch');
       if (generation !== this.generation || this.state !== 'starting') throw new PluginFault('cancelled', 'Start cancelled');
       const env: NodeJS.ProcessEnv = {};
+      // The bundled Electron executable serves as Node for isolated plugin workers.
+      if (process.versions.electron) env.ELECTRON_RUN_AS_NODE = '1';
       for (const key of ['PATH', 'SystemRoot', 'TEMP', 'TMP', 'HOME', 'USERPROFILE', 'LANG']) if (process.env[key]) env[key] = process.env[key];
       const child = spawn(process.execPath, [entry], { cwd: directory, shell: false, windowsHide: true, stdio: 'pipe', env });
       this.child = child;
@@ -137,6 +139,8 @@ export class PluginHost extends EventEmitter {
           else pending.resolve(message.result);
         } else {
           if (this.state !== 'ready') throw new PluginFault('protocol', 'Event before initialization');
+          const namespace = this.manifest.kind === 'hardware' ? 'device.' : this.manifest.kind === 'harness' ? 'harness.' : 'speech.';
+          if (!message.params.event.startsWith(namespace)) throw new PluginFault('protocol', 'Event outside plugin kind scope');
           if (message.params.sequence <= this.eventSequence) throw new PluginFault('protocol', 'Event sequence regression');
           if (Date.now() - this.eventWindow >= 1000) { this.eventWindow = Date.now(); this.eventCount = 0; }
           if (++this.eventCount > this.options.maxEventsPerSecond) throw new PluginFault('limit', 'Plugin event rate exceeded');

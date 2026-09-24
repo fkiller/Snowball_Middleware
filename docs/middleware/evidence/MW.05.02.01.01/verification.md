@@ -1,3 +1,5 @@
+> **2026-09-21 review:** historical evidence below does not establish current task completion. Current status: needs_review. See [the integrity audit](../../AUDIT.md) and PLAN.json for reopened checks, fixture limits and next actions.
+
 # MW.05.02.01.01 — 기존 작업 attach와 새 task 전체 왕복 검증
 
 - **Date**: 2026-09-19

@@ -1,3 +1,5 @@
+> **2026-09-21 review:** historical evidence below does not establish current task completion. Current status: needs_review. See [the integrity audit](../../AUDIT.md) and PLAN.json for reopened checks, fixture limits and next actions.
+
 # Verification Evidence: MW.09.02.01.01 (Paired local host 집계와 장애 분리)
 
 ## Task Information

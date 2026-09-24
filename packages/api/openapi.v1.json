@@ -3,7 +3,7 @@
   "info": {
     "title": "Snowball local middleware API",
     "version": "1.0.0",
-    "description": "Local control only. Exact numeric loopback Host required. Origin required for POST and validated whenever present. Body limit 128 KiB; snapshot limit 8 MiB. No CORS, cookies, external listener, auto dispatch or credential-bearing URLs."
+    "description": "Loopback local control. Normal runtime has no login/PIN. Exact Host and same-origin mutation checks apply in both modes; no CORS or external listener. Optional token mode is explicitly selected by the operator. Queue admission is not an execution receipt; a composed runtime dispatches admitted commands through SessionService."
   },
   "servers": [
     {
@@ -17,6 +17,7 @@
     }
   ],
   "security": [
+    {},
     {
       "LocalSession": []
     }
@@ -411,6 +412,45 @@
         }
       }
     },
+    "/v1/harness/connect-codex": {
+      "post": {
+        "operationId": "connectCodex",
+        "description": "Open native Codex CLI executable, existing home and working-directory pickers; verify version and SHA-256; ask the user to review the exact launch. The browser supplies no path, account or command. A successful connection registers a new explicit instance; existing sessions remain read-only until attached.",
+        "parameters": [
+          { "name": "Origin", "in": "header", "required": true, "schema": { "type": "string" } },
+          { "name": "X-Snowball-CSRF", "in": "header", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false } } } },
+        "responses": {
+          "200": { "description": "Native reviewed instance connected and private selection saved.", "content": { "application/json": { "schema": { "type": "object", "required": ["instanceId", "snapshot"], "additionalProperties": false, "properties": { "instanceId": { "type": "string" }, "snapshot": { "$ref": "#/components/schemas/Snapshot" } } } } } },
+          "default": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/v1/harness/disconnect-codex": {
+      "post": {
+        "operationId": "disconnectCodex",
+        "description": "After native confirmation, remove one saved middleware-owned Codex instance. Its observed tasks remain read-only and unknown commands are never replayed.",
+        "parameters": [
+          { "name": "Origin", "in": "header", "required": true, "schema": { "type": "string" } },
+          { "name": "X-Snowball-CSRF", "in": "header", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["instanceId"], "additionalProperties": false, "properties": { "instanceId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" } } } } } },
+        "responses": { "200": { "description": "Saved instance removed after native confirmation.", "content": { "application/json": { "schema": { "type": "object", "required": ["snapshot"], "additionalProperties": false, "properties": { "snapshot": { "$ref": "#/components/schemas/Snapshot" } } } } } }, "default": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/harness/reset-codex": {
+      "post": {
+        "operationId": "resetCodex",
+        "description": "Native-confirmed repair of all saved Codex connection references. Does not delete the provider login home or middleware task history.",
+        "parameters": [
+          { "name": "Origin", "in": "header", "required": true, "schema": { "type": "string" } },
+          { "name": "X-Snowball-CSRF", "in": "header", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false } } } },
+        "responses": { "200": { "description": "Saved Codex references cleared after native confirmation.", "content": { "application/json": { "schema": { "type": "object", "required": ["snapshot"], "additionalProperties": false, "properties": { "snapshot": { "$ref": "#/components/schemas/Snapshot" } } } } } }, "default": { "$ref": "#/components/responses/Error" } }
+      }
+    },
     "/v1/workspaces/{workspaceId}/recheck": {
       "post": {
         "operationId": "recheckWorkspace",
@@ -548,6 +588,320 @@
           },
           "default": {
             "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/v1/harness/sessions": {
+      "post": {
+        "operationId": "refreshHarnessSessions",
+        "description": "Uses an explicitly connected local harness. Discovery never launches it.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "pluginId"
+                ],
+                "properties": {
+                  "pluginId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current local snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Scope mismatch or control paused"
+          },
+          "503": {
+            "description": "No connected runtime or provider unavailable"
+          }
+        }
+      }
+    },
+    "/v1/harness/models": {
+      "post": {
+        "operationId": "listHarnessModels",
+        "description": "Uses an explicitly connected local harness. Discovery never launches it.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "pluginId",
+                  "instanceId"
+                ],
+                "properties": {
+                  "pluginId": {
+                    "type": "string"
+                  },
+                  "instanceId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Actual selected-provider catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ModelDescriptor"
+                      }
+                    }
+                  },
+                  "required": [
+                    "models"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Scope mismatch or control paused"
+          },
+          "503": {
+            "description": "No connected runtime or provider unavailable"
+          }
+        }
+      }
+    },
+    "/v1/sessions/attach": {
+      "post": {
+        "operationId": "attachHarnessSession",
+        "description": "Uses an explicitly connected local harness. Discovery never launches it.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "sessionKey"
+                ],
+                "properties": {
+                  "sessionKey": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current local snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Scope mismatch or control paused"
+          },
+          "503": {
+            "description": "No connected runtime or provider unavailable"
+          }
+        }
+      }
+    },
+    "/v1/sessions/create": {
+      "post": {
+        "operationId": "createHarnessSession",
+        "description": "Creates a real session using a registered workspace and durable client request ID. The same ID never launches native creation twice. An unconfirmed result requires explicit native-session inspection; no automatic replay.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "pluginId",
+                  "instanceId",
+                  "workspaceId",
+                  "requestId"
+                ],
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Stable ID for this user creation attempt; retain across timeout and restart"
+                  },
+                  "pluginId": {
+                    "type": "string"
+                  },
+                  "instanceId": {
+                    "type": "string"
+                  },
+                  "workspaceId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 128
+                  },
+                  "model": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Native session key, current owner (nullable on read-only recovery), restoredReadOnly and updated snapshot"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "409": {
+            "description": "Paused, mismatched instance, duplicate uncertain request or request-ID input mismatch"
+          },
+          "503": {
+            "description": "Provider unavailable or creation result unconfirmed; inspect session list before retry"
+          }
+        }
+      }
+    },
+    "/v1/sessions/create-status": {
+      "post": {
+        "operationId": "readHarnessSessionCreateReceipt",
+        "description": "Read a durable creation receipt by request ID. Unconfirmed means native creation may or may not have occurred; inspect the native session list and attach an exact selected session manually.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false, "required": ["requestId"], "properties": { "requestId": { "type": "string", "format": "uuid" } } } } } },
+        "responses": { "200": { "description": "confirmed with sessionKey, or unconfirmed without one" }, "404": { "description": "Unknown request ID" } }
+      }
+    },
+    "/v1/settings": {
+      "get": {
+        "operationId": "getLocalSettings",
+        "responses": {
+          "200": {
+            "description": "Applied local settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "settings": {
+                      "$ref": "#/components/schemas/LocalSettings"
+                    }
+                  },
+                  "required": [
+                    "settings"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateLocalSettings",
+        "description": "Revision-checked settings; native autostart must apply before success. No mutation is automatically retried.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "patch": {
+                    "type": "object",
+                    "properties": {
+                      "autostart": {
+                        "type": "boolean"
+                      },
+                      "language": {
+                        "type": "string",
+                        "enum": [
+                          "ko",
+                          "en"
+                        ]
+                      },
+                      "controlPaused": {
+                        "type": "boolean"
+                      },
+                      "notifications": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "expectedRevision",
+                  "patch"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Applied local settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "settings": {
+                      "$ref": "#/components/schemas/LocalSettings"
+                    }
+                  },
+                  "required": [
+                    "settings"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale revision, busy settings or unavailable native autostart"
+          },
+          "503": {
+            "description": "Native or persistence side effect failed"
           }
         }
       }
@@ -979,6 +1333,12 @@
                 "expiresAt": {
                   "type": "integer",
                   "minimum": 0
+                },
+                "allowedAnswers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
               },
               "required": [
@@ -986,7 +1346,8 @@
                 "sessionKey",
                 "ownerId",
                 "status",
-                "revision"
+                "revision",
+                "allowedAnswers"
               ],
               "additionalProperties": false
             }
@@ -1041,6 +1402,7 @@
                   "enum": [
                     "virtual",
                     "hid",
+                    "serial",
                     "lan"
                   ]
                 },
@@ -1143,6 +1505,7 @@
                   "enum": [
                     "virtual",
                     "hid",
+                    "serial",
                     "lan"
                   ]
                 },
@@ -1226,6 +1589,123 @@
           },
           "workspaceSelectionAvailable": {
             "type": "boolean"
+          },
+          "accessMode": {
+            "type": "string",
+            "enum": [
+              "local-no-auth",
+              "token"
+            ]
+          },
+          "desktopCapabilities": {
+            "type": "object",
+            "properties": {
+              "tray": {
+                "type": "boolean"
+              },
+              "autostart": {
+                "type": "boolean"
+              },
+              "codexSelection": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "tray",
+              "autostart"
+            ],
+            "additionalProperties": false
+          },
+          "settings": {
+            "$ref": "#/components/schemas/LocalSettings"
+          },
+          "sessionDetails": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionSummary"
+            }
+          },
+          "connectedHarnesses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HarnessBinding"
+            }
+          },
+          "sessionMessages": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "maxItems": 4,
+              "items": {
+                "$ref": "#/components/schemas/SessionMessage"
+              }
+            },
+            "description": "Bounded live projection: at most 64 sessions; not full native history."
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "workspaceCandidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "candidateId": {
+                  "type": "string"
+                },
+                "harness": {
+                  "type": "object",
+                  "properties": {
+                    "pluginId": {
+                      "type": "string"
+                    },
+                    "instanceId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "pluginId",
+                    "instanceId"
+                  ],
+                  "additionalProperties": false
+                },
+                "nativeProjectId": {
+                  "type": "string"
+                },
+                "root": {
+                  "type": "string"
+                },
+                "displayName": {
+                  "type": "string"
+                },
+                "workspaceId": {
+                  "type": "string",
+                  "description": "Exact registered-root association when one exists; discovery alone grants no workspace access."
+                }
+              },
+              "required": [
+                "candidateId",
+                "harness",
+                "nativeProjectId",
+                "root",
+                "displayName"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "realSessions": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Legacy observation-only projection; never ownership evidence."
+          },
+          "turnsStore": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Legacy transcript projection; production runtime uses bounded sessionMessages."
           }
         },
         "required": [
@@ -1404,6 +1884,226 @@
             ]
           }
         }
+      },
+      "LocalSettings": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "autostart": {
+            "type": "boolean"
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "ko",
+              "en"
+            ],
+            "description": "Native tray menu and notification language; Web UI is currently Korean."
+          },
+          "controlPaused": {
+            "type": "boolean"
+          },
+          "notifications": {
+            "type": "boolean",
+            "description": "Native tray OS alerts for newly pending decisions or uncertain/failed commands; no task content in OS notifications."
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "autostart",
+          "language",
+          "controlPaused",
+          "notifications",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "SessionSummary": {
+        "type": "object",
+        "properties": {
+          "sessionKey": {
+            "type": "string"
+          },
+          "nativeSessionId": {
+            "type": "string"
+          },
+          "harnessPluginId": {
+            "type": "string"
+          },
+          "harnessInstanceId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "preview": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string",
+            "pattern": "^ws_[0-9a-f]{16}$",
+            "description": "Registered local workspace selected when this session was created, when known"
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "ownerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "busy",
+              "error"
+            ]
+          },
+          "activeTurnId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "sessionKey",
+          "nativeSessionId",
+          "harnessPluginId",
+          "harnessInstanceId",
+          "title",
+          "preview",
+          "cwd",
+          "readOnly",
+          "ownerId",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "SessionMessage": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "const": "agent"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "turnId": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "role",
+          "text",
+          "turnId",
+          "receivedAt",
+          "truncated"
+        ],
+        "additionalProperties": false
+      },
+      "HarnessBinding": {
+        "type": "object",
+        "properties": {
+          "pluginId": {
+            "type": "string"
+          },
+          "instanceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "connected": {
+            "type": "boolean"
+          },
+          "auth": {
+            "type": "string"
+          },
+          "sessionListTruncated": {
+            "type": "boolean"
+          },
+          "disabled": {
+            "type": "boolean"
+          },
+          "canAttach": {
+            "type": "boolean"
+          },
+          "canCreate": {
+            "type": "boolean"
+          },
+          "canListModels": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pluginId",
+          "instanceId",
+          "connected",
+          "auth",
+          "sessionListTruncated",
+          "disabled",
+          "canAttach",
+          "canCreate",
+          "canListModels"
+        ],
+        "additionalProperties": false
+      },
+      "ModelDescriptor": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "efforts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "defaultEffort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "model",
+          "displayName",
+          "efforts",
+          "defaultEffort"
+        ],
+        "additionalProperties": false
       }
     },
     "responses": {

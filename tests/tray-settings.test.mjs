@@ -105,10 +105,11 @@ test('A2 acceptance: Settings change/cancel and tray reflect same revision; secr
   );
 
   // Valid revision update succeeds
-  const res2 = await client.updateSettings(1, { language: 'en', autostart: true });
+  await assert.rejects(client.updateSettings(1, { autostart: true }), e => e.code === 'autostart_unavailable');
+  const res2 = await client.updateSettings(1, { language: 'en' });
   assert.equal(res2.settings.revision, 2);
   assert.equal(res2.settings.language, 'en');
-  assert.equal(res2.settings.autostart, true);
+  assert.equal(res2.settings.autostart, false);
 
   // URL and response contain NO secrets
   const jsonStr = JSON.stringify(res2);

@@ -1,3 +1,5 @@
+> **2026-09-21 review:** historical evidence below does not establish current task completion. Current status: blocked. See [the integrity audit](../../AUDIT.md) and PLAN.json for reopened checks, fixture limits and next actions.
+
 # MW.08.02.01.01 — 서명·업데이트·rollback·uninstall 검증
 
 - **Date**: 2026-09-19

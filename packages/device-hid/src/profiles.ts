@@ -19,5 +19,5 @@ export const mk20QmkProfile: HidProfile = {
   identificationButton: 'btn-1'
 };
 
-/** Reviewed and physically verified profiles. */
-export const reviewedProfiles: readonly HidProfile[] = [mk20QmkProfile];
+/** Candidate report mapping lacks physical neutral/press/release and macOS evidence. */
+export const reviewedProfiles: readonly HidProfile[] = [];

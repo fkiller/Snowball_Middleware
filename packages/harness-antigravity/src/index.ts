@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { formatSessionKey, parseSessionKey, type DispatchPort, type DispatchReceipt, type CommandRecord, type DecisionRecord } from '@snowball/core';
+import { formatSessionKey, parseSessionKey, type DispatchPort, type DispatchReceipt, type CommandRecord, type DecisionRecord } from '@snowball/plugin-sdk';
 export { antigravityManifest } from './manifest.js';
 
 export interface AntigravityBinding {
@@ -62,6 +62,18 @@ export class AntigravityObserverAdapter extends EventEmitter implements Dispatch
     };
   }
 
+  private transcriptPath(conversationId: string): string {
+    if (typeof conversationId !== 'string' || !/^[0-9a-fA-F-]{8,64}$/.test(conversationId)) throw new Error('invalid_session_id');
+    const root = fs.realpathSync(this.#brainDir);
+    const file = path.join(root, conversationId, '.system_generated', 'logs', 'transcript.jsonl');
+    if (!fs.existsSync(file)) return file;
+    const resolved = fs.realpathSync(file);
+    const relative = path.relative(root, resolved);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('transcript_outside_root');
+    if (fs.statSync(resolved).size > 4 * 1024 * 1024) throw new Error('transcript_limit');
+    return resolved;
+  }
+
   private sessionKey(conversationId: string): string {
     return formatSessionKey({
       hostId: this.#binding.hostId,
@@ -88,7 +100,8 @@ export class AntigravityObserverAdapter extends EventEmitter implements Dispatch
 
     for (const dir of dirs) {
       let preview = `Conversation ${dir.id.slice(0, 8)}`;
-      const transcriptPath = path.join(dir.dirPath, '.system_generated', 'logs', 'transcript.jsonl');
+      let transcriptPath: string;
+      try { transcriptPath = this.transcriptPath(dir.id); } catch { continue; }
       if (fs.existsSync(transcriptPath)) {
         try {
           const content = fs.readFileSync(transcriptPath, 'utf8');
@@ -126,7 +139,7 @@ export class AntigravityObserverAdapter extends EventEmitter implements Dispatch
   }
 
   async readSession(conversationId: string): Promise<{ nativeId: string; readOnly: true; turns: AntigravityTurn[] }> {
-    const transcriptPath = path.join(this.#brainDir, conversationId, '.system_generated', 'logs', 'transcript.jsonl');
+    const transcriptPath = this.transcriptPath(conversationId);
     if (!fs.existsSync(transcriptPath)) {
       throw new Error(`Session ${conversationId} transcript not found`);
     }
@@ -151,7 +164,7 @@ export class AntigravityObserverAdapter extends EventEmitter implements Dispatch
 
   watchSession(conversationId: string): void {
     if (this.#watchers.has(conversationId)) return;
-    const transcriptPath = path.join(this.#brainDir, conversationId, '.system_generated', 'logs', 'transcript.jsonl');
+    const transcriptPath = this.transcriptPath(conversationId);
     if (!fs.existsSync(transcriptPath)) return;
 
     let offset = 0;
@@ -159,9 +172,9 @@ export class AntigravityObserverAdapter extends EventEmitter implements Dispatch
 
     const watcher = fs.watch(transcriptPath, () => {
       try {
-        const stat = fs.statSync(transcriptPath);
+        const stat = fs.statSync(this.transcriptPath(conversationId));
         if (stat.size > offset) {
-          const fd = fs.openSync(transcriptPath, 'r');
+          const fd = fs.openSync(this.transcriptPath(conversationId), 'r');
           const length = stat.size - offset;
           const buf = Buffer.alloc(length);
           fs.readSync(fd, buf, 0, length, offset);

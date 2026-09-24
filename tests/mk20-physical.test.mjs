@@ -1,8 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { compatibility, requireProductionControl, decodeLegacyInput, encodeLegacyPreview, Mk20LabTransport } from '../../Snowball_Control/plugins/device-mk20/src/index.mjs';
+const enabled = process.env.SNOWBALL_TEST_MK20 === '1';
+const plugin = enabled ? await import('../../Snowball_Control/plugins/device-mk20/src/index.mjs') : {};
+const { compatibility, requireProductionControl, decodeLegacyInput, Mk20LabTransport } = plugin;
 
-test('MW.04.02.01.02.A1: real physical MK20 independent device network preview and pairing boundary', async t => {
+test('MW.04.02.01.02.A1: real physical MK20 independent device network preview and pairing boundary', { skip: !enabled }, async t => {
+  assert.ok(process.env.SNOWBALL_MK20_LOCAL_ADDRESS && process.env.SNOWBALL_MK20_TARGET_ADDRESS, 'Explicit MK20 addresses required');
   // Verify adapter compatibility
   const compat = compatibility();
   assert.equal(compat.model, 'MK20');
@@ -13,8 +16,8 @@ test('MW.04.02.01.02.A1: real physical MK20 independent device network preview a
   // Verify real physical UDP preview transmission to live MK20 at 192.168.1.248:7701
   const transport = new Mk20LabTransport({
     labEnabled: true,
-    localAddress: '192.168.1.225',
-    targetAddress: '192.168.1.248',
+    localAddress: process.env.SNOWBALL_MK20_LOCAL_ADDRESS,
+    targetAddress: process.env.SNOWBALL_MK20_TARGET_ADDRESS,
     targetPort: 7701
   });
   t.after(async () => { await transport.close(); });
@@ -38,7 +41,7 @@ test('MW.04.02.01.02.A1: real physical MK20 independent device network preview a
   await transport.close();
 });
 
-test('MW.04.02.01.02.A2: production control fail-closed requirement and bounded legacy decoding', () => {
+test('MW.04.02.01.02.A2: production control fail-closed requirement and bounded legacy decoding', { skip: !enabled }, () => {
   assert.throws(() => requireProductionControl({ authenticated: true }), /authenticated_firmware_required/);
 
   const packet = Buffer.from(JSON.stringify({ type: 'key', keyId: 1, isDown: true, seq: 10 }));

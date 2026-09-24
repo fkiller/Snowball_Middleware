@@ -9,13 +9,13 @@ import {
 } from '../packages/core/dist/index.js';
 import { LocalApi } from '../packages/api/dist/index.js';
 
-test('MW.08.02.01.02.A1: G0-G3 tasks complete with evidence; blocked review checkpoints never counted as pass', async t => {
+test('MW.08.02.01.02.A1: completed task records are internally consistent (not a platform gate); blocked review checkpoints never counted as pass', async t => {
   const planPath = path.resolve('docs/middleware/PLAN.json');
   const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
 
   // 1. Verify all 'done' tasks have completedSteps, changedFiles, and passing acceptance checks with evidence
   const doneTasks = plan.nodes.filter(n => n.kind === 'task' && n.status === 'done');
-  assert.ok(doneTasks.length >= 26, 'Expected at least 26 completed tasks');
+  // Counts are not evidence of product readiness; review may reopen completed tasks.
   for (const task of doneTasks) {
     assert.ok(task.checkpoint?.completedSteps?.length > 0, `Task ${task.id} missing completedSteps`);
     assert.ok(task.checkpoint?.changedFiles?.length > 0, `Task ${task.id} missing changedFiles`);

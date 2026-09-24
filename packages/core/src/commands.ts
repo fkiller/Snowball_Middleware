@@ -6,11 +6,8 @@ export interface JournalOptions {
   directory: string; hostId: string; now?: () => number;
   maxSessionPending?: number; maxTotalPending?: number; maxJournalBytes?: number; dispatchTimeoutMs?: number;
 }
-export type DispatchReceipt = { status: 'acknowledged' | 'completed'; correlationId: string } | { status: 'not_sent'; reason: string };
-export interface DispatchPort {
-  ownerId: string;
-  execute(envelope: { command: CommandRecord; decision?: DecisionRecord }, signal: AbortSignal): Promise<DispatchReceipt>;
-}
+import type { DispatchPort, DispatchReceipt } from '@snowball/plugin-sdk';
+export type { DispatchPort, DispatchReceipt } from '@snowball/plugin-sdk';
 export interface CommandProof {
   commandId: string; sessionKey: string; ownerId: string; correlationId: string;
   outcome: 'acknowledged' | 'completed' | 'not_delivered';

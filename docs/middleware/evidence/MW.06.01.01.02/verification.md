@@ -1,3 +1,7 @@
+> **2026-09-23 continuation:** The real Electron tray now includes `Codex CLI 연결…` and uses the same reviewed native picker/enrollment operation as the wizard. The selected connection lives in private state; an invalid saved provider does not prevent opening the local UI, and the tray marks degraded status for that case. Browser onboarding can invoke native-confirmed disconnect/reset. Native loopback/no-PIN/pause/zero-main-window smoke passed; real CLI read-only dynamic enrollment, restart restore and disconnect passed. Native dialog interaction, OS login item change and macOS remain outstanding; task stays needs_review.
+
+> **2026-09-21 review:** historical evidence below does not establish current task completion. Current status: needs_review. See [the integrity audit](../../AUDIT.md) and PLAN.json for reopened checks, fixture limits and next actions.
+
 # MW.06.01.01.02 — Tray-only shell과 Settings (completed)
 
 Task status: DONE; A1 and A2 PASS.

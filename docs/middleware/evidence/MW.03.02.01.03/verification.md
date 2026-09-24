@@ -1,3 +1,5 @@
+> **2026-09-21 review:** historical evidence below does not establish current task completion. Current status: needs_review. See [the integrity audit](../../AUDIT.md) and PLAN.json for reopened checks, fixture limits and next actions.
+
 # MW.03.02.01.03 — Harness 재연결·변경·disable/remove 검증
 
 - **Date**: 2026-09-19

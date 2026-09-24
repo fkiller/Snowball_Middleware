@@ -4,7 +4,7 @@ import { createControllerId, parseControllerId, parseInstanceId, parsePluginId, 
 import { copy, isRecord, nonnegative, requireThat } from './journal-model.js';
 
 export interface DeviceSource { pluginId: string; instanceId: string }
-export type DeviceTransport = 'virtual' | 'hid' | 'lan';
+export type DeviceTransport = 'virtual' | 'hid' | 'serial' | 'lan';
 export interface DeviceObservation {
   nativeDeviceId: string; label: string; transport: DeviceTransport;
   capabilities: ('button' | 'select-session' | 'display')[];
@@ -28,7 +28,7 @@ function observation(raw: unknown): DeviceObservation {
   requireThat(isRecord(raw), 'Invalid device observation');
   requireThat(typeof raw.nativeDeviceId === 'string' && raw.nativeDeviceId.length > 0 && raw.nativeDeviceId.length <= 256 && !/[\x00-\x1f]/.test(raw.nativeDeviceId), 'Invalid native device');
   requireThat(typeof raw.label === 'string' && raw.label.length > 0 && raw.label.length <= 128, 'Invalid device label');
-  requireThat(['virtual', 'hid', 'lan'].includes(String(raw.transport)) && typeof raw.supported === 'boolean', 'Invalid transport/support');
+  requireThat(['virtual', 'hid', 'serial', 'lan'].includes(String(raw.transport)) && typeof raw.supported === 'boolean', 'Invalid transport/support');
   requireThat(Array.isArray(raw.capabilities) && raw.capabilities.length <= 3 && raw.capabilities.every(c => ['button', 'select-session', 'display'].includes(c)) && new Set(raw.capabilities).size === raw.capabilities.length, 'Invalid semantic capabilities');
   if (raw.verifiedIdentity !== undefined) requireThat(typeof raw.verifiedIdentity === 'string' && raw.verifiedIdentity.length > 0 && raw.verifiedIdentity.length <= 256, 'Invalid verified identity');
   return { nativeDeviceId: raw.nativeDeviceId, label: raw.label, transport: raw.transport as DeviceTransport, supported: raw.supported, capabilities: [...raw.capabilities] as DeviceObservation['capabilities'], ...(raw.verifiedIdentity !== undefined ? { verifiedIdentity: raw.verifiedIdentity as string } : {}) };

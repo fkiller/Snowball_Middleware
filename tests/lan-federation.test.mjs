@@ -199,19 +199,5 @@ test('MW.09.02.01.01.A2: same native session ID on different hosts isolated via 
     /Foreign host/
   );
 
-  // 3. Multi-host support gate validation:
-  // A single host or single-platform pass does NOT constitute G4 completion.
-  // The matrix requires both Windows and macOS platforms with mutual verification.
-  const verifiedMatrix = [
-    { platform: 'win32', paired: true, verified: true },
-    { platform: 'darwin', paired: true, verified: true },
-  ];
-  const isG4Complete = verifiedMatrix.length >= 2 && verifiedMatrix.every(m => m.paired && m.verified);
-  assert.equal(isG4Complete, true);
-
-  const partialMatrix = [
-    { platform: 'win32', paired: true, verified: true },
-  ];
-  const isPartialG4Complete = partialMatrix.length >= 2 && partialMatrix.every(m => m.paired && m.verified);
-  assert.equal(isPartialG4Complete, false);
+  // This proves identity isolation in one process, not a real two-OS G4 gate.
 });

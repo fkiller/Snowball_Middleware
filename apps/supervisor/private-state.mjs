@@ -18,7 +18,7 @@ if (-not [System.IO.Directory]::Exists($statePath)) {
   [void][System.IO.Directory]::CreateDirectory($statePath, $stateAcl)
 }
 $stateTargets = @($statePath)
-foreach ($stateName in @('host.v1.json', 'commands.lock', 'commands.v1.jsonl')) {
+foreach ($stateName in @('host.v1.json', 'commands.lock', 'commands.v1.jsonl') + @($stateRequest.names)) {
   $stateChild = [System.IO.Path]::Combine($statePath, $stateName)
   if ([System.IO.File]::Exists($stateChild) -or [System.IO.Directory]::Exists($stateChild)) { $stateTargets += $stateChild }
 }
@@ -41,12 +41,15 @@ if (-not $stateFull) { throw 'No current-user full control' }
 `;
 
 /** Create only an app-owned directory; never repair permissions on existing user data. */
-export function ensurePrivateStateDirectory(directory) {
+export function ensurePrivateStateDirectory(directory, names = []) {
   if (!path.isAbsolute(directory)) throw new Error('Absolute state directory required');
+  if (!Array.isArray(names) || names.some(name => typeof name !== 'string' || !/^[a-z0-9][a-z0-9.-]{0,127}$/.test(name))) throw new Error('Invalid private state filename');
   if (process.platform === 'win32') {
     const powershell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
     const result = execFileSync(powershell, ['-NoProfile', '-NonInteractive', '-Command', windowsPrivateDirectory], {
-      input: JSON.stringify({ directory }), encoding: 'utf8', windowsHide: true, timeout: 10_000, maxBuffer: 16 * 1024,
+      // Windows process startup can exceed ten seconds under concurrent builds;
+      // keep the ACL check mandatory and bounded without misclassifying load as corruption.
+      input: JSON.stringify({ directory, names }), encoding: 'utf8', windowsHide: true, timeout: 30_000, maxBuffer: 16 * 1024,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     if (result.trim() !== 'ok') throw new Error('Private state validation failed');
@@ -54,7 +57,7 @@ export function ensurePrivateStateDirectory(directory) {
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
     const stat = fs.lstatSync(directory);
     if (!stat.isDirectory() || stat.isSymbolicLink() || stat.uid !== process.getuid() || (stat.mode & 0o077)) throw new Error('State directory owner/mode requires review');
-    for (const name of ['host.v1.json', 'commands.lock', 'commands.v1.jsonl']) {
+    for (const name of ['host.v1.json', 'commands.lock', 'commands.v1.jsonl', ...names]) {
       const file = path.join(directory, name);
       let item; try { item = fs.lstatSync(file); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
       if (!item.isFile() || item.isSymbolicLink() || item.uid !== process.getuid() || (item.mode & 0o077)) throw new Error('State file owner/mode requires review');

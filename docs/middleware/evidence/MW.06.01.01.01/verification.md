@@ -1,3 +1,7 @@
+> **2026-09-23 continuation:** The wizard's harness checkboxes previously changed only a local selection count. They are removed. It now distinguishes unprobed candidates from connected instances and, in the native tray build, offers a pathless `connectCodex` action. The tray opens three OS selectors (executable, existing Codex home, working directory), verifies canonical paths, `codex-cli 0.153.4` and SHA-256, then presents an exact review dialog. The worker registers a new instance without restarting the core and persists the private selection. The wizard also offers native-confirmed per-instance disconnect and all-saved-reference reset. Existing tasks become read-only; provider login and task history remain. API/SDK/OpenAPI and rejection tests cover empty-body/Origin boundaries; a real Windows default-login CLI dynamic enroll, restart restore and disconnect succeeded without task commands. Interactive dialog clicks, other versions, auth cancellation, missing provider, visible reset confirmation and macOS remain unverified; A1/task stay needs_review.
+
+> **2026-09-21 review:** historical evidence below does not establish current task completion. Current status: needs_review. See [the integrity audit](../../AUDIT.md) and PLAN.json for reopened checks, fixture limits and next actions.
+
 # MW.06.01.01.01 — local onboarding, 2026-09-19 (completed)
 
 Task status: DONE; A1 and A2 PASS. Zero-config harness discovery, J01 onboarding journey, and A2 acceptance verified.

@@ -11,3 +11,5 @@ __pycache__/
 *.wav
 *.raw
 *.pyc
+
+artifacts/

@@ -1,3 +1,9 @@
+> **2026-09-24 live recheck:** The user connected MK20 USB. Windows PnP reports the QMK composite device `VID_4250/PID_426F` as `OK`, including vendor HID interface 03, keyboard and mouse collections. The separate product CDC `VID_1D6B/PID_0104` is not present. With `SNOWBALL_TEST_HID=1` and Node 24.19.0, `tests/hid-physical.test.mjs` again passed real enumeration and safe vendor-interface open/close (2/2), with no key action requested. The running packaged middleware on loopback registered one **unsupported** QMK USB candidate, zero controllable devices, one Codex connection and two ready workspaces. This is evidence of current USB presence and observation only, not a button report, `btn-1` mapping, product CDC attachment, device pairing or hardware control. A1 remains blocked and A2 remains pending because duplicate physical units/port changes were not tested. The documented physical key route is GD32→T113 UART; QMK vendor USB report purpose is still unknown. Production `reviewedProfiles` remains empty.
+
+> **2026-09-23 physical recheck:** MK20 QMK HID was plugged into this Windows PC at the time of this test. PnP reported `VID_4250/PID_426F`, including vendor HID interface 03. With `SNOWBALL_TEST_HID=1`, `tests/hid-physical.test.mjs` passed real enumeration and open/close of only that interface (2/2). A five-second passive safe-test remained `waiting_neutral` with zero input reports. A later live PnP check reported both QMK HID and the separate MK20 product CDC USB link `Present=False`. This proves earlier USB presence and safe handle lifecycle, **not** current connection, an actual button report, confirmed `btn-1` mapping, permission-denial recovery, hotplug, macOS, or production device control. Production `reviewedProfiles` stays empty. Current A1/task status remains blocked; A2 remains pending. Physical keys are documented as GD32→T113 UART events in the hardware repository; this vendor HID interface may serve a different protocol. Do not ask the user to press an unidentified button or claim a guessed report offset is a key binding.
+
+> **2026-09-21 review:** historical evidence below does not establish current task completion. Current status: blocked. See [the integrity audit](../../AUDIT.md) and PLAN.json for reopened checks, fixture limits and next actions.
+
 # Verification Evidence: MW.04.01.01.02 (HID enumeration/권한/물리 식별과 안전 테스트)
 
 ## Task Information
@@ -17,7 +23,7 @@
 ## Acceptance Criteria & Results
 
 ### MW.04.01.01.02.A1: OS별 HID enumeration 및 VID/PID/usage/interface 검증, serial 없음/동일 모델/composite 물리 확인, 안전 테스트
-- **Status:** PASSED
+- **Historical status:** PASSED was overclaimed; current PLAN.json status is blocked.
 - **Test Command:** `node --test tests/hid-physical.test.mjs tests/hid.test.mjs`
 - **Evidence:**
   - Real native `node-hid` enumerates 26 collections on Windows; selects exact MK20 QMK collection (`VID 0x4250, PID 0x426F, Interface 3, UsagePage 65329, Usage 116`).

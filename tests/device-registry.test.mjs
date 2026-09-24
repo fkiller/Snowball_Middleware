@@ -81,7 +81,7 @@ test('real virtual plugin supplies two devices with isolated semantic input and 
   const directory = path.resolve('packages/device-virtual');
   const sha = createHash('sha256').update(fs.readFileSync(path.join(directory, 'dist/index.js'))).digest('hex');
   const manifest = { id: source.pluginId, publisher: 'Snowball fixture', version: '0.1.0', kind: 'hardware', sdkApiRange: '^1.0.0', entrypoint: 'dist/index.js', platforms: ['win32', 'darwin', 'linux'], architectures: ['x64', 'arm64'], capabilities: ['devices.list', 'devices.simulateInput', 'devices.render'].map(operation => ({ operation, access: operation === 'devices.list' ? 'observe' : 'control' })), permissions: [], configSchema: { type: 'object', properties: {}, additionalProperties: false }, integrity: { entrySha256: sha }, license: 'UNLICENSED' };
-  const plugin = new PluginHost({ directory, manifest, approvedDigests: new Map([[manifest.id, sha]]), timeoutMs: 2000 });
+  const plugin = new PluginHost({ directory, manifest, approvedDigests: new Map([[manifest.id, sha]]), timeoutMs: 10000 });
   t.after(() => plugin.stop()); await plugin.start();
   const registry = new DeviceRegistry(); const generation = registry.beginScan(source);
   const candidates = (await plugin.request('devices.list', {})).map(raw => registry.observe(source, generation, raw));

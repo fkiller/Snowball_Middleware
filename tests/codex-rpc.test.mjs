@@ -17,6 +17,11 @@ test('real bidirectional stdio preserves separate numeric request ID namespaces'
 test('oversized native output fails pending requests without returning raw content', async t => {
   const { rpc } = fixture(t); await assert.rejects(rpc.request('flood', {}), e => e.code === 'protocol_failed' && e.delivery === 'unknown');
 });
+
+test('large valid native metadata does not disconnect the next command', async t => {
+  const {rpc}=fixture(t);assert.equal((await rpc.request('large-metadata',{})).preview.length,300000);
+  assert.deepEqual(await rpc.request('echo',{still:'connected'}),{still:'connected'});
+});
 test('cancellation preserves unknown and graceful stop closes the owned process', async t => {
   const { rpc, child } = fixture(t); const abort = new AbortController(); const ready = once(rpc, 'notification');
   const pending = rpc.request('wait', {}, abort.signal); const rejected = assert.rejects(pending, e => e.code === 'cancelled' && e.delivery === 'unknown');

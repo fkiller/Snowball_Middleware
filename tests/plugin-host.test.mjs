@@ -22,7 +22,7 @@ async function fixture(t, body, options = {}) {
   const m = manifest(hash(script));
   // Non-timing tests must tolerate process startup under the full suite's load.
   // Deadline behavior is tested separately with an explicit timeout override.
-  const host = new PluginHost({ directory, manifest: m, approvedDigests: new Map([[m.id, m.integrity.entrySha256]]), timeoutMs: 2000, restartBackoffMs: 1000, ...options });
+  const host = new PluginHost({ directory, manifest: m, approvedDigests: new Map([[m.id, m.integrity.entrySha256]]), timeoutMs: 5000, restartBackoffMs: 1000, ...options });
   t.after(async () => { await host.stop(); await fs.rm(directory, { recursive: true, force: true }); });
   return { host, directory, manifest: m };
 }
@@ -62,9 +62,9 @@ test('unapproved digest and altered artifact never start', async t => {
 test('request timeout retains unknown and late reply does not corrupt next request', async t => {
   // Allow process startup under parallel filesystem/HTTP tests. The late first reply
   // arrives while the second request is pending, rather than after this test exits.
-  const { host } = await fixture(t, `setTimeout(()=>send({jsonrpc:'2.0',id:r.id,result:r.params}),r.params.delay);`, { timeoutMs: 1000 });
+  const { host } = await fixture(t, `setTimeout(()=>send({jsonrpc:'2.0',id:r.id,result:r.params}),r.params.delay);`, { timeoutMs: 3000 });
   await host.start();
-  await assert.rejects(host.request('devices.list', { delay: 1250 }), e => e.code === 'timeout' && e.delivery === 'unknown');
+  await assert.rejects(host.request('devices.list', { delay: 3500 }), e => e.code === 'timeout' && e.delivery === 'unknown');
   assert.deepEqual(await host.request('devices.list', { delay: 500 }), { delay: 500 });
 });
 
@@ -115,4 +115,16 @@ test('concurrent start/stop cancels startup without orphan process', async t => 
   const rejected = assert.rejects(starting, e => e.code === 'cancelled');
   await host.stop(); await rejected;
   assert.equal(host.state, 'stopped');
+});
+
+test('manifest operation namespaces cannot grant a plugin core or other-kind capabilities', () => {
+ const m = manifest('a'.repeat(64));
+ for (const operation of ['core.settings', 'harness.execute', 'system.exec']) assert.throws(() => parseManifest({ ...m, capabilities: [{operation, access:'control'}] }), /scope/);
+});
+
+test('worker cannot emit events in the core or another plugin-kind namespace', async t => {
+ const { host } = await fixture(t, "send({jsonrpc:'2.0',method:'plugin.event',params:{sequence:1,event:'harness.decision',data:{}}});");
+ await host.start(); const fault = once(host, 'fault');
+ const pending = host.request('devices.list', {}); await assert.rejects(pending);
+ assert.match((await fault)[0].message, /scope/); assert.equal(host.state, 'degraded');
 });

@@ -1,4 +1,4 @@
-import { CodexOwnedAdapter, type CodexLaunch } from './index.js';
+import { CodexOwnedAdapter, CodexFault, type CodexLaunch } from './index.js';
 import { API_VERSION } from '@snowball/plugin-sdk';
 
 let adapter: CodexOwnedAdapter | undefined; let connecting: Promise<unknown> | undefined;
@@ -39,6 +39,8 @@ async function handle(request: unknown) {
       else {
         if (!adapter) throw new Error();
         if (request.method === 'harness.list') result = await adapter.listSessions();
+        else if (request.method === 'harness.models') result = await adapter.listModels();
+        else if (request.method === 'harness.attach') result = await adapter.attachSession(p.threadId);
         else if (request.method === 'harness.read') result = await adapter.readSession(p.threadId);
         else if (request.method === 'harness.create') result = await adapter.createSession(p.root, { ephemeral: p.ephemeral, model: p.model });
         else if (request.method === 'harness.refreshAuth') { await adapter.refreshAuth(); result = adapter.status(); }
@@ -48,7 +50,7 @@ async function handle(request: unknown) {
       }
     }
     send({ jsonrpc: '2.0', id: request.id, result });
-  } catch { send({ jsonrpc: '2.0', id: request.id, error: { code: -32000, message: 'Codex operation unavailable; inspect capability state' } }); }
+  } catch (error) { send({ jsonrpc: '2.0', id: request.id, error: { code: -32000, message: error instanceof CodexFault ? `Codex operation unavailable: ${error.code}` : 'Codex operation unavailable; inspect capability state' } }); }
   finally { pending.delete(request.id); }
 }
 process.stdin.on('data', (chunk: Buffer) => {

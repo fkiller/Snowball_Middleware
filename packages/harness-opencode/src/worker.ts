@@ -57,6 +57,7 @@ async function handle(request: unknown) {
           instanceId: p.binding.instanceId,
           baseUrl: p.binding.baseUrl,
           authPassword: p.binding.authPassword,
+          authUsername: p.binding.authUsername,
         });
         await adapter.initialize();
         for (const name of ['event', 'decision', 'offline', 'ownerLost']) {
@@ -69,6 +70,7 @@ async function handle(request: unknown) {
         if (!adapter) throw new Error();
         if (request.method === 'harness.list') result = await adapter.listSessions();
         else if (request.method === 'harness.read') result = await adapter.readSession(p.sessionId);
+        else if (request.method === 'harness.models') result = await adapter.listModels();
         else if (request.method === 'harness.create') result = await adapter.createSession(p.root, { title: p.title });
         else if (request.method === 'harness.refreshAuth') { await adapter.refreshAuth(); result = adapter.status(); }
         else if (request.method === 'harness.execute') result = await adapter.execute(p.envelope, abort.signal);

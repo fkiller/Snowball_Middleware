@@ -1,37 +1,17 @@
-# MW.06.02.01.01 — Overview/Attention와 목적지 고정 상세 검증
+# MW.06.02.01.01 — Supervisor acceptance status (2026-09-23)
 
-- **Date**: 2026-09-19
-- **Environment**: Windows x64, Node 20.19.6
-- **Task ID**: MW.06.02.01.01
-- **Scenarios**: H08, H09, J02, J03
+Status: **needs_review**. The 2026-09-19 fixture report previously in this file overstated A1/A2 as production passes. It asserted filter and pinned-draft behavior that the current live UI has not demonstrated. `tests/supervisor-overview.test.mjs` is a simulated/static check, not live provider acceptance.
 
-## 1. Implemented Components
+Actual Windows browser evidence on the private unsigned portable `artifacts/desktop/1790220257212/Snowball Middleware-win32-x64`:
 
-1. **`apps/supervisor/app.js` (Overview & Attention Surfaces)**:
-   - **Attention Surface**:
-     - Displays pending decisions (`snapshot.decisions.filter(d => d.status === 'pending')`) at the top of the Overview with `승인 (Accept)` and `거부 (Decline)` action buttons.
-     - Displays in-doubt and failed commands (`snapshot.commands.filter(c => c.status === 'unknown' || c.status === 'failed')`) with status tags.
-   - **Filter Controls**:
-     - Filter buttons by Harness (`전체`, `Codex`, `OpenCode`, `Antigravity`).
-     - Session list filtered dynamically according to selected harness.
-   - **Target Invariance (R-TARGET / J03)**:
-     - When drafting a command for an owned session, `activeDraft` binds and displays the pinned target: `명령 작성 중 · 고정 대상: <sessionKey>`.
-     - Switching harness filter or clicking another session does NOT mutate the active draft's destination key.
-     - Submitting the draft sends strictly to the pinned destination.
+- The noAuth loopback page restored two registered, ready workspaces. `Snowball_Control` displayed six native Codex sessions, all read-only until explicit attachment; `Snowball_Middleware` displayed zero. Both Overview cards navigated to the correct project. The connected-harness count was one and registered control-device count was zero.
+- An observed provider project is associated with a registered workspace only by exact server-side root match. A different folder with the same display name remains a separate discovery candidate. The API and browser regression checks cover this case.
+- The Settings modal was unintentionally visible at load because CSP ignored its inline `display:none`. The wizard and voice banner had the same initial hiding pattern. The page now uses the HTML `hidden` state and an explicit CSS rule. The real browser showed Settings closed on load, then open and closed by its buttons.
+- A ready device from another plugin can no longer label MK20 as connected. Current QMK HID and product CDC observations are both absent; no MK20 device is registered or paired.
+- No existing user task was attached, commanded, approved or interrupted during this browser verification.
 
-## 2. Acceptance Verification
+The later packaged end-to-end check found that the new-task dialog defaulted to the first registered folder even when a different project was active. It was closed without creating a task, then fixed to default to the selected project. The rebuilt browser created one new owned Codex verification task in `Snowball_Middleware`, offered real models/efforts, and displayed its exact provider reply with a completed durable command. See [the live browser record](../MW.05.02.01.01/live-browser-20260923.md). This verifies the new-task/send/display route for one Codex instance; it does not close the broader A1/A2 gates.
 
-### MW.06.02.01.01.A1 (PASS)
-- **Title**: Supervisor 브라우저에서 Overview(프로젝트/세션 목록, 상태)와 Attention(승인 대기, 오류)이 정확히 표시된다.
-- **Procedure**: `node --test tests/supervisor-overview.test.mjs`
-- **Result**:
-  - Supervisor assets loaded via `loadSupervisorAssets` contain Attention, Overview, filter controls, and destination pinning logic.
-  - Pending decisions and unknown/failed commands correctly detected and structured into attention cards.
+Verification: Node 24 Windows full suite **225 total, 221 pass, 0 fail, 4 physical skips** after project identity changes; focused Supervisor/onboarding suite **12/12 pass** after the modal fix, then focused Supervisor **10/10** and syntax check after the folder-default correction. Packaged inventory **87/87 hashes**, **90 application files**, native tray/no-front-window/no-PIN/pause smoke passed again on the latest build. Browser card navigation, Settings visibility, selected-folder default and one real owned Codex model/effort response were exercised. These results do not prove pending-decision actions, draft target invariance in a live owned session, complete transcript/history, multi-harness control, hardware pairing, speech or installed release.
 
-### MW.06.02.01.01.A2 (PASS)
-- **Title**: 필터를 전환하거나 다른 세션을 클릭해도 작성 중인 draft나 승인 카드의 대상이 바뀌지 않는다 (R-TARGET).
-- **Procedure**: `node --test tests/supervisor-overview.test.mjs`
-- **Result**:
-  - Filter switching while draft is active preserves original `destinationKey`.
-  - Clicking on other (or read-only) sessions does not retarget the draft.
-  - Command dispatch routes strictly to the pinned destination.
+Next acceptance work: use a newly created owned verification session to exercise real pending/unknown attention navigation and immutable draft target; verify provider receipts and restart behavior. Keep historical user sessions read-only unless explicitly selected for attachment. Test a real MK20 plugin only after its report and pairing contract are verified. The page must remain loopback-only with no Web PIN.

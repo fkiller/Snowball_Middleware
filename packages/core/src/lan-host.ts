@@ -1,5 +1,5 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
-import { generateKeyPairSync, sign, verify, randomBytes, randomInt, timingSafeEqual, type KeyObject } from 'node:crypto';
+import { generateKeyPairSync, sign, verify, randomBytes, randomInt, timingSafeEqual, createPublicKey } from 'node:crypto';
 import { isIPv4 } from 'node:net';
 import { isHostId, parseHostId, createHostId, type HostId } from './identity.js';
 
@@ -85,6 +85,8 @@ export class LanHostRegistry {
     const pairingId = randomBytes(16).toString('hex');
     const pin = randomInt(100000, 1000000).toString();
     const ttlMs = options?.ttlMs ?? 60_000;
+    ensure(Number.isSafeInteger(ttlMs) && ttlMs > 0 && ttlMs <= 60_000, 'invalid_pairing_ttl');
+    ensure(this.pairingSessions.size < 16, 'pairing_capacity');
     const createdAt = this.now();
     const session: PairingSession = {
       pairingId,
@@ -125,6 +127,7 @@ export class LanHostRegistry {
     ensure(session.expiresAt > this.now(), 'pairing_expired', 'Pairing session expired');
 
     // Safe comparison of PIN
+    ensure(typeof pin === 'string' && /^\d{6}$/.test(pin), 'invalid_pin');
     const pinBuf = Buffer.from(pin);
     const expectedBuf = Buffer.from(session.pin);
     const pinMatches = pinBuf.length === expectedBuf.length && timingSafeEqual(pinBuf, expectedBuf);
@@ -132,7 +135,11 @@ export class LanHostRegistry {
 
     const hostId = parseHostId(remoteHost.hostId);
     ensure(hostId !== this.hostId, 'cannot_pair_self', 'Cannot pair with own host identity');
-    ensure(remoteHost.publicKey && remoteHost.publicKey.includes('PUBLIC KEY'), 'invalid_public_key');
+    ensure(typeof remoteHost.publicKey === 'string' && remoteHost.publicKey.length <= 1024, 'invalid_public_key');
+    try { ensure(createPublicKey(remoteHost.publicKey).asymmetricKeyType === 'ed25519', 'invalid_public_key'); } catch { throw new LanHostFault('invalid_public_key'); }
+    ensure(typeof remoteHost.name === 'string' && remoteHost.name.length <= 128, 'invalid_host');
+    ensure(['win32', 'darwin', 'linux'].includes(remoteHost.platform), 'invalid_host');
+    ensure(typeof remoteHost.address === 'string' && isIPv4(remoteHost.address) && Number.isInteger(remoteHost.port) && remoteHost.port > 0 && remoteHost.port <= 65535, 'invalid_endpoint');
 
     const paired: PairedHost = {
       hostId,
@@ -201,9 +208,7 @@ export class LanHostRegistry {
   private pruneSessions(): void {
     const now = this.now();
     for (const [id, session] of this.pairingSessions) {
-      if (session.expiresAt <= now && session.status === 'pending') {
-        session.status = 'expired';
-      }
+      if (session.expiresAt <= now) this.pairingSessions.delete(id);
     }
   }
 }
@@ -220,6 +225,7 @@ export class LanHostListener {
   private listeningOrigin?: string;
   private readonly sockets = new Set<import('node:net').Socket>();
   private readonly now: () => number;
+  private readonly replay = new Map<string, number>();
 
   constructor(
     readonly registry: LanHostRegistry,
@@ -242,13 +248,17 @@ export class LanHostListener {
 
     const bindHost = this.options.host ?? '127.0.0.1';
     const bindPort = this.options.port ?? 0;
+    // Experimental signature transport has no authenticated responses or secure pairing.
+    ensure(bindHost === '127.0.0.1', 'authenticated_lan_transport_required');
 
-    this.server = http.createServer({ maxHeaderSize: 16 * 1024 }, (req, res) => {
+    this.server = http.createServer({ maxHeaderSize: 16 * 1024, requestTimeout: 5000, headersTimeout: 5000, keepAliveTimeout: 1000 }, (req, res) => {
       this.route(req, res).catch(err => {
         this.sendError(res, err);
       });
     });
 
+    this.server.maxConnections = 32;
+    this.server.setTimeout(5000, socket => socket.destroy());
     this.server.on('connection', socket => {
       this.sockets.add(socket);
       socket.on('close', () => this.sockets.delete(socket));
@@ -291,42 +301,13 @@ export class LanHostListener {
     const url = req.url ?? '/';
     const method = req.method ?? 'GET';
 
-    if (method === 'POST' && url === '/peer/pair/initiate') {
-      const body = await this.readJson(req);
-      const session = this.registry.initiatePairing({
-        remoteAddress: typeof body.address === 'string' ? body.address : undefined,
-        remotePort: typeof body.port === 'number' ? body.port : undefined,
-      });
-      this.sendJson(res, 200, {
-        pairingId: session.pairingId,
-        pin: session.pin,
-        expiresAt: session.expiresAt,
-        localHost: this.registry.getLocalHost(),
-      });
+    if (url.startsWith('/peer/pair/')) {
+      // Pairing enrollment is trusted-local only until a reviewed secure ceremony exists.
+      this.sendJson(res, 403, { error: 'local_pairing_required' });
       return;
     }
 
-    if (method === 'POST' && url === '/peer/pair/verify') {
-      const body = await this.readJson(req);
-      ensure(typeof body.pairingId === 'string' && typeof body.pin === 'string' && typeof body.host === 'object' && body.host !== null, 'invalid_request');
-      const remoteHost = body.host as {
-        hostId: HostId;
-        name: string;
-        platform: 'darwin' | 'win32' | 'linux';
-        publicKey: string;
-        address: string;
-        port: number;
-      };
-      const paired = this.registry.verifyPairing(body.pairingId, body.pin, remoteHost);
-      this.sendJson(res, 200, {
-        success: true,
-        pairedHost: paired,
-        localHost: this.registry.getLocalHost(),
-      });
-      return;
-    }
-
-    // All other /peer/* routes require mutual cryptographic authentication
+    // All other /peer/* routes authenticate the request only; this is not a production mutual-auth transport
     const remoteHostId = req.headers['x-snowball-host-id'] as string;
     const timestampStr = req.headers['x-snowball-timestamp'] as string;
     const signature = req.headers['x-snowball-signature'] as string;
@@ -342,7 +323,7 @@ export class LanHostListener {
       return;
     }
 
-    const timestamp = parseInt(timestampStr, 10);
+    const timestamp = /^\d{13}$/.test(timestampStr) ? Number(timestampStr) : NaN;
     if (isNaN(timestamp) || Math.abs(this.now() - timestamp) > 30_000) {
       this.sendJson(res, 401, { error: 'credential_expired', message: 'Timestamp drift or expired credential' });
       return;
@@ -358,6 +339,12 @@ export class LanHostListener {
       this.sendJson(res, 401, { error: 'invalid_signature', message: 'Signature verification failed' });
       return;
     }
+
+    const replayKey = `${remoteHostId}:${signature}`;
+    for (const [key, expiry] of this.replay) if (expiry < this.now()) this.replay.delete(key);
+    if (this.replay.has(replayKey)) { this.sendJson(res, 401, { error: 'replayed_request' }); return; }
+    if (this.replay.size >= 4096) { this.sendJson(res, 429, { error: 'request_capacity' }); return; }
+    this.replay.set(replayKey, timestamp + 30_000);
 
     if (method === 'GET' && url === '/peer/status') {
       const customStatus = this.options.getStatus ? this.options.getStatus() : {};
@@ -436,6 +423,7 @@ export interface HostAggregation {
 }
 
 export interface LanHostFederatorOptions {
+  peerTimeoutMs?: number;
   now?: () => number;
   requestPeer?: (
     address: string,
@@ -494,11 +482,12 @@ export class LanHostFederator {
         if (this.options.requestPeer) {
           const timestamp = this.now();
           const signature = this.registry.signPayload(`${timestamp}:GET:/peer/status:`);
-          const res = await this.options.requestPeer(remote.address, remote.port, '/peer/status', {
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          const res = await Promise.race([this.options.requestPeer(remote.address, remote.port, '/peer/status', {
             'x-snowball-host-id': localHost.hostId,
             'x-snowball-timestamp': timestamp.toString(),
             'x-snowball-signature': signature,
-          });
+          }), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new LanHostFault('peer_timeout')), this.options.peerTimeoutMs ?? 3000); })]).finally(() => { if (timer) clearTimeout(timer); });
 
           if (res.status === 200) {
             result.push({

@@ -21,6 +21,8 @@ import os from 'node:os';
 import { scanHarnessProjects } from './harness-project-scanner.mjs';
 import { scanAllHarnessSessions } from './harness-session-scanner.mjs';
 
+throw new Error('MK20 lab launcher quarantined: unsigned input and private Desktop IPC bypass the command journal. Use npm run start:local. See docs/middleware/AUDIT.md.');
+
 const directory = ensurePrivateStateDirectory(resolveUserDataDir());
 const hostIdFile = path.join(directory, 'host.v1.json');
 let hostId;
@@ -148,7 +150,6 @@ const api = new LocalApi({
   harness,
   supervisor,
   port: 8765,
-  noAuth: true,
   hostname: os.hostname(),
   realSessions: realSessionsData,
   turnsStore: realTurnsData,
@@ -243,71 +244,485 @@ try {
   console.log('  MK20 USB Raw HID   : FAILED (' + err.message + ')');
 }
 
-// Map of MK20 physical keys to labels
-const keyLabels = [
-  { id: 1, top: 'Turn', main: 'APPROVE', flags: 1 },
-  { id: 2, top: 'Turn', main: 'REJECT', flags: 2 },
-  { id: 3, top: 'Turn', main: 'RETRY', flags: 0 },
-  { id: 4, top: 'Turn', main: 'CANCEL', flags: 4 },
-  { id: 5, top: 'Harness', main: 'CODEX', flags: 1 },
-  { id: 6, top: 'Harness', main: 'ANTIGRAV', flags: 1 },
-  { id: 7, top: 'View', main: 'PLAN', flags: 0 },
-  { id: 8, top: 'View', main: 'DIFF', flags: 0 },
-  { id: 9, top: 'Files', main: 'BROWSE', flags: 0 },
-  { id: 10, top: 'Files', main: 'CHANGES', flags: 0 },
-  { id: 11, top: 'Voice', main: 'TALK', flags: 1 },
-  { id: 12, top: 'Voice', main: 'SEND', flags: 2 },
-  { id: 13, top: 'Proj', main: 'LIST', flags: 0 },
-  { id: 14, top: 'Proj', main: 'SWITCH', flags: 0 },
-  { id: 15, top: 'Session', main: 'NEW', flags: 1 },
-  { id: 16, top: 'Session', main: 'ATTACH', flags: 0 },
-  { id: 17, top: 'Action', main: 'OK', flags: 1 },
-  { id: 18, top: 'Action', main: 'BACK', flags: 0 },
-  { id: 19, top: 'Action', main: 'UP', flags: 0 },
-  { id: 20, top: 'Action', main: 'DOWN', flags: 0 }
+import { ContextManager, GitProvider } from './context-manager.mjs';
+import { CodexDesktopClient } from './codex-desktop-client.mjs';
+
+const desktop = new CodexDesktopClient();
+try {
+  const connected = await desktop.connect();
+  if (connected) {
+    console.log('  Codex Desktop IPC  : CONNECTED');
+  } else {
+    console.log('  Codex Desktop IPC  : STANDBY (Named pipe not found or app not running)');
+  }
+} catch (err) {
+  console.log('  Codex Desktop IPC  : STANDBY (' + err.message + ')');
+}
+
+const context = new ContextManager();
+
+// Configure machines
+context.machines = [{ id: 'dev-pc', name: os.hostname().split('.')[0] || 'DEV-PC', isOnline: true }];
+
+// Configure harnesses
+context.harnesses = [
+  { id: 'snowball.codex', name: 'Codex', isEnabled: true },
+  { id: 'snowball.antigravity', name: 'Antigrav', isEnabled: true },
+  { id: 'snowball.opencode', name: 'OpenCode', isEnabled: true }
 ];
 
-let tick = 0;
+// Configure projects and sessions from real scanner data
+if (realSessionsData) {
+  for (const h of context.harnesses) {
+    const harnessData = realSessionsData[h.id] || {};
+    const scopeKey = `dev-pc/${h.id}`;
+    const projs = [];
+    const projEntries = Object.entries(harnessData);
+    // Sort entries so current working project (Snowball Control / Snowball_Control) is first
+    projEntries.sort(([a], [b]) => {
+      const aMatch = a.includes('Snowball') ? -1 : 0;
+      const bMatch = b.includes('Snowball') ? -1 : 0;
+      return aMatch - bMatch;
+    });
+    for (const [projName, sessList] of projEntries) {
+      projs.push({ id: projName, name: projName, path: process.cwd() });
+      context.sessionsByScope[`${scopeKey}/${projName}`] = sessList.map(s => ({
+        id: s.id,
+        sessionKey: s.sessionKey,
+        title: s.title,
+        preview: s.preview,
+        createdAt: s.createdAt || 0,
+        model: s.model,
+        turnCount: s.turnCount
+      }));
+    }
+    context.projectsByScope[scopeKey] = projs;
+  }
+}
+
+// Function to load turns for currently selected session
+async function loadCurrentSessionTurns() {
+  const curSess = context.getCurrentSession();
+  if (!curSess || !curSess.id) {
+    context.setSessionTurns([]);
+    return;
+  }
+  if (realTurnsData) {
+    // 1. Direct lookup by curSess.id
+    if (realTurnsData[curSess.id]) {
+      context.setSessionTurns(realTurnsData[curSess.id]);
+      return;
+    }
+    // 2. Lookup by curSess.sessionKey
+    if (curSess.sessionKey && realTurnsData[curSess.sessionKey]) {
+      context.setSessionTurns(realTurnsData[curSess.sessionKey]);
+      return;
+    }
+    // 3. Lookup by searching keys ending with /${curSess.id} or containing curSess.id
+    for (const [k, turns] of Object.entries(realTurnsData)) {
+      if (k.endsWith(`/${curSess.id}`) || k === curSess.id || k.includes(curSess.id)) {
+        context.setSessionTurns(turns);
+        return;
+      }
+    }
+  }
+
+  // 4. Live fallback: Read directly via Codex Desktop named pipe if connected
+  if (desktop.isConnected && !curSess.id.startsWith('s-')) {
+    try {
+      const threadData = await desktop.readThread(curSess.id, 15);
+      if (threadData?.turns && Array.isArray(threadData.turns) && threadData.turns.length > 0) {
+        const parsed = threadData.turns.map(t => {
+          const userPrompt = (t.items || []).filter(i => i.type === 'userMessage').map(i => i.text || '').join('\n') || t.userPrompt || '';
+          const agentResponse = (t.items || []).filter(i => i.type === 'agentMessage').map(i => i.text || '').join('\n') || t.agentResponse || '';
+          const processDetails = (t.items || []).filter(i => i.type === 'commandExecution').map(i => i.command || '') || t.processDetails || [];
+          return { role: 'turn', userPrompt, agentResponse, processDetails };
+        });
+        context.setSessionTurns(parsed);
+        if (realTurnsData) realTurnsData[curSess.id] = parsed;
+        return;
+      }
+    } catch {}
+  }
+
+  context.setSessionTurns([]);
+}
+
+context.resolveProjectAndSession();
+context.updateReaderForCurrentSession();
+await loadCurrentSessionTurns();
+
 async function paintMk20() {
   if (!mk20Online) return;
-  tick++;
-  const activeHarnesses = harness.describe().candidates.filter(c => c.controllable).map(c => c.id.replace('snowball.', '')).join(', ') || 'Codex, Antigrav';
-  const projects = store.list();
-  const projName = projects[0]?.displayName || 'Snowball_Control';
-
   try {
-    await mk20.preview({
-      title: 'Snowball Middleware',
-      subtitle: `Online: ${api.origin}`,
-      lines: [
-        `Web UI: ${api.origin}/`,
-        `Project: ${projName} (${projects.length} loaded)`,
-        `Harnesses: ${activeHarnesses}`,
-        `Status: READY (tick #${tick})`
-      ],
-      scroll: 0,
-      totalLines: 4,
-      volume: 60,
-      muted: false,
-      keys: keyLabels
-    });
+    const payload = context.toPreviewPayload();
+    await mk20.preview(payload);
   } catch (err) {
-    // ignore transient network error
+    console.error('[MK20 PREVIEW ERROR]:', err.message);
   }
 }
 
 // Initial paint and periodic heartbeat
 await paintMk20();
-const timer = setInterval(() => { void paintMk20(); }, 1500);
+const timer = setInterval(() => { void paintMk20(); }, 1200);
 
-mk20.on('lab.input', input => {
-  console.log('[MK20 INPUT RECEIVED]:', input);
-  void paintMk20();
+// MK20 Hardware Input Dispatcher
+mk20.on('lab.input', async (input) => {
+  if (input.kind !== 'presence') {
+    console.log('[MK20 INPUT RECEIVED]:', input);
+  }
+  try {
+
+  if (input.kind === 'knob-turn') {
+    if (input.knob === 'left') {
+      context.onLeftKnob(input.delta);
+    } else if (input.knob === 'right') {
+      context.onRightKnob(input.delta);
+    }
+    void paintMk20();
+    return;
+  }
+
+  if (input.kind === 'knob-click') {
+    if (input.knob === 'left') {
+      const wasEditor = context.activeEditor;
+      await context.onLeftKnobClick();
+      if (['project', 'session', 'harness', 'machine'].includes(wasEditor)) {
+        await loadCurrentSessionTurns();
+      }
+    } else if (input.knob === 'right') {
+      context.onRightKnobClick();
+    }
+    await paintMk20();
+    return;
+  }
+
+  if (input.kind === 'button' && input.pressed) {
+    const kid = parseInt(input.button.replace('key-', ''), 10);
+    if (!kid || isNaN(kid)) return;
+
+    // ViewMode = workspace (Files modal)
+    if (context.viewMode === 'workspace') {
+      if (context.isWorkspaceViewerActive) {
+        if (kid === 17) {
+          context.closeWorkspaceViewer();
+          context.viewMode = 'session';
+          context.updateReaderForCurrentSession();
+        } else if ([18, 19, 20].includes(kid)) {
+          const pageStart = Math.floor(context.workspaceSelectedFileIdx / 3) * 3;
+          const slot = [18, 19, 20].indexOf(kid);
+          const targetIdx = pageStart + slot;
+          if (targetIdx < context.workspaceFiles.length) {
+            if (targetIdx === context.workspaceSelectedFileIdx) {
+              // Pressing active file exits back to 4x4 browser mode
+              context.closeWorkspaceViewer();
+            } else {
+              const targetItem = context.workspaceFiles[targetIdx];
+              if (targetItem.isDir) {
+                context.closeWorkspaceViewer();
+                if (targetItem.name === '..') {
+                  const parent = (context.filePath === context.fileRoot) ? context.fileRoot : path.dirname(context.filePath);
+                  await context.readWorkspaceFiles(parent);
+                } else {
+                  await context.readWorkspaceFiles(path.join(context.filePath, targetItem.name));
+                }
+              } else {
+                await context.openFileContent(targetIdx, targetItem.name);
+              }
+            }
+          }
+        }
+        void paintMk20();
+        return;
+      }
+
+      // Mode 1: 4x4 Full File Browser Mode
+      if (kid === 17) {
+        context.viewMode = 'session';
+        context.updateReaderForCurrentSession();
+      } else if (kid === 18) {
+        const parent = (context.filePath === context.fileRoot) ? context.fileRoot : path.dirname(context.filePath);
+        await context.readWorkspaceFiles(parent);
+      } else if (kid === 19) {
+        await context.readWorkspaceFiles(context.fileRoot);
+      } else {
+        // Check 16 keys grid
+        const gridRows = [
+          [13, 9, 5, 1],
+          [14, 10, 6, 2],
+          [15, 11, 7, 3],
+          [16, 12, 8, 4]
+        ];
+        for (let r = 0; r < 4; r++) {
+          const cIdx = gridRows[r].indexOf(kid);
+          if (cIdx >= 0) {
+            const fIdx = context.workspaceScrollRow * 4 + r * 4 + cIdx;
+            if (fIdx < context.workspaceFiles.length) {
+              context.workspaceCursorIdx = fIdx;
+              const f = context.workspaceFiles[fIdx];
+              if (f.isDir) {
+                if (f.name === '..') {
+                  const parent = (context.filePath === context.fileRoot) ? context.fileRoot : path.dirname(context.filePath);
+                  await context.readWorkspaceFiles(parent);
+                } else {
+                  await context.readWorkspaceFiles(path.join(context.filePath, f.name));
+                }
+              } else {
+                await context.openFileContent(fIdx, f.name);
+              }
+            }
+            break;
+          }
+        }
+      }
+      void paintMk20();
+      return;
+    }
+
+    // ViewMode = changes (Git diff modal)
+    if (context.viewMode === 'changes') {
+      if (kid === 17 || kid === 7) {
+        context.viewMode = 'session';
+        context.updateReaderForCurrentSession();
+      } else if ([18, 19, 20].includes(kid)) {
+        const i = context.changesFilePage * 3 + [18, 19, 20].indexOf(kid);
+        if (i < context.changedFiles.length) {
+          if (context.isChangesFileSelected && context.selectedChangedFileIdx === i) {
+            context.isChangesFileSelected = false;
+            context.updateReaderForCurrentSession();
+          } else {
+            const diffLines = await GitProvider.getFileDiff(context.changedFiles[i].path, context.getCurrentProject().path);
+            context.selectChangesFile(i, diffLines);
+          }
+        }
+      }
+      void paintMk20();
+      return;
+    }
+
+    // ViewMode = settings
+    if (context.viewMode === 'settings') {
+      if (kid === 17) {
+        context.viewMode = 'session';
+        context.updateReaderForCurrentSession();
+      }
+      void paintMk20();
+      return;
+    }
+
+    // ViewMode = session
+    if (kid === 17) {
+      context.cycleMachine();
+      await loadCurrentSessionTurns();
+    } else if (kid === 13) {
+      context.cycleHarness();
+      await loadCurrentSessionTurns();
+    } else if (kid === 9) {
+      context.openEditor('project');
+    } else if (kid === 5) {
+      context.openEditor('session');
+    } else if (kid === 1) {
+      // New session
+      context.activeEditor = 'none';
+      const newSessionId = `s-${Date.now().toString(36)}`;
+      const newSession = {
+        id: newSessionId,
+        title: 'New task',
+        preview: 'Start fresh conversation',
+        createdAt: Date.now(),
+        model: context.models[context.selectedModelIdx],
+        turnCount: 0
+      };
+      const scopeKey = context.getFullScopeKey();
+      if (!context.sessionsByScope[scopeKey]) {
+        context.sessionsByScope[scopeKey] = [];
+      }
+      context.sessionsByScope[scopeKey].unshift(newSession);
+      context.selectSession(0);
+      context.setSessionTurns([]);
+      context.updateReaderForCurrentSession();
+    } else if (kid === 18) {
+      context.openEditor('model');
+    } else if (kid === 14) {
+      context.openEditor('effort');
+    } else if (kid === 10) {
+      context.openEditor('access');
+    } else if (kid === 6) {
+      context.activeEditor = 'none';
+      await context.readWorkspaceFiles(context.getCurrentProject().path || process.cwd());
+    } else if (kid === 2) {
+      context.activeEditor = 'none';
+      context.viewMode = 'settings';
+      context.updateReaderForCurrentSession();
+    } else if ([19, 15, 11, 7, 3].includes(kid)) {
+      if (context.activeEditor !== 'none') {
+        const field = context.activeEditor;
+        const choiceOffset = [19, 15, 11, 7, 3].indexOf(kid);
+        context.commitActiveEditorChoice(context.editorChoiceWindowStart + choiceOffset);
+        if (['project', 'session', 'machine', 'harness'].includes(field)) {
+          await loadCurrentSessionTurns();
+        }
+      } else {
+        if (kid === 19) {
+          context.jumpPrevPrompt();
+        } else if (kid === 15) {
+          context.jumpNextPrompt();
+        } else if (kid === 11) {
+          context.toggleDetails();
+        } else if (kid === 7) {
+          const files = await GitProvider.getChangedFiles(context.getCurrentProject().path || process.cwd());
+          context.openChangesView(files);
+          if (files.length > 0) {
+            const diffLines = await GitProvider.getFileDiff(files[0].path, context.getCurrentProject().path || process.cwd());
+            context.selectChangesFile(0, diffLines);
+          }
+        }
+      }
+    } else if (kid === 20) {
+      // Talk (Voice input)
+      if (context.isRecordingVoice) {
+        // Finish recording -> transcribe
+        context.isRecordingVoice = false;
+        context.isTranscribingVoice = true;
+        context.updateReaderForCurrentSession();
+        void paintMk20();
+        setTimeout(() => {
+          context.isTranscribingVoice = false;
+          context.voiceDraftText = 'Review draft prompt from physical microphone.';
+          context.updateReaderForCurrentSession();
+          void paintMk20();
+        }, 800);
+      } else {
+        // Start recording
+        context.isRecordingVoice = true;
+        context.voiceDraftText = '';
+        context.voiceSubmission = 'idle';
+        context.updateReaderForCurrentSession();
+      }
+    } else if (kid === 16) {
+      // Send / Done / Reconcile
+      if (context.isRecordingVoice) {
+        context.isRecordingVoice = false;
+        context.isTranscribingVoice = true;
+        context.updateReaderForCurrentSession();
+        void paintMk20();
+        setTimeout(() => {
+          context.isTranscribingVoice = false;
+          context.voiceDraftText = 'Review draft prompt from physical microphone.';
+          context.updateReaderForCurrentSession();
+          void paintMk20();
+        }, 800);
+      } else if (context.voiceSubmission === 'unknown') {
+        // Reconcile delivery
+        console.log('[Main] Reconciling unknown voice draft delivery...');
+        const curSess = context.getCurrentSession();
+        if (desktop.isConnected && curSess?.id) {
+          try {
+            await desktop.readThread(curSess.id, 5);
+            context.voiceSubmission = 'idle';
+            context.voiceDraftText = '';
+            await loadCurrentSessionTurns();
+          } catch {
+            context.voiceSubmission = 'idle';
+            context.voiceDraftText = '';
+            context.updateReaderForCurrentSession();
+          }
+        } else {
+          context.voiceSubmission = 'idle';
+          context.voiceDraftText = '';
+          context.updateReaderForCurrentSession();
+        }
+      } else if (context.voiceDraftText) {
+        // Send prompt
+        const promptText = context.voiceDraftText;
+        context.voiceSubmission = 'sending';
+        context.updateReaderForCurrentSession();
+        void paintMk20();
+
+        const curSess = context.getCurrentSession();
+        const targetThreadId = curSess?.id;
+
+        if (desktop.isConnected && targetThreadId && !targetThreadId.startsWith('s-')) {
+          try {
+            await desktop.sendMessageToThread(targetThreadId, promptText);
+            context.voiceSubmission = 'idle';
+            context.voiceDraftText = '';
+            const existingTurns = [...context.currentTurns];
+            existingTurns.push({
+              role: 'user',
+              userPrompt: promptText,
+              text: promptText,
+              agentResponse: 'Command dispatched to Codex Desktop thread.',
+              processDetails: ['Turn started', 'Desktop IPC active'],
+              status: 'completed'
+            });
+            context.setSessionTurns(existingTurns);
+            setTimeout(async () => {
+              await loadCurrentSessionTurns();
+              void paintMk20();
+            }, 2500);
+          } catch (err) {
+            console.warn('[Main] Desktop send failed:', err.message);
+            context.voiceSubmission = 'unknown';
+            context.updateReaderForCurrentSession();
+          }
+        } else {
+          setTimeout(() => {
+            context.voiceSubmission = 'idle';
+            context.voiceDraftText = '';
+            const existingTurns = [...context.currentTurns];
+            existingTurns.push({
+              role: 'user',
+              userPrompt: promptText,
+              text: promptText,
+              agentResponse: 'Command dispatched and acknowledged by local middleware.',
+              processDetails: ['Turn started', 'Local execution active'],
+              status: 'completed'
+            });
+            context.setSessionTurns(existingTurns);
+            void paintMk20();
+          }, 800);
+        }
+      }
+    } else if (kid === 4) {
+      // Stop / Cancel / Discard
+      if (context.isRecordingVoice || context.isTranscribingVoice) {
+        context.isRecordingVoice = false;
+        context.isTranscribingVoice = false;
+        context.updateReaderForCurrentSession();
+      } else if (context.voiceDraftText) {
+        context.voiceDraftText = '';
+        context.voiceSubmission = 'idle';
+        context.updateReaderForCurrentSession();
+      } else if (context.voiceSubmission === 'unknown') {
+        context.voiceDraftText = '';
+        context.voiceSubmission = 'idle';
+        context.updateReaderForCurrentSession();
+      } else {
+        context.activeEditor = 'none';
+        context.viewMode = 'session';
+        context.updateReaderForCurrentSession();
+      }
+    }
+
+    void paintMk20();
+  }
+  } catch (err) {
+    console.error('[MK20 INPUT ERROR]:', err);
+  }
 });
 
 console.log('====================================================');
 console.log('  RUNNING DAEMON (Press Ctrl+C to stop)');
 console.log('====================================================');
+
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]:', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED REJECTION]:', reason);
+});
 
 const cleanup = async () => {
   clearInterval(timer);

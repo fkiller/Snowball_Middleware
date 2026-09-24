@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { realpath } from 'node:fs/promises';
 import path from 'node:path';
-import { formatSessionKey, parseSessionKey, type DispatchPort, type DispatchReceipt, type CommandRecord, type DecisionRecord } from '@snowball/core';
+import { formatSessionKey, parseSessionKey, type DispatchPort, type DispatchReceipt, type CommandRecord, type DecisionRecord } from '@snowball/plugin-sdk';
 import { CodexFault, CodexStdio, type CodexLaunch, type RpcPort } from './transport.js';
 export { CodexFault, codexLaunchDigest, CodexStdio, type CodexLaunch, type RpcPort } from './transport.js';
 export { codexManifest } from './manifest.js';
@@ -20,11 +20,13 @@ export class CodexOwnedAdapter extends EventEmitter implements DispatchPort {
   #ready = false;
   #auth: 'unknown' | 'needs_auth' | 'available' | 'not_required' = 'unknown';
   #owned = new Set<string>();
+  #attached = new Set<string>();
   #turns = new Map<string, string>();
   #completedTurns = new Set<string>();
   #decisions = new Map<string, NativeDecision>();
   #answers = new Map<string, { resolve(value: DispatchReceipt): void; reject(error: Error): void; dispose(): void }>();
   #busy = new Set<string>();
+  #sessionListTruncated = false;
   constructor(private readonly rpc: RpcPort, binding: CodexBinding) {
     super(); this.#binding = structuredClone(binding);
     formatSessionKey({ hostId: binding.hostId, harness: { pluginId: 'snowball.codex', instanceId: binding.instanceId }, nativeSessionId: 'validation' });
@@ -44,7 +46,7 @@ export class CodexOwnedAdapter extends EventEmitter implements DispatchPort {
     this.rpc.notify('initialized'); this.#ready = true;
     await this.refreshAuth();
   }
-  status() { return { connected: this.#ready, auth: this.#auth, ownerId: this.ownerId, instanceId: this.#binding.instanceId, surface: 'owned-stdio', credentialSource: 'selected-codex-home', existingDesktopControl: false, ownedSessionCount: this.#owned.size, runtimeProcessId: this.rpc.processId ?? null }; }
+  status() { return { connected: this.#ready, auth: this.#auth, ownerId: this.ownerId, instanceId: this.#binding.instanceId, surface: 'owned-stdio', credentialSource: 'selected-codex-home', existingDesktopControl: false, selectedThreadAttach: true, sessionListTruncated: this.#sessionListTruncated, attachedSessionCount: this.#attached.size, ownedSessionCount: this.#owned.size, runtimeProcessId: this.rpc.processId ?? null }; }
   async refreshAuth(): Promise<void> {
     this.ready(); const account = await this.rpc.request('account/read', { refreshToken: false });
     if (!record(account) || typeof account.requiresOpenaiAuth !== 'boolean') throw new CodexFault('invalid_account_state');
@@ -53,9 +55,43 @@ export class CodexOwnedAdapter extends EventEmitter implements DispatchPort {
   }
   private ready(): void { if (!this.#ready) throw new CodexFault('not_connected'); }
   private sessionKey(threadId: string): string { return formatSessionKey({ hostId: this.#binding.hostId, harness: { pluginId: 'snowball.codex', instanceId: this.#binding.instanceId }, nativeSessionId: threadId }); }
+  /** Actual provider catalog; no baked-in model or effort choices. */
+  async listModels(): Promise<Array<{ model: string; displayName: string; efforts: string[]; defaultEffort: string | null }>> {
+    this.ready();
+    const models: Array<{ model: string; displayName: string; efforts: string[]; defaultEffort: string | null }> = [];
+    let cursor: string | undefined;
+    const seen = new Set<string>();
+    for (let page = 0; page < 5; page++) {
+      const result = await this.rpc.request('model/list', { limit: 100, includeHidden: false, ...(cursor ? { cursor } : {}) });
+      if (!record(result) || !Array.isArray(result.data) || result.data.length > 100) throw new CodexFault('invalid_model_catalog');
+      for (const item of result.data) {
+        if (!record(item) || !id(item.model) || !id(item.displayName) || !Array.isArray(item.supportedReasoningEfforts) || item.supportedReasoningEfforts.length > 16) throw new CodexFault('invalid_model_catalog');
+        if (item.hidden === true) continue;
+        const efforts = item.supportedReasoningEfforts.map((e: unknown) => { if (!record(e) || !id(e.reasoningEffort)) throw new CodexFault('invalid_model_catalog'); return e.reasoningEffort; });
+        const defaultEffort = typeof item.defaultReasoningEffort === 'string' && efforts.includes(item.defaultReasoningEffort) ? item.defaultReasoningEffort : null;
+        if (!models.some(m => m.model === item.model)) models.push({ model: item.model, displayName: item.displayName, efforts, defaultEffort });
+      }
+      if (result.nextCursor == null) return models;
+      if (!id(result.nextCursor) || seen.has(result.nextCursor)) throw new CodexFault('invalid_model_cursor');
+      cursor = result.nextCursor; seen.add(cursor);
+    }
+    throw new CodexFault('model_catalog_limit');
+  }
+  /** User-selected existing session. This attaches a command route, not a new session. */
+  async attachSession(threadId: string): Promise<{ sessionKey: string; ownerId: string }> {
+    this.ready();
+    if (!id(threadId) || this.#owned.size >= 128) throw new CodexFault('invalid_thread');
+    if (this.#auth === 'unknown' || this.#auth === 'needs_auth') throw new CodexFault('needs_auth');
+    const result = await this.rpc.request('thread/resume', { threadId, excludeTurns: true });
+    if (!record(result) || !record(result.thread) || result.thread.id !== threadId) throw new CodexFault('invalid_thread_response', 'unknown');
+    this.ready();
+    this.#owned.add(threadId); this.#attached.add(threadId);
+    return { sessionKey: this.sessionKey(threadId), ownerId: this.ownerId };
+  }
   async createSession(root: string, options: { ephemeral?: boolean; model?: string } = {}): Promise<{ sessionKey: string; ownerId: string }> {
     this.ready(); if (this.#auth === 'needs_auth' || this.#auth === 'unknown') throw new CodexFault('needs_auth');
     if (!path.isAbsolute(root) || options.model !== undefined && !id(options.model) || this.#owned.size >= 128) throw new CodexFault('invalid_session_request');
+    if (options.model !== undefined && !(await this.listModels()).some(m => m.model === options.model)) throw new CodexFault('unsupported_execution_settings');
     const cwd = await realpath(root);
     const value = await this.rpc.request('thread/start', { cwd, ephemeral: options.ephemeral === true, approvalPolicy: 'on-request', sandbox: 'read-only', ...(options.model ? { model: options.model } : {}) });
     if (!record(value) || !record(value.thread) || !id(value.thread.id) || this.#owned.has(value.thread.id)) throw new CodexFault('invalid_thread_response', 'unknown');
@@ -63,9 +99,26 @@ export class CodexOwnedAdapter extends EventEmitter implements DispatchPort {
     return { sessionKey: this.sessionKey(value.thread.id), ownerId: this.ownerId };
   }
   async listSessions(): Promise<{ nativeId: string; sessionKey: string; ownerId: string | null; readOnly: boolean; cwd: string }[]> {
-    this.ready(); const result = await this.rpc.request('thread/list', { limit: 100 });
-    if (!record(result) || !Array.isArray(result.data) || result.data.length > 100) throw new CodexFault('invalid_thread_list');
-    return result.data.filter((t: unknown) => record(t) && id(t.id)).map((t: any) => ({ nativeId: t.id, sessionKey: this.sessionKey(t.id), ownerId: this.#owned.has(t.id) ? this.ownerId : null, readOnly: !this.#owned.has(t.id), cwd: typeof t.cwd === 'string' ? t.cwd.slice(0, 4096) : '' }));
+    this.ready(); this.#sessionListTruncated = false;
+    const sessions: { nativeId: string; sessionKey: string; ownerId: string | null; readOnly: boolean; cwd: string }[] = [];
+    let cursor: string | undefined; let bytes = 2; const seen = new Set<string>();
+    // Real histories can exceed the native frame bound at limit=100. Small native
+    // pages and a separate normalized worker-response budget keep both pipes bounded.
+    for (let page = 0; page < 10; page++) {
+      const result = await this.rpc.request('thread/list', { limit: 10, ...(cursor ? { cursor } : {}) });
+      if (!record(result) || !Array.isArray(result.data) || result.data.length > 10) throw new CodexFault('invalid_thread_list');
+      for (const t of result.data) {
+        if (!record(t) || !id(t.id) || sessions.some(s => s.nativeId === t.id)) continue;
+        const session = { nativeId: t.id, sessionKey: this.sessionKey(t.id), ownerId: this.#owned.has(t.id) ? this.ownerId : null, readOnly: !this.#owned.has(t.id), cwd: typeof t.cwd === 'string' ? t.cwd.slice(0, 4096) : '' };
+        bytes += Buffer.byteLength(JSON.stringify(session)) + 1;
+        if (bytes > 48 * 1024) { this.#sessionListTruncated = true; return sessions; }
+        sessions.push(session);
+      }
+      if (result.nextCursor == null) return sessions;
+      if (!id(result.nextCursor) || seen.has(result.nextCursor)) throw new CodexFault('invalid_thread_cursor');
+      cursor = result.nextCursor; seen.add(cursor);
+    }
+    this.#sessionListTruncated = true; return sessions;
   }
   async readSession(threadId: string): Promise<{ nativeId: string; readOnly: boolean }> {
     this.ready(); if (!id(threadId)) throw new CodexFault('invalid_thread');
@@ -84,10 +137,19 @@ export class CodexOwnedAdapter extends EventEmitter implements DispatchPort {
     if (input.operation === 'sessions.send') {
       if (this.#auth === 'needs_auth' || this.#auth === 'unknown') return no('needs_auth');
       if (this.#busy.has(threadId) || this.#turns.has(threadId)) return no('turn_already_active');
-      if (typeof payload.text !== 'string' || !payload.text.trim() || Buffer.byteLength(payload.text) > 60000 || Object.keys(payload).some(k => k !== 'text')) return no('invalid_message');
+      if (typeof payload.text !== 'string' || !payload.text.trim() || Buffer.byteLength(payload.text) > 60000 || Object.keys(payload).some(k => !['text', 'model', 'effort'].includes(k))) return no('invalid_message');
       this.#busy.add(threadId);
       try {
-        const result = await this.rpc.request('turn/start', { threadId, input: [{ type: 'text', text: payload.text }], clientUserMessageId: input.commandId }, signal);
+      if (payload.model !== undefined || payload.effort !== undefined) {
+        if (!id(payload.model)) return no('model_required_for_settings');
+        let catalog; try { catalog = await this.listModels(); } catch { return no('model_catalog_unavailable'); }
+        const model = catalog.find(m => m.model === payload.model);
+        if (!model || payload.effort !== undefined && (typeof payload.effort !== 'string' || !model.efforts.includes(payload.effort))) return no('unsupported_execution_settings');
+        if (signal.aborted) return no('cancelled_before_send');
+      }
+      if (!this.#ready || signal.aborted) return no('cancelled_before_send');
+      if (this.#turns.has(threadId)) return no('turn_already_active');
+        const result = await this.rpc.request('turn/start', { threadId, input: [{ type: 'text', text: payload.text }], clientUserMessageId: input.commandId, ...(payload.model !== undefined ? { model: payload.model } : {}), ...(payload.effort !== undefined ? { effort: payload.effort } : {}) }, signal);
         if (!record(result) || !record(result.turn) || !id(result.turn.id)) throw new CodexFault('invalid_turn_response', 'unknown');
         if (!this.#completedTurns.has(JSON.stringify([threadId, result.turn.id])) && !['completed', 'interrupted', 'failed'].includes(result.turn.status)) this.#turns.set(threadId, result.turn.id);
         return { status: 'acknowledged', correlationId: result.turn.id };
@@ -135,7 +197,7 @@ export class CodexOwnedAdapter extends EventEmitter implements DispatchPort {
     if (value.method === 'account/updated') { this.#auth = 'unknown'; this.emit('authChanged', { requiresRecheck: true }); return; }
     if (!this.#owned.has(p.threadId)) return;
     if (value.method === 'turn/started' && record(p.turn) && id(p.turn.id)) {
-      if (!this.#busy.has(p.threadId) && this.#turns.get(p.threadId) !== p.turn.id) {
+      if (!this.#attached.has(p.threadId) && !this.#busy.has(p.threadId) && this.#turns.get(p.threadId) !== p.turn.id) {
         this.#owned.delete(p.threadId); this.#turns.delete(p.threadId);
         this.emit('ownerLost', { sessionKey: this.sessionKey(p.threadId), ownerId: this.ownerId, reason: 'unexpected_native_turn' }); return;
       }
@@ -145,7 +207,12 @@ export class CodexOwnedAdapter extends EventEmitter implements DispatchPort {
       this.#completedTurns.add(JSON.stringify([p.threadId, p.turn.id]));
       if (this.#completedTurns.size > 256) this.#completedTurns.delete(this.#completedTurns.values().next().value!);
       if (this.#turns.get(p.threadId) === p.turn.id) this.#turns.delete(p.threadId);
-      for (const [k, decision] of this.#decisions) if (decision.threadId === p.threadId && decision.turnId === p.turn.id) this.#decisions.delete(k);
+      for (const [k, decision] of this.#decisions) if (decision.threadId === p.threadId && decision.turnId === p.turn.id) {
+        this.#decisions.delete(k);
+        const pending = this.#answers.get(k);
+        if (pending) { this.#answers.delete(k); pending.dispose(); pending.reject(new CodexFault('decision_resolution_not_acceptance_proof', 'unknown')); }
+        this.emit('decisionResolved', { sessionKey: this.sessionKey(p.threadId), ownerId: this.ownerId, nativeRequestId: decision.id, nativeRevision: decision.revision });
+      }
     }
     if (value.method === 'serverRequest/resolved') {
       const k = key(p.requestId); const native = this.#decisions.get(k);
@@ -153,15 +220,15 @@ export class CodexOwnedAdapter extends EventEmitter implements DispatchPort {
         this.#decisions.delete(k); const pending = this.#answers.get(k);
         // This notification also covers automatic clearing. It cannot prove our exact answer was accepted.
         if (pending) { this.#answers.delete(k); pending.dispose(); pending.reject(new CodexFault('decision_resolution_not_acceptance_proof', 'unknown')); }
-        this.emit('decisionResolved', { sessionKey: this.sessionKey(p.threadId), nativeRequestId: p.requestId, nativeRevision: native.revision });
+        this.emit('decisionResolved', { sessionKey: this.sessionKey(p.threadId), ownerId: this.ownerId, nativeRequestId: p.requestId, nativeRevision: native.revision });
       }
     }
     if (['turn/started', 'turn/completed', 'item/agentMessage/delta'].includes(value.method)) {
-      this.emit('event', { sessionKey: this.sessionKey(p.threadId), ownerId: this.ownerId, kind: value.method, turnId: record(p.turn) ? p.turn.id : p.turnId, ...(value.method === 'item/agentMessage/delta' && typeof p.delta === 'string' ? { text: p.delta.slice(0, 65536) } : {}) });
+      this.emit('event', { sessionKey: this.sessionKey(p.threadId), ownerId: this.ownerId, kind: value.method, turnId: record(p.turn) ? p.turn.id : p.turnId, ...(value.method === 'turn/completed' && ['completed', 'failed', 'interrupted'].includes(p.turn?.status) ? { outcome: p.turn.status } : {}), ...(value.method === 'item/agentMessage/delta' && typeof p.delta === 'string' ? { text: p.delta.slice(-4096), truncated: p.delta.length > 4096 } : {}) });
     }
   }
   private disconnected(): void {
-    this.#ready = false; this.#auth = 'unknown'; this.#owned.clear(); this.#turns.clear(); this.#decisions.clear();
+    this.#ready = false; this.#auth = 'unknown'; this.#owned.clear(); this.#attached.clear(); this.#turns.clear(); this.#decisions.clear();
     for (const p of this.#answers.values()) { p.dispose(); p.reject(new CodexFault('disconnected', 'unknown')); } this.#answers.clear();
     this.emit('offline', { ownerId: this.ownerId });
   }

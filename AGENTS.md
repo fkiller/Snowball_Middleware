@@ -394,3 +394,11 @@ Before implementing a middleware task, read `docs/middleware/PLAN.md`, `docs/mid
 Run `node docs/middleware/validate-plan.mjs --next` to identify the recorded resume task and eligible work. Verify against repository state before continuing. Do not mark a task done without its acceptance evidence, or equate discovery with authenticated command control. Update the task checkpoint and HANDOFF before stopping; record partial work, exact next action, failed approaches, and unexecuted checks. Regenerate the readable tree with `node docs/middleware/validate-plan.mjs --write-tree` after ledger changes.
 
 These rules apply equally to Astra, other Codex models, Antigravity, and other LLMs. Agent identity must not affect application behavior. When moving the middleware into its own repository, migrate the plan, evidence, and continuity instructions and record one authoritative location rather than maintaining divergent ledgers.
+
+## User-confirmed local control contract — 2026-09-21
+
+- Default local Web UI uses noAuth: no login, PIN, pairing code or repeated authorization. It binds only 127.0.0.1; Host/Origin/browser checks stay in force. Optional token mode is operator-selected, not the normal journey.
+- MK20/device pairing is separate from Web UI access. Do not add a Web PIN to repair a device protocol.
+- Connected, explicitly selected harness sessions must accept commands. Discovery alone is observation; explicit attachment establishes the route. Do not treat permanently disabling commands as plugin isolation.
+- Plugin isolation means precise operation/event/session scope and no exceptional core privileges. Current process separation is not OS confinement against malicious same-user plugins; report this limitation honestly.
+- Every model/effort, voice, settings and session action requires actual backend behavior and evidence. Removing a fake fallback makes the state honest; it does not complete the missing MVP feature.

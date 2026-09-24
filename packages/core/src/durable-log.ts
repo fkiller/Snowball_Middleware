@@ -86,7 +86,7 @@ export class DurableLog {
   }
 }
 
-/** Explicit OFFLINE operation; never invoke from ordinary startup, discovery or the HTTP API. */
+/** Exact-token, dead-PID recovery. Startup may call this only after private-state validation; never expose it through discovery or HTTP. */
 export function recoverAbandonedJournalLock(directory: string, expectedToken: string): void {
   const lockPath = path.join(fs.realpathSync(directory), 'commands.lock');
   const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8')) as unknown;

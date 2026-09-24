@@ -33,6 +33,18 @@ async function login(api) { const grant = api.issueBootstrap(); const res = awai
 const input = (journal, commandId, extra = {}) => ({ commandId, sessionKey, ownerId, expectedRevision: journal.session(sessionKey).revision, operation: 'sessions.send', payload: { text: 'private-payload' }, ...extra });
 const matches = (status, code) => error => error.status === status && (!code || error.code === code);
 
+test('workspace candidate association uses exact registered root, not a matching display name', async t => {
+  const { api, root, workspaces } = await setup(t);
+  workspaces.listCandidates = () => [
+    { candidateId: 'same', harness: { pluginId: 'snowball.codex', instanceId: 'local' }, nativeProjectId: 'one', root, displayName: 'workspace' },
+    { candidateId: 'different', harness: { pluginId: 'snowball.codex', instanceId: 'local' }, nativeProjectId: 'two', root: path.join(path.dirname(root), 'other'), displayName: 'workspace' },
+  ];
+  const auth = await login(api);
+  const snapshot = (await request(api, '/v1/snapshot', { auth })).body;
+  assert.equal(snapshot.workspaceCandidates[0].workspaceId, workspaceId);
+  assert.equal(snapshot.workspaceCandidates[1].workspaceId, undefined);
+});
+
 test('SDK default fetch retains the browser global receiver', async () => {
   const original = globalThis.fetch;
   globalThis.fetch = function () {
@@ -181,8 +193,14 @@ test('malformed, compressed and oversized bodies cannot admit work', async t => 
 test('published OpenAPI routes and SDK operations describe the implemented v1 surface', () => {
   const spec = JSON.parse(fs.readFileSync(new URL('../packages/api/openapi.v1.json', import.meta.url)));
   assert.equal(spec.openapi, '3.1.0');
-  assert.equal(Object.keys(spec.paths).length, 11);
+  assert.equal(Object.keys(spec.paths).length, 20);
+  assert.equal(spec.paths['/v1/sessions/create-status'].post.operationId, 'readHarnessSessionCreateReceipt');
+  assert.ok(spec.paths['/v1/sessions/create'].post.requestBody.content['application/json'].schema.required.includes('requestId'));
+  assert.equal(spec.components.schemas.SessionSummary.properties.workspaceId.pattern, '^ws_[0-9a-f]{16}$');
   assert.equal(spec.paths['/v1/harness/scan'].post.operationId, 'scanHarness');
+  assert.equal(spec.paths['/v1/harness/connect-codex'].post.operationId, 'connectCodex');
+  assert.equal(spec.paths['/v1/harness/disconnect-codex'].post.operationId, 'disconnectCodex');
+  assert.equal(spec.paths['/v1/harness/reset-codex'].post.operationId, 'resetCodex');
   assert.equal(spec.paths['/v1/workspaces/{workspaceId}/recheck'].post.operationId, 'recheckWorkspace');
   assert.deepEqual(spec.paths['/v1/bootstrap'].post.security, []);
   assert.ok(spec.paths['/v1/commands'].post.responses['202']);

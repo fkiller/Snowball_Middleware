@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { CodexOwnedAdapter } from '../packages/harness-codex/dist/index.js';
-import { CommandJournal, formatSessionKey } from '../packages/core/dist/index.js';
+import { CommandJournal, SessionService, formatSessionKey } from '../packages/core/dist/index.js';
 const hostId = `host_${'a'.repeat(32)}`, actorId = `ctl_${'b'.repeat(16)}`;
 class Port extends EventEmitter {
   calls = []; count = 0; auth = true; earlyComplete = false; home;
@@ -14,6 +14,8 @@ class Port extends EventEmitter {
     this.calls.push({ method, params });
     if (method === 'initialize') return { userAgent: 'codex_cli_rs/0.153.4 (fixture)', codexHome: this.home };
     if (method === 'account/read') return { requiresOpenaiAuth: true, account: this.auth ? { type: 'chatgpt', email: 'do not expose' } : null };
+    if (method === 'model/list') return { data: [{model:'fixture-model',displayName:'Fixture model',supportedReasoningEfforts:[{reasoningEffort:'low'},{reasoningEffort:'high'}],defaultReasoningEffort:'low'}],nextCursor:null };
+    if (method === 'thread/resume') return { thread: {id:params.threadId} };
     if (method === 'thread/start') return { thread: { id: `owned-${++this.count}` } };
     if (method === 'thread/list') return { data: [{ id: 'desktop-existing', cwd: this.home }, { id: 'owned-1', cwd: this.home }] };
     if (method === 'thread/read') return { thread: { id: params.threadId } };
@@ -36,6 +38,21 @@ async function fixture(t) {
   return { directory, port, adapter, cleanup };
 }
 const envelope = (adapter, sessionKey, operation, payload) => ({ command: { input: { commandId: 'test-command', actorId, ownerId: adapter.ownerId, sessionKey, operation, payload, expectedRevision: 0 } } });
+
+for (const completion of [false, true]) test(`native ${completion ? 'turn completion' : 'request clearing'} closes the approval but never fabricates answer acceptance`, async t => {
+  const { adapter, port, directory, cleanup } = await fixture(t);
+  const journal = new CommandJournal({ directory: path.join(directory, 'journal'), hostId }); cleanup.push(() => journal.close());
+  const service = new SessionService({ hostId, journal }); service.registerAdapter('snowball.codex', adapter);
+  const { sessionKey } = await service.createSession('snowball.codex', directory);
+  await service.sendPrompt(actorId, sessionKey, 'fixture'); await service.dispatchNext(sessionKey);
+  port.emit('request', { id: 0, method: 'item/commandExecution/requestApproval', params: { threadId: 'owned-1', turnId: 'turn-1', itemId: 'item-1', availableDecisions: ['decline'] } });
+  const decision = journal.listDecisions()[0]; assert.equal(decision.status, 'pending');
+  if (completion) port.respond = () => queueMicrotask(() => port.emit('notification', { method: 'turn/completed', params: { threadId: 'owned-1', turn: { id: 'turn-1', status: 'interrupted' } } }));
+  const answered = await service.resolveDecision(actorId, decision.decisionId, 'decline');
+  assert.equal(journal.decision(decision.decisionId).status, 'resolved');
+  assert.equal(journal.command(answered.commandId).status, 'unknown');
+  await assert.rejects(service.resolveDecision(actorId, decision.decisionId, 'decline'));
+});
 test('explicit handshake preserves credential source; unauthenticated state never creates a session', async t => {
   const { port, adapter, directory } = await fixture(t); assert.ok(!JSON.stringify(adapter.status()).includes('do not expose'));
   port.auth = false; await adapter.refreshAuth(); assert.equal(adapter.status().auth, 'needs_auth');
@@ -87,4 +104,29 @@ test('an unexpected native turn revokes local ownership instead of steering anot
   port.emit('notification', { method: 'turn/started', params: { threadId: 'owned-1', turn: { id: 'other-client-turn' } } });
   assert.equal(lost.sessionKey, sessionKey);
   assert.equal((await adapter.execute(envelope(adapter, sessionKey, 'sessions.send', { text: 'must not steer' }), new AbortController().signal)).reason, 'owner_mismatch');
+});
+
+test('selected existing Codex session accepts commands with actual catalog model/effort while unrelated sessions stay outside scope',async t=>{
+ const {adapter,port}=await fixture(t);
+ const models=await adapter.listModels();assert.deepEqual(models[0].efforts,['low','high']);
+ const attached=await adapter.attachSession('desktop-existing');
+ const signal=new AbortController().signal;
+ const receipt=await adapter.execute(envelope(adapter,attached.sessionKey,'sessions.send',{text:'fixture command',model:'fixture-model',effort:'high'}),signal);
+ assert.equal(receipt.status,'acknowledged');
+ const sent=port.calls.find(c=>c.method==='turn/start');assert.equal(sent.params.threadId,'desktop-existing');assert.equal(sent.params.model,'fixture-model');assert.equal(sent.params.effort,'high');
+ assert.deepEqual(port.calls.find(c=>c.method==='thread/resume').params,{threadId:'desktop-existing',excludeTurns:true});
+ port.emit('notification',{method:'turn/completed',params:{threadId:'desktop-existing',turn:{id:'turn-1'}}});
+ const invalid=await adapter.execute(envelope(adapter,attached.sessionKey,'sessions.send',{text:'never send',model:'fixture-model',effort:'invented'}),signal);
+ assert.equal(invalid.reason,'unsupported_execution_settings');assert.equal(port.calls.filter(c=>c.method==='turn/start').length,1);
+ port.emit('notification',{method:'turn/started',params:{threadId:'desktop-existing',turn:{id:'external-turn'}}});
+ assert.equal((await adapter.readSession('desktop-existing')).readOnly,false);
+ const stopped=await adapter.execute(envelope(adapter,attached.sessionKey,'sessions.interrupt',{turnId:'external-turn'}),signal);assert.equal(stopped.status,'acknowledged');
+});
+
+test('large native text becomes an explicitly truncated bounded worker event',async t=>{
+ const {adapter,port,directory}=await fixture(t);const created=await adapter.createSession(directory);let event;
+ adapter.on('event',value=>{event=value;});
+ port.emit('notification',{method:'item/agentMessage/delta',params:{threadId:'owned-1',turnId:'large-turn',delta:'한'.repeat(70000)}});
+ assert.equal(event.sessionKey,created.sessionKey);assert.equal(event.text.length,4096);assert.equal(event.truncated,true);
+ assert.ok(Buffer.byteLength(JSON.stringify(event))<65536);
 });
