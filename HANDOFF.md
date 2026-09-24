@@ -95,7 +95,7 @@ Exact next: exercise native picker/review plus disconnect/reset confirmations in
 
 ## Git and commands
 
-Branch codex/local-control-core, HEAD 06e874a. Many pre-existing dirty/untracked user files plus this review's changes; no commit/reset/stash/bulk staging. Use git status/diff as exact file inventory. No remote configured. Preserve source-repository unrelated changes.
+Branch `codex/local-control-core`, private remote `https://github.com/fkiller/Snowball_Middleware`. Consolidated local-control implementation commit `b078e83` contains the previously dirty task work after 226/222-pass regression, static boundary/audit checks and artifact exclusion review. The current CI metadata fixes may be newer than that commit; run `git status`, `git log -1` and `git diff` for exact state. Do not add `.state`, `artifacts`, credentials or user transcripts to Git.
 
     npm ci --ignore-scripts
     npm run build
