@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "planRevision": 41,
+  "planRevision": 42,
   "updatedAt": "2026-09-24",
   "scope": "Local control first; Web noAuth/no PIN is intended. Connected harness sessions must accept commands within plugin scope. Actual model/effort and all advertised features require real backend evidence.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
@@ -2892,12 +2892,13 @@
           "2026-09-22: rebuilt current portable package with durable session stores, historical-attach metadata and request-ID fixes at artifacts/desktop/1790133804472; packaged executable smoke exit 0, actual Tray, zero main windows, loopback noAuth, pause/resume and clean exit. Inventory hashes 85/85 with zero unexpected or missing application files; still unsigned and not installed.",
           "2026-09-23: real-user-data packaged restart exposed four abandoned WAL locks after forced termination. Startup now checks private state and uses exact-token/dead-PID recovery before opening each of the four journals; a live owner remains locked. Focused integration test passed both cases. Windows portable read-only MK20 QMK HID/product CDC observation is separate from device registration.",
           "2026-09-24: final Windows package inventory 96/96 and 99 application files passed native tray/no-front-window/loopback-noAuth/pause smoke.",
-          "2026-09-24: unsigned per-user Inno Setup installer built; fresh-path install, installed executable smoke and uninstall all exited successfully. Live user-state snapshot showed two ready projects, controllable Codex, read-only OpenCode and unsupported MK20 QMK USB candidate."
+          "2026-09-24: unsigned per-user Inno Setup installer built; fresh-path install, installed executable smoke and uninstall all exited successfully. Live user-state snapshot showed two ready projects, controllable Codex, read-only OpenCode and unsupported MK20 QMK USB candidate.",
+          "2026-09-24: GitHub Actions run 36053361742 passed Windows x64 and macOS arm64 native tray/loopback/noAuth/pause package smoke with 96/96 hashes and 99 application files; macOS ditto ZIP extraction passed the same smoke again. Local installer rebuilt at e5d6d22, then clean-path install/smoke/uninstall passed. See desktop-ci-20260924.md."
         ],
-        "nextAction": "Use an accessible macOS host for desktop package/install smoke; verify Windows login/sleep lifecycle and obtain signing identity before a production release.",
+        "nextAction": "Verify macOS x64 and signed/notarized user installation, Windows login/sleep lifecycle and another-user secret isolation before production release. macOS arm64 CI package/archive smoke is complete.",
         "blockers": [
-          "No accessible macOS desktop build/test host or code-signing certificate in the current session.",
-          "Windows login/sleep lifecycle and signed release have not been verified."
+          "macOS x64 and signed/notarized user installation have not been verified; no signing identity is available.",
+          "Windows login/sleep lifecycle and another-user secret isolation have not been verified."
         ],
         "updatedAt": "2026-09-24"
       },
@@ -2926,8 +2927,15 @@
           "date": "2026-09-24",
           "environment": "Windows x64, Node 24.19.0; private GitHub Windows/macOS CI where applicable",
           "procedure": "Build final Windows package and installer, install silently to a fresh path, run installed native tray smoke, uninstall and verify executable removal.",
-          "result": "Partial Windows: bundled runtime and clean-path installer operated without external Node/Python; macOS arm64/x64 desktop install remains unavailable, so A1 stays blocked.",
+          "result": "Partial Windows: bundled runtime and clean-path installer operated without external Node/Python. macOS arm64 CI package and archive roundtrip executed without external Node/Python; macOS x64 and signed user install remain unavailable, so A1 stays blocked.",
           "reference": "docs/middleware/evidence/MW.08.01.01.01/installer-20260924.md"
+        },
+        {
+          "date": "2026-09-24",
+          "environment": "GitHub Actions macos-latest arm64 and windows-latest x64, Node 24, commit e5d6d22",
+          "procedure": "Build and verify packaged Electron applications; archive/extract the macOS app and repeat inventory/native smoke; locally rebuild and clean-install/smoke/uninstall Windows installer.",
+          "result": "Both OS jobs passed native tray/noAuth/pause smoke and 96/96 hashes; macOS archive roundtrip passed. Windows installer lifecycle passed. macOS x64, signed/notarized install and login/sleep remain open.",
+          "reference": "docs/middleware/evidence/MW.08.01.01.01/desktop-ci-20260924.md"
         }
       ],
       "audit": {

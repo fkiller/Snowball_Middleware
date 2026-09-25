@@ -2,7 +2,7 @@
 
 # MW.08.01.01.01 — Mac/Windows clean install과 사용자 세션 lifecycle
 
-Task status: BLOCKED on macOS environment; A2 PASS, A1 partial (Windows x64 pass, macOS blocked).
+Historical 2026-09-19 fixture record below. Current PLAN revision 42 keeps the task blocked, A1 blocked and A2 pending. Windows x64 installed runtime and macOS ARM64 CI package/archive smoke have since passed; macOS x64, signed/notarized user installation, OS login/sleep and another-user secret isolation remain open. See [desktop CI evidence](desktop-ci-20260924.md).
 
 ## Implemented
 

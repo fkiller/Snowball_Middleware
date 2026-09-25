@@ -1,6 +1,6 @@
 # Middleware execution plan — local control first
 
-상태: 2026-09-24 재감사·구현 중 (PLAN revision 41). 실제 상태는 PLAN.json의 L5 증거와 CONTROL_REALITY.md, HANDOFF.md를 따른다. Windows 실제 Codex 제어, 읽기 전용 네이티브 연결 복원/해제, unsigned portable tray 및 per-user installer 설치·실행·제거는 검증됐지만 G2/G3 출시는 미완료다. harness 플러그인 3종의 별도 비공개 release/Windows·macOS CI는 통과했고 공개 라이선스는 미정이다. MK20 QMK HID는 현재 Windows에서 감지되고 안전한 vendor-interface 열기/닫기가 검증됐다. 별도 본체 CDC는 미감지이고 버튼 보고서와 인증 페어링은 아직 검증되지 않았다.
+상태: 2026-09-24 재감사·구현 중 (PLAN revision 42). 실제 상태는 PLAN.json의 L5 증거와 CONTROL_REALITY.md, HANDOFF.md를 따른다. Windows 실제 Codex 제어, 읽기 전용 네이티브 연결 복원/해제, unsigned portable tray 및 per-user installer 설치·실행·제거는 검증됐다. macOS ARM64 CI에서 desktop 앱 빌드·실행과 ZIP 해제 후 재실행도 통과했지만 x64·서명·공증·실사용 설치는 미검증으로 G2/G3 출시는 미완료다. harness 플러그인 3종의 별도 비공개 release/Windows·macOS CI는 통과했고 공개 라이선스는 미정이다. MK20 QMK HID는 현재 Windows에서 감지되고 안전한 vendor-interface 열기/닫기가 검증됐다. 별도 본체 CDC는 미감지이고 버튼 보고서와 인증 페어링은 아직 검증되지 않았다.
 
 이 저장소 `Snowball_Middleware`의 PLAN.json만 편집한다. 원본 Snowball_Control의 원장은 이곳을 가리키는 redirect다.
 
