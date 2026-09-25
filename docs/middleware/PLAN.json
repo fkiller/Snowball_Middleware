@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "planRevision": 43,
+  "planRevision": 44,
   "updatedAt": "2026-09-24",
   "scope": "Local control first; Web noAuth/no PIN is intended. Connected harness sessions must accept commands within plugin scope. Actual model/effort and all advertised features require real backend evidence.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
@@ -2213,9 +2213,10 @@
         ],
         "nextAction": "Exercise visible native picker and disconnect/reset confirmation dialogs on the user desktop. Then verify live concurrent Codex Desktop ownership using only a new verification task, exact approval-answer evidence and native-create uncertainty recovery. Preserve the corrected server-side workspace/session identity projection.",
         "blockers": [
-          "No actual concurrent Desktop ownership or native approval-answer receipt proved. Full historical transcript and provider-side reconciliation of a native create whose reply was lost remain; a durable request receipt now prevents same-ID reexecution and exposes an unconfirmed state for manual exact-session inspection."
+          "No actual concurrent Desktop ownership or native approval-answer receipt proved. Full historical transcript and provider-side reconciliation of a native create whose reply was lost remain; a durable request receipt now prevents same-ID reexecution and exposes an unconfirmed state for manual exact-session inspection.",
+          "2026-09-24: installed Windows app is running and the browser URL was queued, but the computer-use inventory returned no apps or browsers and creating an in-app browser tab reported unavailable. Visible picker/confirmation acceptance cannot be claimed from API checks alone."
         ],
-        "updatedAt": "2026-09-23"
+        "updatedAt": "2026-09-24"
       },
       "priority": {
         "designDemand": 4,
