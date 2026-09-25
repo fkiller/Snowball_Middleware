@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "planRevision": 42,
+  "planRevision": 43,
   "updatedAt": "2026-09-24",
   "scope": "Local control first; Web noAuth/no PIN is intended. Connected harness sessions must accept commands within plugin scope. Actual model/effort and all advertised features require real backend evidence.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
@@ -2893,7 +2893,8 @@
           "2026-09-23: real-user-data packaged restart exposed four abandoned WAL locks after forced termination. Startup now checks private state and uses exact-token/dead-PID recovery before opening each of the four journals; a live owner remains locked. Focused integration test passed both cases. Windows portable read-only MK20 QMK HID/product CDC observation is separate from device registration.",
           "2026-09-24: final Windows package inventory 96/96 and 99 application files passed native tray/no-front-window/loopback-noAuth/pause smoke.",
           "2026-09-24: unsigned per-user Inno Setup installer built; fresh-path install, installed executable smoke and uninstall all exited successfully. Live user-state snapshot showed two ready projects, controllable Codex, read-only OpenCode and unsupported MK20 QMK USB candidate.",
-          "2026-09-24: GitHub Actions run 36053361742 passed Windows x64 and macOS arm64 native tray/loopback/noAuth/pause package smoke with 96/96 hashes and 99 application files; macOS ditto ZIP extraction passed the same smoke again. Local installer rebuilt at e5d6d22, then clean-path install/smoke/uninstall passed. See desktop-ci-20260924.md."
+          "2026-09-24: GitHub Actions run 36053361742 passed Windows x64 and macOS arm64 native tray/loopback/noAuth/pause package smoke with 96/96 hashes and 99 application files; macOS ditto ZIP extraction passed the same smoke again. Local installer rebuilt at e5d6d22, then clean-path install/smoke/uninstall passed. See desktop-ci-20260924.md.",
+          "2026-09-24: private v0.1.0-private desktop prerelease published; both assets redownloaded and SHA-256 matched. Windows installer installed to current-user Programs and launched with two ready projects, Codex control, OpenCode observer and unsupported MK20 candidate. See desktop-ci-20260924.md."
         ],
         "nextAction": "Verify macOS x64 and signed/notarized user installation, Windows login/sleep lifecycle and another-user secret isolation before production release. macOS arm64 CI package/archive smoke is complete.",
         "blockers": [
