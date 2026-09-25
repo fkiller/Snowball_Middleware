@@ -19,7 +19,7 @@ app.setName('Snowball Middleware');app.setPath('userData',path.join(dataDir,'des
 if(process.platform==='win32')app.setAppUserModelId('local.snowball.middleware');
 const lock=app.requestSingleInstanceLock();
 if(!lock){app.quit();}else{
-let tray,worker,client,state,origin,stopping=false,stopPromise,poll,notification,enrollmentBusy=false,savedConnectionWarning=false;
+let tray,worker,client,state,origin,stopping=false,startupFailed=false,stopPromise,poll,notification,enrollmentBusy=false,savedConnectionWarning=false;
 const attentionNotifications=new AttentionNotifications();
 const launchArgs=[...(app.isPackaged?[]:[fileURLToPath(import.meta.url)]),...args.filter(a=>a!=='--smoke-test')];
 const loginConfig={path:process.execPath,args:launchArgs};
@@ -33,7 +33,7 @@ function drawIcon(){
 function updateMenu(){
   if(!tray)return;const paused=state?.settings?.controlPaused;const waiting=state?.decisions?.filter(d=>d.status==='pending').length??0;
   const l=labels(state?.settings?.language);
-  const status=!client||savedConnectionWarning?l.degraded:paused?l.paused:waiting?l.attention:l.connected;
+  const status=!origin&&!startupFailed?l.starting:!client||savedConnectionWarning?l.degraded:paused?l.paused:waiting?l.attention:l.connected;
   tray.setToolTip('Snowball · '+status);
   tray.setContextMenu(Menu.buildFromTemplate([
     {label:'Snowball · '+status,enabled:false},{type:'separator'},
@@ -104,7 +104,7 @@ worker.on('message',async message=>{
     }catch{console.error('Native tray/runtime verification failed');process.exitCode=1;await stop();}
   }else if(message?.kind==='failed'){console.error(message.code,smoke?message.detail??'':'');process.exitCode=1;await stop();}
 });
-worker.on('exit',()=>{client=undefined;enrollmentBusy=false;clearInterval(poll);updateMenu();if(!stopping){console.error('Local core exited; no commands retried');if(smoke){process.exitCode=1;void stop();}}});
+worker.on('exit',()=>{client=undefined;startupFailed=true;enrollmentBusy=false;clearInterval(poll);updateMenu();if(!stopping){console.error('Local core exited; no commands retried');if(smoke){process.exitCode=1;void stop();}}});
 worker.postMessage({kind:'start',dataDir,codexConfig:argument('--codex-control-config'),opencodeConfig:argument('--opencode-observer-config'),smoke});
 if(smoke)setTimeout(()=>{if(!stopping){console.error('Native tray smoke deadline');process.exitCode=1;void stop();}},30000).unref();
 }).catch(async () => { console.error('Native tray startup failed'); process.exitCode=1; await stop(); });
