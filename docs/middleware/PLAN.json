@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "planRevision": 45,
+  "planRevision": 46,
   "updatedAt": "2026-09-24",
   "scope": "Local control first; Web noAuth/no PIN is intended. Connected harness sessions must accept commands within plugin scope. Actual model/effort and all advertised features require real backend evidence.",
   "authoritativeRepository": "E:/developments/projects/Snowball_Middleware",
@@ -2896,11 +2896,12 @@
           "2026-09-24: final Windows package inventory 96/96 and 99 application files passed native tray/no-front-window/loopback-noAuth/pause smoke.",
           "2026-09-24: unsigned per-user Inno Setup installer built; fresh-path install, installed executable smoke and uninstall all exited successfully. Live user-state snapshot showed two ready projects, controllable Codex, read-only OpenCode and unsupported MK20 QMK USB candidate.",
           "2026-09-24: GitHub Actions run 36053361742 passed Windows x64 and macOS arm64 native tray/loopback/noAuth/pause package smoke with 96/96 hashes and 99 application files; macOS ditto ZIP extraction passed the same smoke again. Local installer rebuilt at e5d6d22, then clean-path install/smoke/uninstall passed. See desktop-ci-20260924.md.",
-          "2026-09-24: private v0.1.0-private desktop prerelease published; both assets redownloaded and SHA-256 matched. Windows installer installed to current-user Programs and launched with two ready projects, Codex control, OpenCode observer and unsupported MK20 candidate. See desktop-ci-20260924.md."
+          "2026-09-24: private v0.1.0-private desktop prerelease published; both assets redownloaded and SHA-256 matched. Windows installer installed to current-user Programs and launched with two ready projects, Codex control, OpenCode observer and unsupported MK20 candidate. See desktop-ci-20260924.md.",
+          "2026-09-24: private v0.1.0-private.3 prerelease at 47983b0 contains Windows x64, macOS ARM64 and macOS Intel x64 unsigned assets. Three-platform CI and both Mac ZIP extraction smokes passed 96/96 hashes, 99 files and real tray/noAuth/pause. All remote assets were redownloaded/hash-verified. Windows installer clean-path install/smoke/uninstall passed; current-user install was updated and restored two ready projects and real harnesses. Slow startup now has explicit starting tray status. See desktop-three-platform-20260924.md."
         ],
-        "nextAction": "Verify macOS x64 and signed/notarized user installation, Windows login/sleep lifecycle and another-user secret isolation before production release. macOS arm64 CI package/archive smoke is complete.",
+        "nextAction": "Verify signed/notarized macOS user installation, Windows publisher signing, login/sleep lifecycle and another-user secret isolation before production release. Both Mac architectures have unsigned CI package/archive smoke only.",
         "blockers": [
-          "macOS x64 and signed/notarized user installation have not been verified; no signing identity is available.",
+          "Signed/notarized macOS user installation and Windows publisher signing have not been verified; no signing identity is available.",
           "Windows login/sleep lifecycle and another-user secret isolation have not been verified."
         ],
         "updatedAt": "2026-09-24"
@@ -2930,15 +2931,22 @@
           "date": "2026-09-24",
           "environment": "Windows x64, Node 24.19.0; private GitHub Windows/macOS CI where applicable",
           "procedure": "Build final Windows package and installer, install silently to a fresh path, run installed native tray smoke, uninstall and verify executable removal.",
-          "result": "Partial Windows: bundled runtime and clean-path installer operated without external Node/Python. macOS arm64 CI package and archive roundtrip executed without external Node/Python; macOS x64 and signed user install remain unavailable, so A1 stays blocked.",
+          "result": "Historical partial result: Windows installer and macOS ARM64 CI passed. Later three-platform CI also exercised macOS Intel x64; signed user install and explicit absence of external Node/Python on runtime PATH remain unverified, so A1 stays blocked.",
           "reference": "docs/middleware/evidence/MW.08.01.01.01/installer-20260924.md"
         },
         {
           "date": "2026-09-24",
           "environment": "GitHub Actions macos-latest arm64 and windows-latest x64, Node 24, commit e5d6d22",
           "procedure": "Build and verify packaged Electron applications; archive/extract the macOS app and repeat inventory/native smoke; locally rebuild and clean-install/smoke/uninstall Windows installer.",
-          "result": "Both OS jobs passed native tray/noAuth/pause smoke and 96/96 hashes; macOS archive roundtrip passed. Windows installer lifecycle passed. macOS x64, signed/notarized install and login/sleep remain open.",
+          "result": "Historical two-job run passed. Later three-platform CI also passed macOS Intel x64 native package/archive smoke. Signed/notarized user install and login/sleep remain open.",
           "reference": "docs/middleware/evidence/MW.08.01.01.01/desktop-ci-20260924.md"
+        },
+        {
+          "date": "2026-09-24",
+          "environment": "GitHub Actions Windows x64, macOS ARM64 and macOS Intel x64, Node 24, source commit 47983b0",
+          "procedure": "Build/run all packaged applications, hash inventories, archive/extract both Mac apps and repeat smoke; locally clean-install/smoke/uninstall Windows installer; update current-user installation.",
+          "result": "All three platform jobs passed native tray/noAuth/pause and 96/96 hashes; Mac archive roundtrips passed. Windows install lifecycle and live two-project runtime passed. Signed/notarized user install, external-runtime-free PATH proof and login/sleep remain open.",
+          "reference": "docs/middleware/evidence/MW.08.01.01.01/desktop-three-platform-20260924.md"
         }
       ],
       "audit": {

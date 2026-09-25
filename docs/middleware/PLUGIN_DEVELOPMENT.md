@@ -1,6 +1,6 @@
 # Plugin development and distribution status
 
-2026-09-24: the owner selected private repositories under `fkiller` and left licensing undecided. Three harness plugins have verified independent private releases. The middleware source also has a separate private remote at [Snowball_Middleware](https://github.com/fkiller/Snowball_Middleware); private distribution is not public redistribution.
+2026-09-24: the owner selected private repositories under `fkiller` and left licensing undecided. Three harness plugins have verified independent private releases. The middleware source has a separate private remote at [Snowball_Middleware](https://github.com/fkiller/Snowball_Middleware) and a [three-platform unsigned desktop prerelease](https://github.com/fkiller/Snowball_Middleware/releases/tag/v0.1.0-private.3). Private distribution is not public redistribution.
 
 | Component | Current authority | Status |
 |---|---|---|
