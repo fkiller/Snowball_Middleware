@@ -1,4 +1,6 @@
-# MW.08.01.01.01 — Windows installer and live runtime, 2026-09-24
+# MW.08.01.01.01 — Initial Windows installer and live runtime, 2026-09-24
+
+Historical build evidence for the first unsigned installer. The later private release, current installed app and macOS ARM64 CI evidence are in [desktop-ci-20260924.md](desktop-ci-20260924.md).
 
 Windows x64 source package: `artifacts/desktop/1790278444879/Snowball Middleware-win32-x64`. Reviewed allowlist inventory: 96 matching SHA-256 application entries and exactly 99 expected application files. `scripts/verify-packaged-desktop.mjs` ran the real executable and confirmed a native tray, zero front windows, 127.0.0.1 noAuth/no PIN, real pause/resume, and clean exit.
 
