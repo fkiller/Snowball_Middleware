@@ -418,6 +418,7 @@ try {
   const depRes = await LocalWhisperProvider.ensureDependencies((msg) => {
     console.log(`  ${msg}`);
   });
+  if (!depRes.ok) console.warn('  Whisper Runtime    : Verification failed; voice capture will report an error until dependencies are ready');
   if (depRes.status && depRes.status.gpu_name) {
     console.log(`  Whisper Hardware   : ${depRes.status.gpu_name} (CUDA cuBLAS: ${depRes.status.cuda_ready ? 'READY' : 'ABSENT'})`);
   }
@@ -462,6 +463,7 @@ try {
         process.stdout.write(`\r    [Download] ${msg.slice(0, 65).padEnd(65)}`);
       }
     });
+    if (!dlResult.ok) throw new Error(dlResult.error || 'Whisper model download was not confirmed');
     console.log(`\n  Whisper Model DL   : READY (${dlResult.status})`);
   } else {
     console.log(`  Whisper Model DL   : VERIFIED (Present in cache)`);

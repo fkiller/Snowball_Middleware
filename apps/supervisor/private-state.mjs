@@ -8,7 +8,12 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 $stateRequest = [Console]::In.ReadToEnd() | ConvertFrom-Json
 $statePath = [System.IO.Path]::GetFullPath($stateRequest.directory)
-$stateSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+$stateIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+$stateSid = $stateIdentity.User
+$stateOwnerSids = @($stateSid.Value)
+# Elevated Windows tokens create files owned by their built-in default owner.
+# Administrators already remain a trusted ACL principal; all ACL checks below still apply.
+if ($stateIdentity.Owner.Value -eq 'S-1-5-32-544') { $stateOwnerSids += $stateIdentity.Owner.Value }
 if (-not [System.IO.Directory]::Exists($statePath)) {
   $stateAcl = New-Object System.Security.AccessControl.DirectorySecurity
   $stateAcl.SetOwner($stateSid)
@@ -26,7 +31,7 @@ foreach ($stateTarget in $stateTargets) {
 if (([System.IO.File]::GetAttributes($stateTarget) -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Linked state directory' }
 if ([System.IO.Directory]::Exists($stateTarget)) { $stateAcl = [System.IO.Directory]::GetAccessControl($stateTarget) }
 else { $stateAcl = [System.IO.File]::GetAccessControl($stateTarget) }
-if ($stateAcl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value -ne $stateSid.Value) { throw 'Foreign state owner' }
+if ($stateAcl.GetOwner([System.Security.Principal.SecurityIdentifier]).Value -notin $stateOwnerSids) { throw 'Foreign state owner' }
 $stateRules = $stateAcl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])
 $stateFull = $false
 foreach ($stateAccess in $stateRules) {

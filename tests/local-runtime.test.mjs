@@ -143,7 +143,7 @@ test('PINless runtime connects an existing session and dispatches selected nativ
   const workspace = await client.selectWorkspace();
   const created = await client.createSession({requestId:'11111111-1111-4111-8111-111111111111',pluginId:'snowball.codex',instanceId:'runtime',workspaceId:workspace.workspaceId,title:'Real created fixture task',model:'catalog-only'});
   assert.equal(created.snapshot.sessionDetails.find(s => s.sessionKey === created.sessionKey).title,'Real created fixture task');
-  const started = calls.find(c => c.method === 'thread/start'); assert.equal(started.params.cwd,fs.realpathSync(temp)); assert.equal(started.params.model,'catalog-only');
+  const started = calls.find(c => c.method === 'thread/start'); assert.equal(fs.realpathSync.native(started.params.cwd),fs.realpathSync.native(temp)); assert.equal(started.params.model,'catalog-only');
   await assert.rejects(client.createSession({requestId:'22222222-2222-4222-8222-222222222222',pluginId:'snowball.codex',instanceId:'wrong',workspaceId:workspace.workspaceId}), e=>e.code==='create_unavailable');
   assert.equal(calls.filter(c => c.method === 'thread/start').length,1);
 });

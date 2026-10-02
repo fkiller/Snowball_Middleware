@@ -396,7 +396,7 @@ def check_apple_silicon(tracer: TraceLogger, simulate: str = None) -> bool:
     if simulate in ("apple_silicon", "metal_fail"):
         tracer.log("APPLE", f"SIMULATION: Apple Silicon branch forced ({simulate})", "PASS")
         return True
-    if simulate in ("nvidia", "vulkan", "vulkan_fail", "cpu_only", "nvidia_fail"):
+    if simulate in ("nvidia", "vulkan", "vulkan_fail", "cpu_only", "cuda_fail", "nvidia_fail"):
         tracer.log("APPLE", f"SIMULATION: Non-Apple-Silicon branch forced ({simulate})", "INFO")
         return False
 
@@ -449,7 +449,7 @@ def assess_metal(tracer: TraceLogger, simulate: str = None) -> dict:
 
 def check_nvidia(tracer: TraceLogger, simulate: str = None) -> dict:
     tracer.log("NVIDIA", "Probing for NVIDIA GPU hardware and drivers...")
-    if simulate == "nvidia_fail":
+    if simulate in ("cuda_fail", "nvidia_fail"):
         tracer.log("NVIDIA", "SIMULATION: NVIDIA detected but CUDA assessment will fail", "WARN")
         return {"detected": True, "simulate_fail": True}
     if simulate == "nvidia":
@@ -719,6 +719,15 @@ def run_assessment(args) -> dict:
                 path_steps.append("vulkan_fail")
                 fallback_reason = f"Vulkan failed: {vulkan_res.get('error')}"
                 selected_backend = "cpu"
+
+    # The resident faster-whisper/CTranslate2 worker accepts CUDA or CPU only.
+    # Detecting a graphics loader is not evidence of a supported STT backend.
+    if selected_backend not in ("cuda", "cpu"):
+        fallback_reason = f"{selected_backend} is unsupported by the resident faster-whisper worker"
+        tracer.log("RUNTIME", fallback_reason, "WARN")
+        path_steps.append("unsupported_backend_cpu")
+        selected_backend = "cpu"
+        device_details = {}
 
     # Step 4: Finalize Decision
     print("-" * 80)
