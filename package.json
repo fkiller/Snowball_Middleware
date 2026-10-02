@@ -23,6 +23,7 @@
     "start:tray": "node apps/desktop/launch.mjs",
     "test:tray": "node apps/desktop/launch.mjs --smoke-test",
     "export:harnesses": "node scripts/export-harness-repositories.mjs",
+    "sync:harnesses": "node scripts/sync-harness-repositories.mjs",
     "package:desktop": "node scripts/package-desktop.mjs",
     "package:windows-installer": "node scripts/package-windows-installer.mjs"
   },

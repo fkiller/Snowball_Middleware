@@ -1,1 +1,7 @@
-{"name":"@snowball/device-virtual","version":"0.1.0","private":true,"type":"module","license":"UNLICENSED"}
+{
+  "name": "@snowball/device-virtual",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0"
+}

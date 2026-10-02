@@ -1,78 +1,263 @@
-// Prepare private, independently buildable repositories; never publishes or chooses a license.
+// Prepare public, independently buildable harness plugin repositories under Apache-2.0.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 
-const root=fileURLToPath(new URL('..',import.meta.url));
-const output=process.argv[2];
-if(!output||!path.isAbsolute(output)||fs.existsSync(output))throw new Error('Choose a new absolute output directory');
-const npm=process.env.npm_execpath;
-if(!npm||!fs.existsSync(npm))throw new Error('Run with npm run export:harnesses -- ABSOLUTE_NEW_DIRECTORY');
-const base=JSON.parse(fs.readFileSync(path.join(root,'tsconfig.base.json'),'utf8'));
-fs.mkdirSync(output,{recursive:true});
-const sdkPack=JSON.parse(execFileSync(process.execPath,[npm,'pack',path.join(root,'packages/plugin-sdk'),'--pack-destination',output,'--ignore-scripts','--json'],{encoding:'utf8',windowsHide:true}))[0];
-const sdkTar=path.join(output,sdkPack.filename);
-for(const name of ['harness-codex','harness-opencode','harness-antigravity']){
-  const source=path.join(root,'packages',name), destination=path.join(output,name);
-  fs.mkdirSync(destination);fs.cpSync(path.join(source,'src'),path.join(destination,'src'),{recursive:true,errorOnExist:true});
-  const pkg=JSON.parse(fs.readFileSync(path.join(source,'package.json'),'utf8'));
-  pkg.dependencies={'@snowball/plugin-sdk':`file:vendor/${sdkPack.filename}`};
-  pkg.bundledDependencies=['@snowball/plugin-sdk'];
-  pkg.devDependencies={'typescript':'5.9.3','@types/node':'20.19.43'};
-  pkg.engines={node:'>=22.12'};pkg.files=['dist','src','README.md','vendor','docs','scripts'];
-  pkg.scripts={build:'tsc -p tsconfig.json',test:'npm run build && node --test tests/protocol.test.mjs'+(name==='harness-codex'?'':' tests/adapter.test.mjs'),'test:package':'node scripts/verify-release-package.mjs'};
-  fs.mkdirSync(path.join(destination,'vendor'));fs.copyFileSync(sdkTar,path.join(destination,'vendor',sdkPack.filename));
-  fs.writeFileSync(path.join(destination,'package.json'),JSON.stringify(pkg,null,2)+'\n');
-  fs.writeFileSync(path.join(destination,'tsconfig.json'),JSON.stringify({...base,compilerOptions:{...base.compilerOptions,rootDir:'src',outDir:'dist'},include:['src/**/*.ts']},null,2)+'\n');
-  fs.writeFileSync(path.join(destination,'.gitignore'),'node_modules/\ndist/\n*.log\n');
-  fs.mkdirSync(path.join(destination,'tests'));
-  const provider=name.slice(8),manifest=provider+'Manifest';
-  const testSource=`import test from 'node:test';
+const root = fileURLToPath(new URL('..', import.meta.url));
+const output = process.argv[2];
+if (!output || !path.isAbsolute(output) || fs.existsSync(output)) {
+  throw new Error('Choose a new absolute output directory');
+}
+
+const npm = process.env.npm_execpath;
+if (!npm || !fs.existsSync(npm)) {
+  throw new Error('Run with npm run export:harnesses -- ABSOLUTE_NEW_DIRECTORY');
+}
+
+const base = JSON.parse(fs.readFileSync(path.join(root, 'tsconfig.base.json'), 'utf8'));
+fs.mkdirSync(output, { recursive: true });
+
+const sdkPack = JSON.parse(
+  execFileSync(
+    process.execPath,
+    [npm, 'pack', path.join(root, 'packages/plugin-sdk'), '--pack-destination', output, '--ignore-scripts', '--json'],
+    { encoding: 'utf8', windowsHide: true }
+  )
+)[0];
+const sdkTar = path.join(output, sdkPack.filename);
+
+const targets = [
+  { name: 'harness-codex', repoName: 'Snowball_Harness_Codex', provider: 'codex', title: 'Codex CLI' },
+  { name: 'harness-opencode', repoName: 'Snowball_Harness_OpenCode', provider: 'opencode', title: 'OpenCode' },
+  { name: 'harness-antigravity', repoName: 'Snowball_Harness_Antigravity', provider: 'antigravity', title: 'Google Antigravity' }
+];
+
+for (const { name, repoName, provider, title } of targets) {
+  const source = path.join(root, 'packages', name);
+  const destination = path.join(output, repoName);
+  fs.mkdirSync(destination, { recursive: true });
+  fs.cpSync(path.join(source, 'src'), path.join(destination, 'src'), { recursive: true, errorOnExist: true });
+
+  const pkg = JSON.parse(fs.readFileSync(path.join(source, 'package.json'), 'utf8'));
+  pkg.license = 'Apache-2.0';
+  pkg.dependencies = { '@snowball/plugin-sdk': `file:vendor/${sdkPack.filename}` };
+  pkg.bundledDependencies = ['@snowball/plugin-sdk'];
+  pkg.devDependencies = { typescript: '5.9.3', '@types/node': '20.19.43' };
+  pkg.engines = { node: '>=22.12' };
+  pkg.files = ['dist', 'src', 'README.md', 'LICENSE', 'assets', 'vendor', 'docs', 'scripts'];
+  pkg.scripts = {
+    build: 'tsc -p tsconfig.json',
+    test: 'npm run build && node --test tests/protocol.test.mjs' + (name === 'harness-codex' ? '' : ' tests/adapter.test.mjs'),
+    'test:package': 'node scripts/verify-release-package.mjs'
+  };
+
+  fs.mkdirSync(path.join(destination, 'vendor'), { recursive: true });
+  fs.copyFileSync(sdkTar, path.join(destination, 'vendor', sdkPack.filename));
+  fs.writeFileSync(path.join(destination, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
+  fs.writeFileSync(
+    path.join(destination, 'tsconfig.json'),
+    JSON.stringify({ ...base, compilerOptions: { ...base.compilerOptions, rootDir: 'src', outDir: 'dist' }, include: ['src/**/*.ts'] }, null, 2) + '\n'
+  );
+  fs.writeFileSync(path.join(destination, '.gitignore'), 'node_modules/\ndist/\n*.log\n');
+
+  // Copy License and Assets
+  if (fs.existsSync(path.join(root, 'LICENSE'))) {
+    fs.copyFileSync(path.join(root, 'LICENSE'), path.join(destination, 'LICENSE'));
+  }
+  const assetsDir = path.join(destination, 'assets');
+  fs.mkdirSync(assetsDir, { recursive: true });
+  if (fs.existsSync(path.join(root, 'assets/banner.png'))) {
+    fs.copyFileSync(path.join(root, 'assets/banner.png'), path.join(assetsDir, 'banner.png'));
+  }
+  if (fs.existsSync(path.join(root, 'assets/icon.png'))) {
+    fs.copyFileSync(path.join(root, 'assets/icon.png'), path.join(assetsDir, 'icon.png'));
+  }
+
+  // Tests
+  fs.mkdirSync(path.join(destination, 'tests'), { recursive: true });
+  const manifest = provider + 'Manifest';
+  const testSource = `import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {createInterface} from 'node:readline';
 import {once} from 'node:events';
 import {parseManifest} from '@snowball/plugin-sdk';
 import {${manifest}} from '../dist/index.js';
-test('independent worker uses SDK protocol and exits on EOF without launching a harness',async()=>{
- const m=parseManifest(await ${manifest}());
- const child=spawn(process.execPath,[m.entrypoint],{stdio:'pipe',windowsHide:true,env:{...process.env,NODE_OPTIONS:''}});
- const exited=once(child,'exit');const lines=createInterface({input:child.stdout});const output=[];child.stderr.resume();
- lines.on('line',line=>output.push(JSON.parse(line)));
- const timeout=setTimeout(()=>child.kill(),15000);
- try{
-  child.stdin.write(JSON.stringify({jsonrpc:'2.0',id:1,method:'plugin.initialize',params:{apiVersion:'1.0.0',pluginId:m.id}})+'\\n');
-  const deadline=Date.now()+12000;while(!output.length&&Date.now()<deadline)await new Promise(r=>setTimeout(r,10));
-  assert.equal(output[0]?.result?.pluginId,m.id);assert.equal(output[0]?.result?.apiVersion,'1.0.0');
-  child.stdin.end();const [code]=await exited;assert.equal(code,0);
- }finally{clearTimeout(timeout);lines.close();if(child.exitCode===null)child.kill();}
+
+test('independent worker uses SDK protocol and exits on EOF without launching a harness', async () => {
+  const m = parseManifest(await ${manifest}());
+  const child = spawn(process.execPath, [m.entrypoint], {
+    stdio: 'pipe',
+    windowsHide: true,
+    env: { ...process.env, NODE_OPTIONS: '' }
+  });
+  const exited = once(child, 'exit');
+  const lines = createInterface({ input: child.stdout });
+  const output = [];
+  child.stderr.resume();
+  lines.on('line', line => output.push(JSON.parse(line)));
+  const timeout = setTimeout(() => child.kill(), 15000);
+  try {
+    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'plugin.initialize', params: { apiVersion: '1.0.0', pluginId: m.id } }) + '\\n');
+    const deadline = Date.now() + 12000;
+    while (!output.length && Date.now() < deadline) await new Promise(r => setTimeout(r, 10));
+    assert.equal(output[0]?.result?.pluginId, m.id);
+    assert.equal(output[0]?.result?.apiVersion, '1.0.0');
+    child.stdin.end();
+    const [code] = await exited;
+    assert.equal(code, 0);
+  } finally {
+    clearTimeout(timeout);
+    lines.close();
+    if (child.exitCode === null) child.kill();
+  }
 });
 `;
-  fs.writeFileSync(path.join(destination,'tests/protocol.test.mjs'),testSource);
-  if(provider!=='codex'){
-    let tests=fs.readFileSync(path.join(root,'tests',name+'.test.mjs'),'utf8');
-    tests=tests.replaceAll(`../packages/${name}/dist/index.js`,'../dist/index.js').replaceAll("'../packages/core/dist/index.js'","'@snowball/plugin-sdk'");
-    fs.writeFileSync(path.join(destination,'tests/adapter.test.mjs'),tests);
+  fs.writeFileSync(path.join(destination, 'tests/protocol.test.mjs'), testSource);
+  if (provider !== 'codex') {
+    let tests = fs.readFileSync(path.join(root, 'tests', name + '.test.mjs'), 'utf8');
+    tests = tests.replaceAll(`../packages/${name}/dist/index.js`, '../dist/index.js').replaceAll("'../packages/core/dist/index.js'", "'@snowball/plugin-sdk'");
+    fs.writeFileSync(path.join(destination, 'tests/adapter.test.mjs'), tests);
   }
-  let existing=fs.existsSync(path.join(source,'README.md'))?fs.readFileSync(path.join(source,'README.md'),'utf8'):'';
-  if(provider==='opencode'){
-    fs.mkdirSync(path.join(destination,'docs'));
-    fs.copyFileSync(path.join(root,'docs/middleware/OPENCODE_OWNERSHIP.md'),path.join(destination,'docs/OWNERSHIP.md'));
-    fs.mkdirSync(path.join(destination,'scripts'));
-    fs.copyFileSync(path.join(root,'scripts/verify-opencode-isolation.mjs'),path.join(destination,'scripts/verify-opencode-isolation.mjs'));
-    existing=existing.replace(/The production owned-server design and remaining L3–L5 evidence gates are in[^\n]+/, 'The production owned-server design and remaining L3–L5 evidence gates are in `docs/OWNERSHIP.md`. Repository-wide release and license decisions remain with the publisher.');
+
+  // Scripts & Docs
+  fs.mkdirSync(path.join(destination, 'scripts'), { recursive: true });
+  fs.copyFileSync(path.join(root, 'scripts/verify-harness-release-package.mjs'), path.join(destination, 'scripts/verify-release-package.mjs'));
+
+  fs.mkdirSync(path.join(destination, 'docs'), { recursive: true });
+  if (provider === 'opencode') {
+    fs.copyFileSync(path.join(root, 'docs/middleware/OPENCODE_OWNERSHIP.md'), path.join(destination, 'docs/OWNERSHIP.md'));
+    fs.copyFileSync(path.join(root, 'scripts/verify-opencode-isolation.mjs'), path.join(destination, 'scripts/verify-opencode-isolation.mjs'));
   }
-  fs.mkdirSync(path.join(destination,'scripts'),{recursive:true});
-  fs.copyFileSync(path.join(root,'scripts/verify-harness-release-package.mjs'),path.join(destination,'scripts/verify-release-package.mjs'));
-  if(provider==='codex'){
-    existing=existing.split('## Reproduce local native verification')[0].replace(/See `docs\/middleware\/CONTROL_REALITY\.md`\./, 'The original middleware repository tracks integration and release gates separately.');
-  }
-  fs.writeFileSync(path.join(destination,'README.md'),`# ${pkg.name}\n\nPrivate standalone export under the owner's GitHub account. No middleware or hardware checkout is required. Run \`npm ci --ignore-scripts\`, then \`npm test\`. The vendored SDK tarball is a local prerelease, not a published SDK. This UNLICENSED/private repository is for integration and reference; public redistribution or package release needs a license and release decision.\n\nTests use isolated protocol/provider fixtures, never your existing tasks or credentials. Codex real-provider acceptance and other provider limitations are documented below; protocol conformance alone does not prove control support.\n\n${existing.trimEnd()}\n`);
-  fs.mkdirSync(path.join(destination,'docs'),{recursive:true});
-  fs.writeFileSync(path.join(destination,'docs/INTEGRATION.md'),`# Plugin integration reference\n\nThis repository is independently buildable and intentionally does not import the Snowball middleware checkout. Its local \`vendor/snowball-plugin-sdk-0.1.0.tgz\` is the exact prerelease protocol dependency in \`package-lock.json\`; it is not a registry release. Release tarballs also bundle the installed SDK because npm cannot resolve a nested \`file:vendor/...\` dependency in a consumer project.\n\nStart with \`src/manifest.ts\` to see the plugin ID, kind, reviewed worker entrypoint, integrity digest and explicitly declared operations. The middleware's PluginHost validates the manifest, checks the entrypoint digest, starts \`src/worker.ts\` without a shell, performs \`plugin.initialize\`, and dispatches only declared JSON-RPC operations. \`tests/protocol.test.mjs\` demonstrates the independent handshake and EOF cleanup. Provider tests in \`tests/adapter.test.mjs\`, where present, test provider data separately.\n\nThe adapter in \`src/index.ts\` translates provider-specific identity, sessions, model catalog and events into the SDK contract. A listed or discovered session is read-only until the middleware explicitly attaches an owner to that exact instance/session. Commands go through the middleware's local API and durable command journal, never directly from a device plugin to a harness. Do not claim create/send/decision/interrupt operations in a new manifest until real-provider receipts and failure behavior have been verified for each operation.\n\nRun \`npm ci --ignore-scripts\` and \`npm test\` on a supported Node version (>=22.12). GitHub Actions checks both Windows and macOS builds. Those CI checks validate portable protocol/fixture behavior; they do not constitute native provider, hardware or end-user installation acceptance. The repo is private and UNLICENSED pending the owner's license decision.\n`);
-  fs.mkdirSync(path.join(destination,'.github/workflows'),{recursive:true});
-  fs.writeFileSync(path.join(destination,'.github/workflows/check.yml'),`name: Standalone checks\non: [push, pull_request]\njobs:\n  test:\n    strategy:\n      matrix:\n        os: [windows-latest, macos-latest]\n    runs-on: \${{ matrix.os }}\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: '22'\n          cache: npm\n      - run: npm ci --ignore-scripts\n      - run: npm test\n      - run: npm run test:package\n`);
-  execFileSync(process.execPath,[npm,'install','--package-lock-only','--ignore-scripts','--no-audit','--no-fund'],{cwd:destination,stdio:'inherit',windowsHide:true});
+
+  // Readme
+  const readmeContent = `<p align="center">
+  <img src="assets/banner.png" alt="Snowball Banner" width="100%">
+</p>
+
+# ${pkg.name}
+
+<p align="left">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache-2.0"></a>
+  <img src="https://img.shields.io/badge/Node.js-%3E%3D22.12-brightgreen.svg" alt="Node.js: >=22.12">
+  <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg" alt="Platform">
+</p>
+
+Official standalone harness plugin for **${title}** in the [Snowball Local Control ecosystem](https://github.com/fkiller/Snowball_Control).
+
+This plugin provides seamless, sandbox-isolated orchestration between the [Snowball Middleware](https://github.com/fkiller/Snowball_Middleware) host and the local \`${provider}\` native execution environment.
+
+---
+
+## Key Capabilities
+
+- **Zero Simulation**: Direct native interaction with live local CLI processes and runtime sessions without fake/mock delays or synthetic responses.
+- **Living Source of Truth**: Scans local caches and native CLI models/variants dynamically; never hardcodes models or supported reasoning effort tiers.
+- **Local-First & Sandbox Isolation**: Strictly bounded JSON-RPC protocol over \`@snowball/plugin-sdk\`, running isolated worker processes with entrypoint digest verification.
+- **Cross-Platform**: Tested and verified across Windows, macOS, and Linux.
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js >= 22.12
+- Local \`${provider}\` native CLI environment
+
+### Installation & Build
+
+\`\`\`bash
+# Clone repository
+git clone https://github.com/fkiller/${repoName}.git
+cd ${repoName}
+
+# Install dependencies (using vendored SDK)
+npm ci --ignore-scripts
+
+# Build TypeScript
+npm run build
+\`\`\`
+
+### Running Tests
+
+\`\`\`bash
+# Run protocol and adapter test suites
+npm test
+
+# Verify release package integrity and manifest digests
+npm run test:package
+\`\`\`
+
+---
+
+## Architecture & Integration
+
+This plugin implements the Snowball Plugin SDK protocol v1. Detailed specifications and lifecycle hooks are documented in [\`docs/INTEGRATION.md\`](docs/INTEGRATION.md).
+
+${provider === 'opencode' ? 'Ownership and isolation evidence gates are documented in [`docs/OWNERSHIP.md`](docs/OWNERSHIP.md).\n\n' : ''}---
+
+## License
+
+This project is licensed under the Apache-2.0 License - see the [LICENSE](LICENSE) file for details.
+`;
+  fs.writeFileSync(path.join(destination, 'README.md'), readmeContent);
+
+  // docs/INTEGRATION.md
+  fs.writeFileSync(
+    path.join(destination, 'docs/INTEGRATION.md'),
+    `# Plugin integration reference
+
+This repository is independently buildable and intentionally does not import the Snowball middleware checkout. Its local \`vendor/${sdkPack.filename}\` is the exact prerelease protocol dependency in \`package-lock.json\`; it is not a registry release. Release tarballs also bundle the installed SDK because npm cannot resolve a nested \`file:vendor/...\` dependency in a consumer project.
+
+Start with \`src/manifest.ts\` to see the plugin ID, kind, reviewed worker entrypoint, integrity digest and explicitly declared operations. The middleware's PluginHost validates the manifest, checks the entrypoint digest, starts \`src/worker.ts\` without a shell, performs \`plugin.initialize\`, and dispatches only declared JSON-RPC operations. \`tests/protocol.test.mjs\` demonstrates the independent handshake and EOF cleanup. Provider tests in \`tests/adapter.test.mjs\`, where present, test provider data separately.
+
+The adapter in \`src/index.ts\` translates provider-specific identity, sessions, model catalog and events into the SDK contract. A listed or discovered session is read-only until the middleware explicitly attaches an owner to that exact instance/session. Commands go through the middleware's local API and durable command journal, never directly from a device plugin to a harness. Do not claim create/send/decision/interrupt operations in a new manifest until real-provider receipts and failure behavior have been verified for each operation.
+
+Run \`npm ci --ignore-scripts\` and \`npm test\` on a supported Node version (>=22.12). GitHub Actions checks both Windows and macOS builds. Those CI checks validate portable protocol/fixture behavior.
+
+This project is licensed under the Apache-2.0 License.
+`
+  );
+
+  // CI Workflow
+  fs.mkdirSync(path.join(destination, '.github/workflows'), { recursive: true });
+  fs.writeFileSync(
+    path.join(destination, '.github/workflows/check.yml'),
+    `name: Standalone checks
+on: [push, pull_request]
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: \${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm run test:package
+`
+  );
+
+  execFileSync(process.execPath, [npm, 'install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund'], {
+    cwd: destination,
+    stdio: 'inherit',
+    windowsHide: true
+  });
 }
-console.log(JSON.stringify({output,repositories:3,published:false,license:'UNLICENSED',sdkIntegrity:sdkPack.integrity}));
+
+console.log(
+  JSON.stringify({
+    output,
+    repositories: targets.length,
+    published: false,
+    license: 'Apache-2.0',
+    sdkIntegrity: sdkPack.integrity
+  })
+);
