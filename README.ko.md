@@ -46,7 +46,7 @@
 로컬 루프백 웹 수퍼바이저(`http://127.0.0.1:8765/`)는 외부 클라우드 의존성 없이 탐색된 작업공간, 활성 하네스(Codex, AGY, OpenCode), 그리고 실시간 하드웨어 연결 상태를 직관적으로 제공합니다:
 
 <p align="center">
-  <img src="assets/screenshots/web_supervisor_dashboard.png" width="100%" alt="Snowball 웹 수퍼바이저 대시보드">
+  <img src="assets/screenshots/web_supervisor_dashboard_ko.png" width="100%" alt="Snowball 웹 수퍼바이저 대시보드">
 </p>
 
 ### 물리 MK20 터미널 연동 (Hardware Terminal)
@@ -152,7 +152,8 @@ Snowball_Middleware/
 │   ├── banner.png
 │   ├── icon.png
 │   ├── screenshots/            # 웹 수퍼바이저 대시보드 및 하드웨어 캡처
-│   │   ├── web_supervisor_dashboard.png
+│   │   ├── web_supervisor_dashboard_ko.png
+│   │   ├── web_supervisor_dashboard_en.png
 │   │   ├── mk20_navigation_demo.gif
 │   │   └── mk20_ui_elements_test.gif
 │   └── videos/                 # 시연 녹화 영상

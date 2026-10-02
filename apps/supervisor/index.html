@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -11,18 +11,23 @@
     <header>
       <div class="header-left">
         <span class="brand">SNOWBALL</span>
-        <span class="badge" id="host-badge">이 컴퓨터 · 로컬 제어</span>
-        <span class="badge badge-neutral" id="device-badge">MK20 탐색 중</span>
+        <span class="badge" id="host-badge">This Computer · Local Control</span>
+        <span class="badge badge-neutral" id="device-badge">MK20 Not Detected</span>
       </div>
       <div class="header-right">
-        <button id="btn-settings" class="secondary icon-btn" type="button" title="설정">⚙️ 설정</button>
+        <div class="lang-switch" role="group" aria-label="Language">
+          <button id="lang-btn-en" class="lang-btn active" type="button" title="English">EN</button>
+          <span class="lang-divider">/</span>
+          <button id="lang-btn-ko" class="lang-btn" type="button" title="한국어">KO</button>
+        </div>
+        <button id="btn-settings" class="secondary icon-btn" type="button" title="Settings" data-i18n-title="settings_title">⚙️ <span data-i18n="settings_btn">Settings</span></button>
       </div>
     </header>
 
-    <section id="overview-container" class="overview" aria-label="전체 작업 현황"></section>
+    <section id="overview-container" class="overview" aria-label="Workspaces Overview"></section>
 
     <!-- 1. Breadcrumb Bar (Host > Harness > Project > Session) -->
-    <nav id="breadcrumb-bar" class="breadcrumb-container" aria-label="작업 탐색"></nav>
+    <nav id="breadcrumb-bar" class="breadcrumb-container" aria-label="Task Navigation"></nav>
 
     <!-- 2. Workspace View (MK20 Session Workspace) -->
     <div id="workspace-container" class="workspace-layout">
@@ -39,10 +44,10 @@
       <div id="prompt-container" class="prompt-panel">
         <div id="voice-draft-banner" class="voice-draft-banner" hidden></div>
         <div class="prompt-input-row">
-          <textarea id="prompt-input" rows="3" placeholder="메시지를 입력하거나 음성으로 말하세요... (Enter: 전송, Shift+Enter: 줄바꿈)"></textarea>
+          <textarea id="prompt-input" rows="3" placeholder="Type a message or use voice input... (Enter: Send, Shift+Enter: Newline)" data-i18n-placeholder="prompt_placeholder"></textarea>
           <div class="prompt-actions">
-            <button id="btn-voice" class="secondary voice-btn" type="button" title="음성 입력">🎙️ 음성</button>
-            <button id="btn-send" class="send-btn" type="button" title="명령 전송">전송 ↵</button>
+            <button id="btn-voice" class="secondary voice-btn" type="button" title="Voice Input" data-i18n-title="voice_btn_title">🎙️ <span data-i18n="voice_btn">Voice</span></button>
+            <button id="btn-send" class="send-btn" type="button" title="Send Command" data-i18n-title="send_btn_title"><span data-i18n="send_btn">Send</span> ↵</button>
           </div>
         </div>
       </div>
@@ -50,10 +55,10 @@
 
     <!-- 3. Setup Wizard (One-time onboarding / Rerun) -->
     <div id="wizard-container" class="wizard-layout" hidden>
-      <nav aria-label="설정 단계" id="steps"></nav>
+      <nav aria-label="Wizard Steps" id="steps"></nav>
       <section aria-labelledby="title">
         <p id="eyebrow"></p>
-        <h1 id="title">내 작업을 한곳에서</h1>
+        <h1 id="title" data-i18n="wizard_default_title">Your Work In One Place</h1>
         <p id="description"></p>
         <div id="content"></div>
         <p id="notice" role="status" aria-live="polite"></p>
@@ -65,64 +70,63 @@
     <div id="settings-modal" class="modal-backdrop" hidden>
       <div class="modal-dialog">
         <div class="modal-header">
-          <h2>⚙️ 설정</h2>
+          <h2>⚙️ <span data-i18n="settings_modal_title">Settings</span></h2>
           <button id="btn-close-settings" class="close-btn" type="button">✕</button>
         </div>
         <div class="modal-body">
           <section class="settings-section">
-            <h3>시스템 설정</h3>
+            <h3 data-i18n="system_settings">System Settings</h3>
             <label class="setting-row">
               <input type="checkbox" id="setting-autostart" disabled>
-              <span>OS 로그인 시 자동 실행</span>
+              <span data-i18n="setting_autostart">Start automatically on OS login</span>
             </label>
             <label class="setting-row">
               <input type="checkbox" id="setting-tray" disabled>
-              <span>시스템 트레이 실행 상태</span>
+              <span data-i18n="setting_tray">System tray running state</span>
             </label>
           </section>
           <section class="settings-section">
-            <h3>트레이 표시 및 알림</h3>
-            <label class="setting-row">트레이 언어 <select id="setting-language" disabled><option value="ko">한국어</option><option value="en">English</option></select></label>
-            <label class="setting-row"><input type="checkbox" id="setting-notifications" disabled>새 승인 요청·명령 오류의 OS 알림</label>
-            <p>트레이 실행 중에 적용됩니다. Web 화면 언어는 한국어입니다.</p>
+            <h3 data-i18n="tray_and_notifications">Tray Display & Notifications</h3>
+            <label class="setting-row"><span data-i18n="setting_language_label">Language</span> <select id="setting-language"><option value="en">English</option><option value="ko">한국어</option></select></label>
+            <label class="setting-row"><input type="checkbox" id="setting-notifications" disabled><span data-i18n="setting_notifications">OS notifications for approval requests and command errors</span></label>
+            <p data-i18n="setting_tray_notice">Applied during tray execution. UI language can also be toggled directly from the header.</p>
           </section>
 
-
           <section class="settings-section">
-            <h3>음성 엔진 (Voice Engine)</h3>
+            <h3 data-i18n="voice_engine_title">Voice Engine</h3>
             <div class="setting-row">
-              <label for="setting-voice-engine">음성 인식 엔진:</label>
+              <label for="setting-voice-engine" data-i18n="voice_engine_label">Voice recognition engine:</label>
               <select id="setting-voice-engine" disabled>
-                <option value="webspeech" selected>브라우저 음성 인식 (지원 시)</option>
+                <option value="webspeech" selected data-i18n="voice_engine_webspeech">Browser Web Speech (if supported)</option>
               </select>
             </div>
           </section>
 
           <section class="settings-section">
-            <h3>하드웨어 장치 (MK20)</h3>
+            <h3 data-i18n="hardware_title">Hardware Devices (MK20)</h3>
             <div id="settings-devices-list"></div>
-            <p>Wi-Fi 개발 연결은 장치 주소와 이 PC의 네트워크 인터페이스를 직접 지정합니다. 주소 응답은 페어링이나 명령 권한을 뜻하지 않습니다.</p>
-            <div class="setting-row"><label for="mk20-lan-address">MK20 주소</label><input id="mk20-lan-address" type="text" inputmode="decimal" placeholder="192.168.1.248" maxlength="15"></div>
-            <div class="setting-row"><label for="mk20-lan-interface">PC 인터페이스</label><select id="mk20-lan-interface"></select></div>
+            <p data-i18n="mk20_lan_notice">Wi-Fi development connection specifies the device address and network interface directly. Address response does not imply pairing or command authorization.</p>
+            <div class="setting-row"><label for="mk20-lan-address" data-i18n="mk20_address_label">MK20 Address</label><input id="mk20-lan-address" type="text" inputmode="decimal" placeholder="192.168.1.248" maxlength="15"></div>
+            <div class="setting-row"><label for="mk20-lan-interface" data-i18n="mk20_interface_label">PC Interface</label><select id="mk20-lan-interface"></select></div>
             <div class="settings-actions">
-              <button id="mk20-lan-save" type="button">Wi-Fi 주소 확인</button>
-              <button id="mk20-lan-remove" class="secondary" type="button">Wi-Fi 주소 제거</button>
+              <button id="mk20-lan-save" type="button" data-i18n="mk20_lan_save">Verify Wi-Fi Address</button>
+              <button id="mk20-lan-remove" class="secondary" type="button" data-i18n="mk20_lan_remove">Remove Wi-Fi Address</button>
             </div>
             <p id="mk20-lan-status"></p>
           </section>
 
           <section class="settings-section">
-            <h3>Harness 관리 & 마법사</h3>
+            <h3 data-i18n="harness_mgmt_title">Harness Management & Wizard</h3>
             <div class="settings-actions">
-              <button id="btn-settings-rescan" class="secondary" type="button">Harness 다시 찾기</button>
-              <button id="btn-rerun-wizard" class="secondary" type="button">초기 설정 마법사 다시 실행</button>
+              <button id="btn-settings-rescan" class="secondary" type="button" data-i18n="btn_rescan_harness">Rescan Harnesses</button>
+              <button id="btn-rerun-wizard" class="secondary" type="button" data-i18n="btn_rerun_wizard">Rerun Setup Wizard</button>
             </div>
           </section>
         </div>
       </div>
     </div>
 
-    <footer>장치와 음성 기능 없이도 시작할 수 있습니다. 연결이나 명령은 자동으로 실행하지 않습니다.</footer>
+    <footer data-i18n="footer_notice">You can start without devices or voice features. Connections and commands are never executed automatically.</footer>
   </main>
   <script type="module" src="/supervisor/app.js"></script>
 </body>

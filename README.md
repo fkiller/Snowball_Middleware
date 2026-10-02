@@ -46,7 +46,7 @@ It provides developers with:
 The local-loopback Web Supervisor (`http://127.0.0.1:8765/`) provides zero-cloud oversight, workspace project discovery, active harness monitoring (Codex, AGY, OpenCode), and real-time physical device connectivity:
 
 <p align="center">
-  <img src="assets/screenshots/web_supervisor_dashboard.png" width="100%" alt="Snowball Web Supervisor Dashboard">
+  <img src="assets/screenshots/web_supervisor_dashboard_en.png" width="100%" alt="Snowball Web Supervisor Dashboard">
 </p>
 
 ### Physical MK20 Terminal Integration
@@ -152,7 +152,8 @@ Snowball_Middleware/
 │   ├── banner.png
 │   ├── icon.png
 │   ├── screenshots/            # Web Supervisor dashboard & MK20 hardware captures
-│   │   ├── web_supervisor_dashboard.png
+│   │   ├── web_supervisor_dashboard_en.png
+│   │   ├── web_supervisor_dashboard_ko.png
 │   │   ├── mk20_navigation_demo.gif
 │   │   └── mk20_ui_elements_test.gif
 │   └── videos/                 # Demonstration recordings

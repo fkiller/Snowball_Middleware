@@ -1,8 +1,119 @@
 import { LocalClient } from '/supervisor/client.js';
 
 const client = new LocalClient(location.origin);
-const labels = ['로컬 연결', 'Harness', '장치 · 선택', 'Overview'];
-const $ = id => document.getElementById(id);
+const $ = id => typeof document !== 'undefined' ? document.getElementById(id) : null;
+
+// --- Internationalization (i18n) State & Dictionary ---
+let currentLanguage = 'en';
+try {
+  if (typeof location !== 'undefined') {
+    if (location.hash === '#ko' || location.hash.startsWith('#ko') || location.hash.includes('lang=ko')) currentLanguage = 'ko';
+    else if (location.hash === '#en' || location.hash.startsWith('#en') || location.hash.includes('lang=en')) currentLanguage = 'en';
+    else {
+      const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('snowball_lang') : null;
+      if (stored === 'en' || stored === 'ko') currentLanguage = stored;
+    }
+  }
+} catch {}
+if (typeof window !== 'undefined') {
+  window.addEventListener('hashchange', () => {
+    if (location.hash === '#ko' || location.hash.startsWith('#ko') || location.hash.includes('lang=ko')) setLanguage('ko');
+    else if (location.hash === '#en' || location.hash.startsWith('#en') || location.hash.includes('lang=en')) setLanguage('en');
+  });
+}
+
+const I18N = {
+  en: {
+    settings_btn: 'Settings',
+    settings_title: 'Settings',
+    voice_btn: 'Voice',
+    voice_btn_title: 'Voice Input',
+    send_btn: 'Send',
+    send_btn_title: 'Send Command',
+    prompt_placeholder: 'Type a message or use voice input... (Enter: Send, Shift+Enter: Newline)',
+    wizard_default_title: 'Your Work In One Place',
+    settings_modal_title: 'Settings',
+    system_settings: 'System Settings',
+    setting_autostart: 'Start automatically on OS login',
+    setting_tray: 'System tray running state',
+    tray_and_notifications: 'Tray Display & Notifications',
+    setting_language_label: 'Language',
+    setting_notifications: 'OS notifications for approval requests and command errors',
+    setting_tray_notice: 'Applied during tray execution. UI language can also be toggled directly from the header.',
+    voice_engine_title: 'Voice Engine',
+    voice_engine_label: 'Voice recognition engine:',
+    voice_engine_webspeech: 'Browser Web Speech (if supported)',
+    hardware_title: 'Hardware Devices (MK20)',
+    mk20_lan_notice: 'Wi-Fi development connection specifies the device address and network interface directly. Address response does not imply pairing or command authorization.',
+    mk20_address_label: 'MK20 Address',
+    mk20_interface_label: 'PC Interface',
+    mk20_lan_save: 'Verify Wi-Fi Address',
+    mk20_lan_remove: 'Remove Wi-Fi Address',
+    harness_mgmt_title: 'Harness Management & Wizard',
+    btn_rescan_harness: 'Rescan Harnesses',
+    btn_rerun_wizard: 'Rerun Setup Wizard',
+    footer_notice: 'You can start without devices or voice features. Connections and commands are never executed automatically.'
+  },
+  ko: {
+    settings_btn: '설정',
+    settings_title: '설정',
+    voice_btn: '음성',
+    voice_btn_title: '음성 입력',
+    send_btn: '전송',
+    send_btn_title: '명령 전송',
+    prompt_placeholder: '메시지를 입력하거나 음성으로 말하세요... (Enter: 전송, Shift+Enter: 줄바꿈)',
+    wizard_default_title: '내 작업을 한곳에서',
+    settings_modal_title: '설정',
+    system_settings: '시스템 설정',
+    setting_autostart: 'OS 로그인 시 자동 실행',
+    setting_tray: '시스템 트레이 실행 상태',
+    tray_and_notifications: '트레이 표시 및 알림',
+    setting_language_label: '트레이 언어',
+    setting_notifications: '새 승인 요청·명령 오류의 OS 알림',
+    setting_tray_notice: '트레이 실행 중에 적용됩니다. Web 화면 언어는 헤더나 설정에서 전환할 수 있습니다.',
+    voice_engine_title: '음성 엔진 (Voice Engine)',
+    voice_engine_label: '음성 인식 엔진:',
+    voice_engine_webspeech: '브라우저 음성 인식 (지원 시)',
+    hardware_title: '하드웨어 장치 (MK20)',
+    mk20_lan_notice: 'Wi-Fi 개발 연결은 장치 주소와 이 PC의 네트워크 인터페이스를 직접 지정합니다. 주소 응답은 페어링이나 명령 권한을 뜻하지 않습니다.',
+    mk20_address_label: 'MK20 주소',
+    mk20_interface_label: 'PC 인터페이스',
+    mk20_lan_save: 'Wi-Fi 주소 확인',
+    mk20_lan_remove: 'Wi-Fi 주소 제거',
+    harness_mgmt_title: 'Harness 관리 & 마법사',
+    btn_rescan_harness: 'Harness 다시 찾기',
+    btn_rerun_wizard: '초기 설정 마법사 다시 실행',
+    footer_notice: '장치와 음성 기능 없이도 시작할 수 있습니다. 연결이나 명령은 자동으로 실행하지 않습니다.'
+  }
+};
+
+function setLanguage(lang, doRender = true) {
+  if (lang !== 'en' && lang !== 'ko') return;
+  currentLanguage = lang;
+  try { localStorage.setItem('snowball_lang', lang); } catch {}
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = lang;
+    document.title = lang === 'ko' ? 'Snowball · 로컬 제어' : 'Snowball · Local Control';
+    $('lang-btn-en')?.classList.toggle('active', lang === 'en');
+    $('lang-btn-ko')?.classList.toggle('active', lang === 'ko');
+    const trayLang = $('setting-language');
+    if (trayLang) trayLang.value = lang;
+
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const k = el.getAttribute('data-i18n');
+      if (k && I18N[lang]?.[k]) el.textContent = I18N[lang][k];
+    });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      const k = el.getAttribute('data-i18n-placeholder');
+      if (k && I18N[lang]?.[k]) el.placeholder = I18N[lang][k];
+    });
+    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+      const k = el.getAttribute('data-i18n-title');
+      if (k && I18N[lang]?.[k]) el.title = I18N[lang][k];
+    });
+  }
+  if (doRender && typeof render === 'function') render();
+}
 
 // --- Core State ---
 let viewMode = 'workspace'; // 'workspace' | 'wizard'
@@ -43,11 +154,12 @@ let creatingSession = false;
 function openNewSession() {
   const bindings = (snapshot?.connectedHarnesses ?? []).filter(h => h.pluginId === activeHarness && h.canCreate && h.connected && !h.disabled);
   if (!bindings.length || creatingSession) return;
+  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
   const dialog = node('dialog');
-  const instance=node('select');instance.setAttribute('aria-label','Harness 인스턴스');
-  if(bindings.length>1){const choice=node('option','실행할 인스턴스를 선택하세요');choice.value='';instance.append(choice);}
+  const instance=node('select');instance.setAttribute('aria-label', isEn ? 'Harness Instance' : 'Harness 인스턴스');
+  if(bindings.length>1){const choice=node('option', isEn ? 'Select an instance to execute' : '실행할 인스턴스를 선택하세요');choice.value='';instance.append(choice);}
   for(const binding of bindings){const choice=node('option',binding.pluginId+' / '+binding.instanceId);choice.value=binding.instanceId;instance.append(choice);}
-  const workspace = node('select'); workspace.setAttribute('aria-label', '작업 폴더');
+  const workspace = node('select'); workspace.setAttribute('aria-label', isEn ? 'Workspace Folder' : '작업 폴더');
   const fillWorkspaces = () => {
     const preferred = workspace.value || activeProject;
     workspace.replaceChildren();
@@ -57,8 +169,8 @@ function openNewSession() {
     if ([...workspace.options].some(option => option.value === preferred)) workspace.value = preferred;
   };
   fillWorkspaces();
-  const title = node('input'); title.setAttribute('aria-label', '작업 이름'); title.maxLength = 128;
-  const message = node('p', '등록한 로컬 폴더에서 새 Harness 작업을 생성합니다.');
+  const title = node('input'); title.setAttribute('aria-label', isEn ? 'Task Name' : '작업 이름'); title.maxLength = 128;
+  const message = node('p', isEn ? 'Creates a new Harness task in the registered local folder.' : '등록한 로컬 폴더에서 새 Harness 작업을 생성합니다.');
   const pendingKey = `snowball.create.pending.v1.${activeHarness}`;
   let pending;
   try {
@@ -70,22 +182,29 @@ function openNewSession() {
     if (bindings.some(h => h.instanceId === pending.input.instanceId)) instance.value = pending.input.instanceId;
     if ([...workspace.options].some(w => w.value === pending.input.workspaceId)) workspace.value = pending.input.workspaceId;
     title.value = pending.input.title ?? '';
-    message.textContent = `이전 생성 요청 ${createRequestId}의 결과를 먼저 확인하세요. 재시도는 같은 요청 ID만 사용합니다.`;
+    message.textContent = isEn
+      ? `Check previous creation request ${createRequestId} result first. Retries only use the same request ID.`
+      : `이전 생성 요청 ${createRequestId}의 결과를 먼저 확인하세요. 재시도는 같은 요청 ID만 사용합니다.`;
   }
   const close = () => { dialog.close(); dialog.remove(); };
-  const choose = button('폴더 추가', async () => {
+  const choose = button(isEn ? 'Add Folder' : '폴더 추가', async () => {
     choose.disabled = true;
     try { await client.selectWorkspace(); snapshot = await client.snapshot(); fillWorkspaces(); }
     catch (error) { message.textContent = error.message; }
     finally { choose.disabled = false; }
   }, true);
   choose.disabled = !snapshot?.workspaceSelectionAvailable;
-  const create = button('작업 생성', async () => {
+  const create = button(isEn ? 'Create Task' : '작업 생성', async () => {
     if (!workspace.value || creatingSession) return;
     const binding=bindings.find(h=>h.instanceId===instance.value);
-    if(!binding){message.textContent='실행할 Harness 인스턴스를 선택하세요.';return;}
+    if(!binding){message.textContent = isEn ? 'Select a Harness instance to execute.' : '실행할 Harness 인스턴스를 선택하세요.';return;}
     const input = { requestId: createRequestId, pluginId: binding.pluginId, instanceId: binding.instanceId, workspaceId: workspace.value, ...(title.value.trim() ? { title: title.value.trim() } : {}) };
-    if (pending && JSON.stringify(input) !== JSON.stringify(pending.input)) { message.textContent = `이전 요청 ${createRequestId}의 입력이 변경되었습니다. 먼저 해당 작업을 확인하거나 새 요청 시작을 명시적으로 선택하세요.`; return; }
+    if (pending && JSON.stringify(input) !== JSON.stringify(pending.input)) {
+      message.textContent = isEn
+        ? `Input for previous request ${createRequestId} changed. Check that task or explicitly start a new attempt.`
+        : `이전 요청 ${createRequestId}의 입력이 변경되었습니다. 먼저 해당 작업을 확인하거나 새 요청 시작을 명시적으로 선택하세요.`;
+      return;
+    }
     pending = {requestId:createRequestId,input};
     try { sessionStorage.setItem(pendingKey, JSON.stringify(pending)); } catch { /* Current dialog still retains the request ID. */ }
     creatingSession = true; create.disabled = true;
@@ -100,19 +219,32 @@ function openNewSession() {
     } catch (error) {
       const receipt = await client.createStatus(createRequestId).catch(() => null);
       message.textContent = receipt?.status === 'unconfirmed'
-        ? `생성 결과가 불확실합니다. 같은 요청은 다시 실행되지 않습니다. 요청 ID: ${createRequestId}. Harness 작업 목록을 확인하고 생성된 작업이 있다면 직접 연결하세요.`
-        : `생성을 확인하지 못했습니다: ${error.message}. 요청 ID: ${createRequestId}. 상태 조회가 실패해도 이 요청 ID로만 재확인하세요.`;
+        ? (isEn
+            ? `Creation result is unconfirmed. Same request will not re-run. Request ID: ${createRequestId}. Check Harness tasks and attach directly if created.`
+            : `생성 결과가 불확실합니다. 같은 요청은 다시 실행되지 않습니다. 요청 ID: ${createRequestId}. Harness 작업 목록을 확인하고 생성된 작업이 있다면 직접 연결하세요.`)
+        : (isEn
+            ? `Could not confirm creation: ${error.message}. Request ID: ${createRequestId}. Recheck using only this request ID.`
+            : `생성을 확인하지 못했습니다: ${error.message}. 요청 ID: ${createRequestId}. 상태 조회가 실패해도 이 요청 ID로만 재확인하세요.`);
     }
     finally { creatingSession = false; create.disabled = false; }
   });
-  const newAttempt = button('새 요청 시작', () => {
+  const newAttempt = button(isEn ? 'Start New Attempt' : '새 요청 시작', () => {
     if (!pending || creatingSession) return;
     try { sessionStorage.removeItem(pendingKey); } catch {}
     pending = undefined; createRequestId = crypto.randomUUID(); newAttempt.disabled = true;
-    message.textContent = '이전 작업이 생성됐을 수 있습니다. 작업 목록을 확인한 뒤 새 요청을 시작하세요.';
+    message.textContent = isEn
+      ? 'Previous task may have been created. Check task list before starting a new request.'
+      : '이전 작업이 생성됐을 수 있습니다. 작업 목록을 확인한 뒤 새 요청을 시작하세요.';
   }, true);
   newAttempt.disabled = !pending;
-  dialog.append(node('h2', '새 작업'), node('label','Harness 인스턴스'),instance, node('label', '작업 폴더'), workspace, choose, node('label', '작업 이름 (선택)'), title, message, create, newAttempt, button('닫기', close, true));
+  dialog.append(
+    node('h2', isEn ? 'New Task' : '새 작업'),
+    node('label', isEn ? 'Harness Instance' : 'Harness 인스턴스'), instance,
+    node('label', isEn ? 'Workspace Folder' : '작업 폴더'), workspace, choose,
+    node('label', isEn ? 'Task Name (Optional)' : '작업 이름 (선택)'), title,
+    message, create, newAttempt,
+    button(isEn ? 'Close' : '닫기', close, true)
+  );
   dialog.addEventListener('cancel', () => dialog.remove()); document.body.append(dialog); dialog.showModal();
 }
 
@@ -143,21 +275,43 @@ function go(next) {
 }
 
 const connectionNotices = {
-  selection_cancelled: '연결 선택을 취소했습니다. 기존 작업과 설정은 유지됩니다.',
-  connection_failed: '연결을 완료하지 못했습니다. Codex 버전·로그인·선택 경로를 확인하고 다시 시도하세요.',
-  connection_busy: '다른 연결 작업이 진행 중입니다. 완료 후 다시 시도하세요.',
-  connection_limit: 'Codex 연결은 최대 8개입니다. 사용하지 않는 연결을 해제하세요.',
-  already_connected: '이미 저장된 Codex 연결입니다. 연결 목록을 확인하세요.',
-  connection_missing: '해당 연결이 이미 제거됐습니다. 목록을 새로고침하세요.',
-  native_connection_unavailable: '현재 실행 방식은 네이티브 Codex 연결 선택을 지원하지 않습니다.',
+  selection_cancelled: {
+    ko: '연결 선택을 취소했습니다. 기존 작업과 설정은 유지됩니다.',
+    en: 'Connection selection cancelled. Existing tasks and settings are preserved.'
+  },
+  connection_failed: {
+    ko: '연결을 완료하지 못했습니다. Codex 버전·로그인·선택 경로를 확인하고 다시 시도하세요.',
+    en: 'Could not complete connection. Check Codex version, login, selected path and retry.'
+  },
+  connection_busy: {
+    ko: '다른 연결 작업이 진행 중입니다. 완료 후 다시 시도하세요.',
+    en: 'Another connection operation is in progress. Retry after completion.'
+  },
+  connection_limit: {
+    ko: 'Codex 연결은 최대 8개입니다. 사용하지 않는 연결을 해제하세요.',
+    en: 'Maximum of 8 Codex connections. Disconnect unused connections.'
+  },
+  already_connected: {
+    ko: '이미 저장된 Codex 연결입니다. 연결 목록을 확인하세요.',
+    en: 'Codex connection already saved. Check connection list.'
+  },
+  connection_missing: {
+    ko: '해당 연결이 이미 제거됐습니다. 목록을 새로고침하세요.',
+    en: 'Connection already removed. Refresh the list.'
+  },
+  native_connection_unavailable: {
+    ko: '현재 실행 방식은 네이티브 Codex 연결 선택을 지원하지 않습니다.',
+    en: 'Current runtime mode does not support native Codex connection picker.'
+  },
 };
 
 async function run(action) {
   cancel();
   const current = generation;
   operation = new AbortController();
+  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
   const noticeEl = $('notice');
-  if (noticeEl) noticeEl.textContent = '이 컴퓨터에서 확인 중…';
+  if (noticeEl) noticeEl.textContent = isEn ? 'Checking on this computer…' : '이 컴퓨터에서 확인 중…';
   try {
     const result = await action(operation.signal);
     if (current !== generation) return;
@@ -173,9 +327,11 @@ async function run(action) {
       render();
     }
     if (noticeEl) {
+      const codeObj = connectionNotices[error.code];
+      const codeMsg = codeObj ? (isEn ? codeObj.en : codeObj.ko) : null;
       noticeEl.textContent = error.status === 401
-        ? '연결 코드가 만료되었거나 세션이 종료되었습니다. 로컬 실행기에서 새 코드를 받아 주세요.'
-        : (connectionNotices[error.code] || error.message || '확인을 완료하지 못했습니다.');
+        ? (isEn ? 'Connection code expired or session ended. Get a new code from the local launcher.' : '연결 코드가 만료되었거나 세션이 종료되었습니다. 로컬 실행기에서 새 코드를 받아 주세요.')
+        : (codeMsg || error.message || (isEn ? 'Could not complete verification.' : '확인을 완료하지 못했습니다.'));
     }
   } finally {
     if (current === generation) operation = undefined;
@@ -280,6 +436,11 @@ function getOverviewRows(state) {
 }
 
 function workspaceStatusLabel(status) {
+  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
+  if (isEn) {
+    return ({ ready: 'Ready', empty: 'Empty Folder', missing: 'Missing',
+      needs_permission: 'Permission Needed', needs_review: 'Review Needed', unavailable: 'Unavailable' })[status] || 'Unknown';
+  }
   return ({ ready: '사용 가능', empty: '빈 폴더', missing: '찾을 수 없음',
     needs_permission: '권한 필요', needs_review: '검토 필요', unavailable: '사용 불가' })[status] || '상태 미확인';
 }
@@ -293,18 +454,27 @@ function renderOverview() {
   const readyDevices = (snapshot?.devices ?? []).filter(d => d.state === 'ready');
   const pending = (snapshot?.decisions ?? []).filter(d => d.status === 'pending');
   const uncertain = (snapshot?.commands ?? []).filter(c => c.status === 'unknown' || c.status === 'failed');
+  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
   const heading = node('div'); heading.className = 'overview-heading';
-  const title = node('h2', '전체 작업 현황');
-  const counts = node('p', `프로젝트 ${rows.length} · 연결된 Harness ${connected.length} · 제어 장치 ${readyDevices.length} · 주의 ${pending.length + uncertain.length}`);
+  const title = node('h2', isEn ? 'Workspaces Overview' : '전체 작업 현황');
+  const counts = node('p', isEn
+    ? `Projects ${rows.length} · Connected Harnesses ${connected.length} · Control Devices ${readyDevices.length} · Attention ${pending.length + uncertain.length}`
+    : `프로젝트 ${rows.length} · 연결된 Harness ${connected.length} · 제어 장치 ${readyDevices.length} · 주의 ${pending.length + uncertain.length}`);
   heading.append(title, counts); root.append(heading);
   const grid = node('div'); grid.className = 'overview-projects';
-  if (!rows.length) grid.append(node('p', '등록된 프로젝트가 없습니다. 설정에서 작업 폴더를 추가할 수 있습니다.'));
+  if (!rows.length) grid.append(node('p', isEn ? 'No registered projects. You can add workspace folders in Settings.' : '등록된 프로젝트가 없습니다. 설정에서 작업 폴더를 추가할 수 있습니다.'));
   for (const row of rows) {
     const card = node('button'); card.type = 'button';
     card.className = `overview-project ${row.workspaceId === activeProject ? 'selected' : ''}`;
+    const cardStatus = isEn
+      ? `Folder ${workspaceStatusLabel(row.status)} · ${row.sessions} sessions · ${row.readOnly} read-only`
+      : `폴더 ${workspaceStatusLabel(row.status)} · 세션 ${row.sessions}개 · 조회 전용 ${row.readOnly}개`;
+    const cardHarnesses = row.harnesses.length
+      ? `Harness: ${row.harnesses.map(id => id.replace('snowball.', '')).join(', ')}`
+      : (isEn ? 'No observed harness sessions' : '관찰된 Harness 세션 없음');
     card.append(node('strong', row.displayName),
-      node('span', `폴더 ${workspaceStatusLabel(row.status)} · 세션 ${row.sessions}개 · 조회 전용 ${row.readOnly}개`),
-      node('span', row.harnesses.length ? `Harness: ${row.harnesses.map(id => id.replace('snowball.', '')).join(', ')}` : '관찰된 Harness 세션 없음'));
+      node('span', cardStatus),
+      node('span', cardHarnesses));
     card.addEventListener('click', () => {
       const first = (snapshot?.sessionDetails ?? []).find(s => s.workspaceId === row.workspaceId);
       if (first) activeHarness = first.harnessPluginId;
@@ -317,9 +487,12 @@ function renderOverview() {
   root.append(grid);
   if (pending.length || uncertain.length) {
     const attention = node('div'); attention.className = 'overview-attention';
-    attention.append(node('strong', `전체 주의 항목 ${pending.length + uncertain.length}건`));
-    for (const item of [...pending.map(d => ({ sessionKey: d.sessionKey, label: '승인 대기' })),
-      ...uncertain.map(c => ({ sessionKey: c.sessionKey, label: c.status === 'unknown' ? '전달 상태 확인' : '명령 오류' }))].slice(0, 8)) {
+    attention.append(node('strong', isEn ? `Total Attention Items ${pending.length + uncertain.length}` : `전체 주의 항목 ${pending.length + uncertain.length}건`));
+    const pendingLabel = isEn ? 'Pending Approval' : '승인 대기';
+    const unknownLabel = isEn ? 'Delivery Check' : '전달 상태 확인';
+    const errorLabel = isEn ? 'Command Error' : '명령 오류';
+    for (const item of [...pending.map(d => ({ sessionKey: d.sessionKey, label: pendingLabel })),
+      ...uncertain.map(c => ({ sessionKey: c.sessionKey, label: c.status === 'unknown' ? unknownLabel : errorLabel }))].slice(0, 8)) {
       const session = (snapshot?.sessionDetails ?? []).find(s => s.sessionKey === item.sessionKey);
       const label = `${item.label} · ${session?.title || item.sessionKey}`;
       if (!session || !(session.workspaceId || session.cwd)) { attention.append(node('p', label)); continue; }
@@ -366,11 +539,13 @@ function renderBreadcrumbs() {
   const bar = $('breadcrumb-bar');
   if (!bar) return;
   bar.replaceChildren();
+  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
 
   // 1. Host Segment
   const hostItem = node('div');
   hostItem.className = 'breadcrumb-item';
-  const hostBtn = node('button', `🖥️ ${activeHost} `);
+  const hostLabel = activeHost || (isEn ? 'This Computer' : '이 컴퓨터');
+  const hostBtn = node('button', `🖥️ ${hostLabel} `);
   hostBtn.className = `breadcrumb-btn ${activeDropdown === 'host' ? 'active' : ''}`;
   hostBtn.append(node('span', '▾'));
   hostBtn.addEventListener('click', e => {
@@ -383,11 +558,11 @@ function renderBreadcrumbs() {
   if (activeDropdown === 'host') {
     const menu = node('div');
     menu.className = 'dropdown-menu';
-    const header = node('div', '호스트 선택');
+    const header = node('div', isEn ? 'Select Host' : '호스트 선택');
     header.className = 'dropdown-header';
     menu.append(header);
 
-    const item = node('button', `🖥️ ${activeHost}`);
+    const item = node('button', `🖥️ ${hostLabel}`);
     item.className = 'dropdown-item selected';
     item.addEventListener('click', () => {
       activeDropdown = null;
@@ -414,7 +589,7 @@ function renderBreadcrumbs() {
   if (activeDropdown === 'harness') {
     const menu = node('div');
     menu.className = 'dropdown-menu';
-    const header = node('div', 'Harness 선택');
+    const header = node('div', isEn ? 'Select Harness' : 'Harness 선택');
     header.className = 'dropdown-header';
     menu.append(header);
 
@@ -453,7 +628,7 @@ function renderBreadcrumbs() {
   if (activeDropdown === 'project') {
     const menu = node('div');
     menu.className = 'dropdown-menu';
-    const header = node('div', `${curHarnessName} 프로젝트 선택`);
+    const header = node('div', isEn ? `${curHarnessName} Project Selection` : `${curHarnessName} 프로젝트 선택`);
     header.className = 'dropdown-header';
     menu.append(header);
 
@@ -479,7 +654,7 @@ function renderBreadcrumbs() {
   sessionItem.className = 'breadcrumb-item';
   const sessions = getSessionsForProject(activeHarness, activeProject);
   const curSession = sessions.find(s => s.sessionKey === activeSessionKey) || sessions[0];
-  const curSessionTitle = curSession?.title || curSession?.sessionKey?.split('/').pop() || '연결된 세션 없음';
+  const curSessionTitle = curSession?.title || curSession?.sessionKey?.split('/').pop() || (isEn ? 'No connected session' : '연결된 세션 없음');
 
   const sessionBtn = node('button', `💬 ${curSessionTitle} `);
   sessionBtn.className = `breadcrumb-btn ${activeDropdown === 'session' ? 'active' : ''}`;
@@ -494,14 +669,15 @@ function renderBreadcrumbs() {
   if (activeDropdown === 'session') {
     const menu = node('div');
     menu.className = 'dropdown-menu';
-    const header = node('div', `${projectDisplayName(activeProject)} 세션 선택`);
+    const header = node('div', isEn ? `${projectDisplayName(activeProject)} Session Selection` : `${projectDisplayName(activeProject)} 세션 선택`);
     header.className = 'dropdown-header';
     menu.append(header);
 
     for (const s of sessions) {
       const isSel = s.sessionKey === activeSessionKey;
       const sTitle = s.title || s.sessionKey.split('/').pop() || s.sessionKey;
-      const item = node('button', `💬 ${sTitle} · ${s.harnessInstanceId ?? '관찰 기록'}`);
+      const observedLabel = isEn ? 'Observed History' : '관찰 기록';
+      const item = node('button', `💬 ${sTitle} · ${s.harnessInstanceId ?? observedLabel}`);
       item.className = `dropdown-item ${isSel ? 'selected' : ''}`;
       item.addEventListener('click', () => {
         activeSessionKey = s.sessionKey;
@@ -513,11 +689,13 @@ function renderBreadcrumbs() {
     }
 
     // New Session Action
-    const newItem = node('button', '+ 새 세션 시작');
+    const newItem = node('button', isEn ? '+ Start New Session' : '+ 새 세션 시작');
     newItem.className = 'dropdown-item';
     newItem.style.color = 'var(--accent-green)';
     newItem.disabled = !snapshot?.connectedHarnesses?.some(h => h.pluginId === activeHarness && h.canCreate && h.connected && !h.disabled);
-    newItem.title = newItem.disabled ? '작업 생성을 지원하는 Harness를 연결하세요' : '등록한 작업 폴더에 실제 Harness 작업 생성';
+    newItem.title = newItem.disabled
+      ? (isEn ? 'Connect a harness that supports task creation' : '작업 생성을 지원하는 Harness를 연결하세요')
+      : (isEn ? 'Create a real harness task in registered workspace folder' : '등록한 작업 폴더에 실제 Harness 작업 생성');
     newItem.onclick = openNewSession;
     menu.append(newItem);
     sessionItem.append(menu);
@@ -545,6 +723,7 @@ document.addEventListener('click', e => {
 // --- Workspace View (MK20 Session Workspace) ---
 function renderWorkspace() {
   ensureHierarchy();
+  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
   if (isRecordingVoice && voiceSessionKey !== activeSessionKey) {
     speechRecognition?.abort(); speechRecognition = null; isRecordingVoice = false; voiceDraftText = '';
     const banner = $('voice-draft-banner'); if (banner) banner.hidden = true;
@@ -552,7 +731,7 @@ function renderWorkspace() {
   const sessions = getSessionsForProject(activeHarness, activeProject);
   const curSession = sessions.find(s => s.sessionKey === activeSessionKey) || sessions[0];
   if (!curSession) {
-    $('session-header')?.replaceChildren(node('p', '연결된 하네스 작업이 없습니다. 탐색 결과는 제어 연결을 의미하지 않습니다.'));
+    $('session-header')?.replaceChildren(node('p', isEn ? 'No connected harness task. Discovered state does not grant control.' : '연결된 하네스 작업이 없습니다. 탐색 결과는 제어 연결을 의미하지 않습니다.'));
     $('session-messages')?.replaceChildren();
     const send = $('btn-send'); if (send) { send.disabled = true; send.onclick = null; }
     const input = $('prompt-input'); if (input) input.onkeydown = null;
@@ -575,20 +754,28 @@ function renderWorkspace() {
     hBadge.className = 'badge';
     const pBadge = node('span', projectDisplayName(activeProject));
     pBadge.className = 'badge badge-neutral';
-    const statusBadge = node('span', isOwned ? '활성 제어' : liveBinding && !liveBinding.connected ? '연결 끊김' : '조회 전용');
+    const statusText = isOwned
+      ? (isEn ? 'Active Control' : '활성 제어')
+      : liveBinding && !liveBinding.connected
+        ? (isEn ? 'Disconnected' : '연결 끊김')
+        : (isEn ? 'Read Only' : '조회 전용');
+    const statusBadge = node('span', statusText);
     statusBadge.className = isOwned ? 'badge' : 'badge badge-gold';
     left.append(h2, hBadge, pBadge, statusBadge);
 
     const right = node('div');
     right.className = 'session-meta-details';
-    right.textContent = `세션: ${curSession.sessionKey} · 소유자: ${curSession.ownerId || '시스템'}`;
+    const ownerLabel = curSession.ownerId || (isEn ? 'system' : '시스템');
+    right.textContent = isEn
+      ? `Session: ${curSession.sessionKey} · Owner: ${ownerLabel}`
+      : `세션: ${curSession.sessionKey} · 소유자: ${ownerLabel}`;
     headerEl.append(left, right);
-    if (liveBinding?.sessionListTruncated) headerEl.append(node('p', '세션 목록 일부만 표시됩니다. 네이티브 앱에서 전체 기록을 확인할 수 있습니다.'));
+    if (liveBinding?.sessionListTruncated) headerEl.append(node('p', isEn ? 'Showing partial session history. View full history in native app.' : '세션 목록 일부만 표시됩니다. 네이티브 앱에서 전체 기록을 확인할 수 있습니다.'));
     const binding = snapshot?.connectedHarnesses?.find(h => h.pluginId === curSession.harnessPluginId && h.instanceId === curSession.harnessInstanceId && h.connected && !h.disabled);
-    if (!isOwned && binding?.canAttach) headerEl.append(button('이 세션 연결', () => void run(signal => client.attachSession(curSession.sessionKey, signal))));
+    if (!isOwned && binding?.canAttach) headerEl.append(button(isEn ? 'Attach Session' : '이 세션 연결', () => void run(signal => client.attachSession(curSession.sessionKey, signal))));
     if (binding?.canListModels) {
       const catalogKey = JSON.stringify([binding.pluginId, binding.instanceId]);
-      headerEl.append(button('모델 목록 갱신', () => void run(async signal => {
+      headerEl.append(button(isEn ? 'Refresh Models' : '모델 목록 갱신', () => void run(async signal => {
         const result = await client.models(binding.pluginId, binding.instanceId, signal);
         modelCatalogs.set(catalogKey, result.models); return client.snapshot(signal);
       }), true));
@@ -597,13 +784,13 @@ function renderWorkspace() {
       const selected = models.find(m => m.model === chosen.model);
       if (selected && chosen.effort && !selected.efforts.includes(chosen.effort)) { delete chosen.effort; executionBySession.set(curSession.sessionKey, chosen); }
       if (chosen.model && !selected) executionBySession.delete(curSession.sessionKey);
-      const modelSelect = node('select'); modelSelect.setAttribute('aria-label', '모델');
-      const defaultOption = node('option', 'Harness 기본 모델'); defaultOption.value = ''; modelSelect.append(defaultOption);
+      const modelSelect = node('select'); modelSelect.setAttribute('aria-label', isEn ? 'Model' : '모델');
+      const defaultOption = node('option', isEn ? 'Harness Default Model' : 'Harness 기본 모델'); defaultOption.value = ''; modelSelect.append(defaultOption);
       for (const m of models) { const option = node('option', m.displayName); option.value = m.model; modelSelect.append(option); }
       modelSelect.value = selected?.model ?? ''; modelSelect.disabled = !models.length;
       modelSelect.onchange = () => { executionBySession.set(curSession.sessionKey, modelSelect.value ? { model: modelSelect.value } : {}); renderWorkspace(); };
-      const effortSelect = node('select'); effortSelect.setAttribute('aria-label', '추론 강도');
-      const effortDefault = node('option', 'Harness 기본 effort'); effortDefault.value = ''; effortSelect.append(effortDefault);
+      const effortSelect = node('select'); effortSelect.setAttribute('aria-label', isEn ? 'Reasoning Effort' : '추론 강도');
+      const effortDefault = node('option', isEn ? 'Harness Default Effort' : 'Harness 기본 effort'); effortDefault.value = ''; effortSelect.append(effortDefault);
       for (const effort of selected?.efforts ?? []) { const option = node('option', effort); option.value = effort; effortSelect.append(option); }
       effortSelect.value = selected?.efforts.includes(chosen.effort) ? chosen.effort : ''; effortSelect.disabled = !selected;
       effortSelect.onchange = () => { executionBySession.set(curSession.sessionKey, { model: selected.model, ...(effortSelect.value ? { effort: effortSelect.value } : {}) }); };
@@ -623,15 +810,19 @@ function renderWorkspace() {
     if (pendingDecisions.length > 0 || inDoubtCommands.length > 0) {
       const banner = node('div');
       banner.className = 'attention-banner';
-      const text = node('p', `⚠️ ATTENTION · 승인 대기 ${pendingDecisions.length}건 / 상태 확인 ${inDoubtCommands.length}건`);
+      const text = node('p', isEn
+        ? `⚠️ ATTENTION · ${pendingDecisions.length} Pending Approval / ${inDoubtCommands.length} In-Doubt Commands`
+        : `⚠️ ATTENTION · 승인 대기 ${pendingDecisions.length}건 / 상태 확인 ${inDoubtCommands.length}건`);
       const actions = node('div');
       actions.className = 'attention-actions';
 
       for (const d of pendingDecisions) {
-        const decisionLabel=node('p', '선택된 작업의 승인 요청 · '+d.decisionId);
+        const decisionLabel=node('p', (isEn ? 'Approval request for selected task · ' : '선택된 작업의 승인 요청 · ') + d.decisionId);
         actions.append(decisionLabel);
         for(const answer of d.allowedAnswers ?? []) {
-          const label={accept:'승인',decline:'거부',cancel:'취소'}[answer];
+          const label= isEn
+            ? ({accept:'Accept',decline:'Decline',cancel:'Cancel'}[answer])
+            : ({accept:'승인',decline:'거부',cancel:'취소'}[answer]);
           if(!label)continue;
           const action=button(label,()=>void run(async signal=>{
             await client.submit({commandId:'cmd_dec_'+crypto.randomUUID(),sessionKey:d.sessionKey,ownerId:d.ownerId,
@@ -651,12 +842,17 @@ function renderWorkspace() {
   const messagesEl = $('session-messages');
   if (messagesEl) {
     messagesEl.replaceChildren();
-    const turns = [...(snapshot?.turnsStore?.[curSession.sessionKey] ?? sessionTurns[curSession.sessionKey] ?? []), ...(snapshot?.sessionMessages?.[curSession.sessionKey] ?? []).map(m => ({ ...m, text: (m.truncated ? '[이전 내용 생략] ' : '') + m.text, time: new Date(m.receivedAt).toLocaleTimeString() }))];
+    const truncatedPrefix = isEn ? '[Earlier content truncated] ' : '[이전 내용 생략] ';
+    const turns = [...(snapshot?.turnsStore?.[curSession.sessionKey] ?? sessionTurns[curSession.sessionKey] ?? []), ...(snapshot?.sessionMessages?.[curSession.sessionKey] ?? []).map(m => ({ ...m, text: (m.truncated ? truncatedPrefix : '') + m.text, time: new Date(m.receivedAt).toLocaleTimeString() }))];
 
     if (turns.length === 0) {
       const empty = node('div');
       empty.className = 'message-empty-state';
-      empty.replaceChildren(node('div', '💬', 'icon'), node('strong', curSession.title || '선택된 세션'), node('p', '확인된 대화 및 명령 내역이 여기에 표시됩니다.'));
+      empty.replaceChildren(
+        node('div', '💬', 'icon'),
+        node('strong', curSession.title || (isEn ? 'Selected Session' : '선택된 세션')),
+        node('p', isEn ? 'Confirmed conversation and command history will appear here.' : '확인된 대화 및 명령 내역이 여기에 표시됩니다.')
+      );
       messagesEl.append(empty);
     } else {
       for (const turn of turns) {
@@ -665,7 +861,12 @@ function renderWorkspace() {
         
         const meta = node('div');
         meta.className = 'message-meta';
-        meta.replaceChildren(node('span', turn.role === 'user' ? '👤 사용자' : turn.role === 'system' ? 'Snowball 상태' : `⚡ ${curHarnessName}`), node('span', turn.time || ''));
+        const roleLabel = turn.role === 'user'
+          ? (isEn ? '👤 User' : '👤 사용자')
+          : turn.role === 'system'
+            ? (isEn ? 'Snowball Status' : 'Snowball 상태')
+            : `⚡ ${curHarnessName}`;
+        meta.replaceChildren(node('span', roleLabel), node('span', turn.time || ''));
         
         const content = node('div');
         content.className = 'message-text';
@@ -689,13 +890,19 @@ function renderWorkspace() {
 
   if (sendBtn && promptInput) {
     sendBtn.disabled = !isOwned;
-    sendBtn.title = isOwned ? '명령 전송' : '조회 전용 세션입니다';
+    sendBtn.title = isOwned
+      ? (isEn ? 'Send Command' : '명령 전송')
+      : (isEn ? 'Read-only session' : '조회 전용 세션입니다');
+    sendBtn.textContent = (isEn ? 'Send' : '전송') + ' ↵';
+    promptInput.placeholder = isEn
+      ? 'Type a message or use voice input... (Enter: Send, Shift+Enter: Newline)'
+      : '메시지를 입력하거나 음성으로 말하세요... (Enter: 전송, Shift+Enter: 줄바꿈)';
 
     const handleSend = () => {
       const text = promptInput.value.trim();
       if (!text || !isOwned) return;
 
-      // Target Invariance (A2 / R-TARGET / J03)
+      // R-TARGET: 명령 작성 중 · 고정 대상 (Target invariance preserved)
       activeDraft = {
         destinationKey: curSession.sessionKey,
         ownerId: curSession.ownerId,
@@ -705,7 +912,6 @@ function renderWorkspace() {
       const execution = structuredClone(executionBySession.get(curSession.sessionKey) ?? {});
       const draft = activeDraft;
       const commandId='cmd_send_'+crypto.randomUUID();draft.commandId=commandId;
-      const draftHeader = `명령 작성 중 · 고정 대상: ${activeDraft.destinationKey}`;
 
       const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       if (!sessionTurns[curSession.sessionKey]) sessionTurns[curSession.sessionKey] = [];
@@ -725,13 +931,15 @@ function renderWorkspace() {
             expectedRevision: curSession.revision ?? 0,
           }, signal);
 
-          // Admission is queued, not provider execution or completion.
           activeDraft = null;
           renderWorkspace();
         } catch (err) {
+          const failMsg = isEn
+            ? `Could not verify delivery: ${err.message}. Will not retry automatically. Command ID: ${commandId}`
+            : `전송 결과를 확인하지 못했습니다: ${err.message}. 자동 재전송하지 않습니다. 명령 ID: ${commandId}`;
           sessionTurns[curSession.sessionKey].push({
             role: 'system',
-            text: `전송 결과를 확인하지 못했습니다: ${err.message}. 자동 재전송하지 않습니다. 명령 ID: ${commandId}`,
+            text: failMsg,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           });
           renderWorkspace();
@@ -753,24 +961,28 @@ function renderWorkspace() {
   if (voiceBtn && voiceBanner) {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     voiceBtn.disabled = !isOwned || !SpeechRec;
-    voiceBtn.title = SpeechRec ? '브라우저 음성 인식 사용 (브라우저에 따라 네트워크 이용)' : '이 브라우저는 음성 인식을 지원하지 않습니다';
+    voiceBtn.title = SpeechRec
+      ? (isEn ? 'Browser Web Speech (may use network depending on browser)' : '브라우저 음성 인식 사용 (브라우저에 따라 네트워크 이용)')
+      : (isEn ? 'This browser does not support voice recognition' : '이 브라우저는 음성 인식을 지원하지 않습니다');
+    voiceBtn.textContent = '🎙️ ' + (isEn ? 'Voice' : '음성');
     voiceBtn.onclick = () => {
       voiceSessionKey = curSession.sessionKey;
       isRecordingVoice = !isRecordingVoice;
       if (isRecordingVoice) {
         voiceBtn.className = 'secondary voice-btn recording';
-        voiceBtn.textContent = '⏹️ 중지';
+        voiceBtn.textContent = isEn ? '⏹️ Stop' : '⏹️ 중지';
         voiceBanner.hidden = false;
-        voiceBanner.innerHTML = `<span class="voice-pulse"></span><span>음성을 듣고 있습니다... 말씀하세요</span>`;
+        voiceBanner.replaceChildren(
+          node('span', '', 'voice-pulse'),
+          node('span', isEn ? 'Listening... Speak now' : '음성을 듣고 있습니다... 말씀하세요')
+        );
 
-        // Check Web Speech API
-        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRec) {
           try {
             speechRecognition = new SpeechRec();
             speechRecognition.continuous = true;
             speechRecognition.interimResults = true;
-            speechRecognition.lang = 'ko-KR';
+            speechRecognition.lang = isEn ? 'en-US' : 'ko-KR';
             speechRecognition.onresult = event => {
               if (voiceSessionKey !== activeSessionKey || !isRecordingVoice) return;
               let transcript = '';
@@ -778,18 +990,25 @@ function renderWorkspace() {
                 transcript += event.results[i][0].transcript;
               }
               voiceDraftText = transcript;
-              voiceBanner.replaceChildren(node('span', transcript || '음성 인식 중...'));
+              voiceBanner.replaceChildren(node('span', transcript || (isEn ? 'Transcribing voice...' : '음성 인식 중...')));
             };
-            speechRecognition.onerror = () => { isRecordingVoice = false; voiceDraftText = ''; voiceBanner.replaceChildren(node('span', '음성 인식을 완료하지 못했습니다.')); voiceBtn.textContent = '🎙️ 음성'; };
+            speechRecognition.onerror = () => {
+              isRecordingVoice = false; voiceDraftText = '';
+              voiceBanner.replaceChildren(node('span', isEn ? 'Could not complete voice recognition.' : '음성 인식을 완료하지 못했습니다.'));
+              voiceBtn.textContent = '🎙️ ' + (isEn ? 'Voice' : '음성');
+            };
             speechRecognition.start();
-          } catch { isRecordingVoice = false; voiceBanner.replaceChildren(node('span', '음성 인식을 시작하지 못했습니다.')); }
+          } catch {
+            isRecordingVoice = false;
+            voiceBanner.replaceChildren(node('span', isEn ? 'Could not start voice recognition.' : '음성 인식을 시작하지 못했습니다.'));
+          }
         } else {
           isRecordingVoice = false;
-          voiceBanner.replaceChildren(node('span', '음성 인식 기능이 없습니다. 텍스트로 입력해 주세요.'));
+          voiceBanner.replaceChildren(node('span', isEn ? 'Voice recognition not supported. Please type as text.' : '음성 인식 기능이 없습니다. 텍스트로 입력해 주세요.'));
         }
       } else {
         voiceBtn.className = 'secondary voice-btn';
-        voiceBtn.textContent = '🎙️ 음성';
+        voiceBtn.textContent = '🎙️ ' + (isEn ? 'Voice' : '음성');
         voiceBanner.hidden = true;
         if (speechRecognition) {
           try { speechRecognition.stop(); } catch {}
@@ -807,6 +1026,7 @@ function renderWorkspace() {
 
 // --- Settings Modal ---
 function renderDeviceStatus() {
+  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
   const candidates = snapshot?.deviceCandidates ?? [];
   const devices = snapshot?.devices ?? [];
   const sources = snapshot?.deviceSources ?? [];
@@ -816,38 +1036,53 @@ function renderDeviceStatus() {
   const mk20Ready = devices.some(d => (d.source?.pluginId === 'snowball.device-mk20' || d.source?.pluginId === 'plugin.mk20' || d.label?.includes('MK20')) && d.state === 'ready');
   const badge = $('device-badge');
   if (badge) {
-    badge.textContent = mk20Ready ? 'MK20 제어 연결됨'
-      : lan && qmk ? 'MK20 Wi-Fi 응답 · 키 USB 감지 · 제어 미연결'
-      : lan ? 'MK20 Wi-Fi 주소 응답 · 제어 미연결'
-      : qmk && cdc ? 'MK20 USB 2종 감지 · 제어 미연결'
-      : qmk ? 'MK20 키 USB 감지 · 본체 USB(CDC) 미감지'
-      : cdc ? 'MK20 본체 USB 감지 · 제어 미연결'
-      : !sources.length ? 'MK20 탐색 미설정'
-      : sources.some(s => s.status === 'failed') ? 'MK20 장치 탐색 실패'
-      : 'MK20 USB 미감지';
+    if (isEn) {
+      badge.textContent = mk20Ready ? 'MK20 Connected'
+        : lan && qmk ? 'MK20 Wi-Fi Responding · Key USB Detected · Control Not Connected'
+        : lan ? 'MK20 Wi-Fi Address Responding · Control Not Connected'
+        : qmk && cdc ? 'MK20 Dual USB Detected · Control Not Connected'
+        : qmk ? 'MK20 Key USB Detected · Main USB (CDC) Not Detected'
+        : cdc ? 'MK20 Main USB Detected · Control Not Connected'
+        : !sources.length ? 'MK20 Discovery Not Configured'
+        : sources.some(s => s.status === 'failed') ? 'MK20 Discovery Failed'
+        : 'MK20 USB Not Detected';
+    } else {
+      badge.textContent = mk20Ready ? 'MK20 제어 연결됨'
+        : lan && qmk ? 'MK20 Wi-Fi 응답 · 키 USB 감지 · 제어 미연결'
+        : lan ? 'MK20 Wi-Fi 주소 응답 · 제어 미연결'
+        : qmk && cdc ? 'MK20 USB 2종 감지 · 제어 미연결'
+        : qmk ? 'MK20 키 USB 감지 · 본체 USB(CDC) 미감지'
+        : cdc ? 'MK20 본체 USB 감지 · 제어 미연결'
+        : !sources.length ? 'MK20 탐색 미설정'
+        : sources.some(s => s.status === 'failed') ? 'MK20 장치 탐색 실패'
+        : 'MK20 USB 미감지';
+    }
     badge.className = mk20Ready ? 'badge' : 'badge badge-neutral';
   }
   const list = $('settings-devices-list');
   if (!list) return;
   list.replaceChildren();
-  if (!devices.length) list.append(node('p', '제어 가능한 등록 장치 없음'));
+  if (!devices.length) list.append(node('p', isEn ? 'No controllable registered devices' : '제어 가능한 등록 장치 없음'));
   for (const d of devices) {
     const card = node('div'); card.className = 'card'; card.style.margin = '6px 0';
-    card.replaceChildren(node('strong', `${d.label} [${d.transport}]`), node('p', `상태: ${d.state} · 기능: ${d.capabilities.join(', ')}`));
+    const statusText = isEn ? `Status: ${d.state} · Capabilities: ${d.capabilities.join(', ')}` : `상태: ${d.state} · 기능: ${d.capabilities.join(', ')}`;
+    card.replaceChildren(node('strong', `${d.label} [${d.transport}]`), node('p', statusText));
     list.append(card);
   }
   for (const candidate of candidates) {
     const card = node('div'); card.className = 'card'; card.style.margin = '6px 0';
-    card.replaceChildren(node('strong', candidate.label), node('p', candidate.transport === 'lan'
-      ? '지정한 네트워크의 개발 포트 응답 · 장치 신원/페어링 미검증 · 명령 불가'
-      : 'USB에서 관찰됨 · 아직 페어링/입력 계약 미검증 · 명령 불가'));
+    const candidateText = candidate.transport === 'lan'
+      ? (isEn ? 'Port responding on specified development network · Identity/pairing unverified · No command rights' : '지정한 네트워크의 개발 포트 응답 · 장치 신원/페어링 미검증 · 명령 불가')
+      : (isEn ? 'Observed on USB · Pairing/input contract unverified · No command rights' : 'USB에서 관찰됨 · 아직 페어링/입력 계약 미검증 · 명령 불가');
+    card.replaceChildren(node('strong', candidate.label), node('p', candidateText));
     list.append(card);
   }
-  if (sources.some(s => s.source.endsWith('/windows-product-cdc')) && !cdc)
+  if (sources.some(s => s.source.endsWith('/windows-product-cdc')) && !cdc) {
     list.append(node('p', qmk
-      ? 'MK20 본체 제품 USB(CDC)는 현재 감지되지 않습니다. QMK 키 컨트롤러 USB만으로는 본체 제어 연결이 성립하지 않습니다.'
-      : 'MK20 키 컨트롤러 HID와 본체 제품 USB(CDC)가 모두 현재 감지되지 않습니다.'));
-  if (sources.some(s => s.status === 'failed')) list.append(node('p', '장치 탐색에 실패한 경로가 있습니다. 네트워크·USB 상태를 확인한 뒤 다시 시도하세요.'));
+      ? (isEn ? 'MK20 main product USB (CDC) is currently not detected. QMK key controller USB alone does not establish main control connection.' : 'MK20 본체 제품 USB(CDC)는 현재 감지되지 않습니다. QMK 키 컨트롤러 USB만으로는 본체 제어 연결이 성립하지 않습니다.')
+      : (isEn ? 'Both MK20 key controller HID and main product USB (CDC) are currently not detected.' : 'MK20 키 컨트롤러 HID와 본체 제품 USB(CDC)가 모두 현재 감지되지 않습니다.')));
+  }
+  if (sources.some(s => s.status === 'failed')) list.append(node('p', isEn ? 'Some discovery paths failed. Check network/USB status and retry.' : '장치 탐색에 실패한 경로가 있습니다. 네트워크·USB 상태를 확인한 뒤 다시 시도하세요.'));
   const address = $('mk20-lan-address'), iface = $('mk20-lan-interface'), status = $('mk20-lan-status');
   const config = snapshot?.mk20Lan;
   if (iface && config) {
@@ -857,10 +1092,19 @@ function renderDeviceStatus() {
     if ([...iface.options].some(option => option.value === preferred)) iface.value = preferred;
   }
   if (address && document.activeElement !== address) address.value = config?.selected?.targetAddress ?? '';
-  if (status) status.textContent = config?.error ? '저장된 MK20 주소 설정을 읽을 수 없습니다. 새 주소를 저장하거나 제거하세요.' : config?.selected
-    ? lan ? '설정한 Wi-Fi 주소가 응답합니다. 실제 MK20 제어에는 장치 페어링이 필요합니다.' : '주소는 저장됐지만 개발 포트 응답이 없습니다. Wi-Fi 경로와 기기 전원을 확인하세요.'
-    : 'Wi-Fi 주소가 설정되지 않았습니다.';
+  if (status) {
+    if (isEn) {
+      status.textContent = config?.error ? 'Unable to read saved MK20 address settings. Save a new address or remove it.' : config?.selected
+        ? lan ? 'Configured Wi-Fi address responds. Device pairing is required for actual MK20 control.' : 'Address saved, but development port is not responding. Check Wi-Fi route and device power.'
+        : 'Wi-Fi address not configured.';
+    } else {
+      status.textContent = config?.error ? '저장된 MK20 주소 설정을 읽을 수 없습니다. 새 주소를 저장하거나 제거하세요.' : config?.selected
+        ? lan ? '설정한 Wi-Fi 주소가 응답합니다. 실제 MK20 제어에는 장치 페어링이 필요합니다.' : '주소는 저장됐지만 개발 포트 응답이 없습니다. Wi-Fi 경로와 기기 전원을 확인하세요.'
+        : 'Wi-Fi 주소가 설정되지 않았습니다.';
+    }
+  }
 }
+
 function initSettingsModal() {
   const modal = $('settings-modal');
   const btnOpen = $('btn-settings');
@@ -870,6 +1114,11 @@ function initSettingsModal() {
   const chkAutostart = $('setting-autostart');
   const trayLanguage=$('setting-language'), notifications=$('setting-notifications');
   const mk20Save=$('mk20-lan-save'), mk20Remove=$('mk20-lan-remove');
+  const btnLangEn = $('lang-btn-en'), btnLangKo = $('lang-btn-ko');
+
+  if (btnLangEn) btnLangEn.onclick = () => setLanguage('en');
+  if (btnLangKo) btnLangKo.onclick = () => setLanguage('ko');
+
   if (mk20Save) mk20Save.onclick=()=>void run(async signal=>{
     await client.configureMk20Lan($('mk20-lan-address').value.trim(),$('mk20-lan-interface').value,signal);
     return client.snapshot(signal);
@@ -880,14 +1129,20 @@ function initSettingsModal() {
   });
   const syncSettings=()=>{
     if(chkAutostart)chkAutostart.checked=!!snapshot?.settings?.autostart;
-    if(trayLanguage){trayLanguage.value=snapshot?.settings?.language??'ko';trayLanguage.disabled=!snapshot?.desktopCapabilities?.tray;}
+    if(trayLanguage){
+      trayLanguage.value=currentLanguage;
+      trayLanguage.disabled=false;
+    }
     if(notifications){notifications.checked=!!snapshot?.settings?.notifications;notifications.disabled=!snapshot?.desktopCapabilities?.tray;}
   };
   const updateSetting=async patch=>{
     if(!snapshot?.settings)return;
     await run(async signal=>{await client.updateSettings(snapshot.settings.revision,patch,signal);return client.snapshot(signal);});syncSettings();
   };
-  if(trayLanguage)trayLanguage.onchange=()=>void updateSetting({language:trayLanguage.value});
+  if(trayLanguage)trayLanguage.onchange=()=>{
+    setLanguage(trayLanguage.value);
+    void updateSetting({language:trayLanguage.value});
+  };
   if(notifications)notifications.onchange=()=>void updateSetting({notifications:notifications.checked});
 
   if (btnOpen) {
@@ -896,7 +1151,11 @@ function initSettingsModal() {
       syncSettings();
       // Sync autostart setting
       if (chkAutostart && snapshot?.settings) {
-        chkAutostart.checked = !!snapshot.settings.autostart; chkAutostart.disabled = !snapshot.desktopCapabilities?.autostart; chkAutostart.title = chkAutostart.disabled ? '트레이 실행기로 시작하면 OS 자동 실행을 설정할 수 있습니다' : '실제 OS 로그인 항목 설정';
+        const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
+        chkAutostart.checked = !!snapshot.settings.autostart; chkAutostart.disabled = !snapshot.desktopCapabilities?.autostart;
+        chkAutostart.title = chkAutostart.disabled
+          ? (isEn ? 'Start with desktop launcher to configure OS autostart' : '트레이 실행기로 시작하면 OS 자동 실행을 설정할 수 있습니다')
+          : (isEn ? 'Configure actual OS login item' : '실제 OS 로그인 항목 설정');
         const tray = $('setting-tray'); if (tray) tray.checked = !!snapshot.desktopCapabilities?.tray;
       }
       renderDeviceStatus();
@@ -943,8 +1202,10 @@ function initSettingsModal() {
 
 // --- Setup Wizard (One-time onboarding / Rerun) ---
 function renderWizard() {
+  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
+  const stepNames = isEn ? ['Local Connection', 'Harness', 'Device (Optional)', 'Overview'] : ['로컬 연결', 'Harness', '장치 · 선택', 'Overview'];
   $('steps').replaceChildren(
-    ...labels.map((name, index) => {
+    ...stepNames.map((name, index) => {
       const el = node(index === step ? 'strong' : 'span', `${index + 1}. ${name}`);
       if (snapshot && index > 0) {
         el.style.cursor = 'pointer';
@@ -957,24 +1218,36 @@ function renderWizard() {
   $('actions').replaceChildren();
   $('notice').textContent = '';
   $('eyebrow').textContent = step === 3 ? 'LOCAL OVERVIEW' : `GET STARTED · ${step + 1} / 3`;
-  $('title').textContent = [
+  $('title').textContent = (isEn ? [
+    'Your Work In One Place',
+    'Connect Your Harness',
+    'Choose How To Control',
+    'Tasks on this Computer',
+  ] : [
     '내 작업을 한곳에서',
     '사용하는 Harness 연결',
     '원하는 방식으로 조작',
     '이 컴퓨터의 작업',
-  ][step];
-  $('description').textContent = [
+  ])[step];
+  $('description').textContent = (isEn ? [
+    snapshot?.accessMode === 'local-no-auth' ? 'Connected to this computer. No login or PIN required.' : 'Enter local connection code for selected token mode.',
+    'Check harness candidates on this computer. Only connected harnesses can be controlled.',
+    'Devices are optional. Check registration status or continue without hardware.',
+    'Projects, sessions, and Attention (pending approvals, errors) for selected harness.',
+  ] : [
     snapshot?.accessMode === 'local-no-auth' ? '이 컴퓨터에 연결되었습니다. 로그인이나 PIN 입력이 필요하지 않습니다.' : '선택한 토큰 모드의 로컬 연결 코드를 입력하세요.',
     '이 컴퓨터의 Harness 후보를 확인하세요. 실제 연결된 Harness의 작업만 제어할 수 있습니다.',
     '장치는 선택 사항입니다. 현재 등록 상태를 확인하거나 하드웨어 없이 계속하세요.',
     '선택한 Harness의 프로젝트 및 세션, Attention(승인 대기, 오류) 상태입니다.',
-  ][step];
+  ])[step];
 
   if (step === 0 && snapshot?.accessMode === 'local-no-auth') {
-    $('content').append(node('p', '로컬 연결 완료')); $('actions').append(button('계속', () => go(1))); return;
+    $('content').append(node('p', isEn ? 'Local connection complete' : '로컬 연결 완료'));
+    $('actions').append(button(isEn ? 'Continue' : '계속', () => go(1)));
+    return;
   }
   if (step === 0) {
-    const label = node('label', '일회용 연결 코드');
+    const label = node('label', isEn ? 'One-time Connection Code' : '일회용 연결 코드');
     label.htmlFor = 'code';
     const input = node('input');
     input.id = 'code';
@@ -983,11 +1256,11 @@ function renderWizard() {
     input.maxLength = 43;
     $('content').append(label, input);
     $('actions').append(
-      button('로컬 서비스 연결', () => {
+      button(isEn ? 'Connect Local Service' : '로컬 서비스 연결', () => {
         const code = input.value;
         input.value = '';
         if (!/^[A-Za-z0-9_-]{43}$/.test(code)) {
-          $('notice').textContent = '로컬 실행기가 발급한 연결 코드를 입력해 주세요.';
+          $('notice').textContent = isEn ? 'Please enter the connection code issued by the local launcher.' : '로컬 실행기가 발급한 연결 코드를 입력해 주세요.';
           return;
         }
         void run(async signal => {
@@ -1006,35 +1279,38 @@ function renderWizard() {
     const connected = (snapshot?.connectedHarnesses ?? []).filter(h => h.pluginId === 'snowball.codex');
     for (const binding of connected) {
       const item = node('div'); item.className = 'card';
-      item.append(node('strong', `Codex CLI · ${binding.instanceId}`), node('p', binding.connected ? '연결됨 · 기존 작업은 직접 연결해야 명령 가능' : '연결 끊김 · 재검토 필요'));
-      if (snapshot?.desktopCapabilities?.codexSelection) item.append(button('연결 해제…', () => void run(async signal => (await client.disconnectCodex(binding.instanceId, signal)).snapshot), true));
+      const connDesc = binding.connected
+        ? (isEn ? 'Connected · Existing tasks must be explicitly attached to send commands' : '연결됨 · 기존 작업은 직접 연결해야 명령 가능')
+        : (isEn ? 'Disconnected · Review needed' : '연결 끊김 · 재검토 필요');
+      item.append(node('strong', `Codex CLI · ${binding.instanceId}`), node('p', connDesc));
+      if (snapshot?.desktopCapabilities?.codexSelection) item.append(button(isEn ? 'Disconnect…' : '연결 해제…', () => void run(async signal => (await client.disconnectCodex(binding.instanceId, signal)).snapshot), true));
       $('content').append(item);
     }
     if (!survey || !survey.candidates.length) {
-      const c = node('div', '설치된 Harness 후보 목록을 확인 중이거나 비어 있습니다.');
+      const c = node('div', isEn ? 'Checking installed harness candidates or none found.' : '설치된 Harness 후보 목록을 확인 중이거나 비어 있습니다.');
       c.className = 'card';
       $('content').append(c);
     } else {
       for (const candidate of survey.candidates) {
         const c = node('div');
         c.className = 'card';
-        c.append(node('strong', candidate.providerId), node('p', candidate.locator), node('p', '설치 후보 · 아직 연결 또는 제어 확인 전'));
+        c.append(node('strong', candidate.providerId), node('p', candidate.locator), node('p', isEn ? 'Installed candidate · Unconnected / control unverified' : '설치 후보 · 아직 연결 또는 제어 확인 전'));
         $('content').append(c);
       }
     }
 
     $('actions').append(
-      ...(snapshot?.desktopCapabilities?.codexSelection ? [button('Codex CLI 연결…', () => void run(async signal => (await client.connectCodex(signal)).snapshot))] : []),
-      ...(snapshot?.desktopCapabilities?.codexSelection ? [button('저장된 Codex 연결 복구/초기화…', () => void run(async signal => (await client.resetCodex(signal)).snapshot), true)] : []),
+      ...(snapshot?.desktopCapabilities?.codexSelection ? [button(isEn ? 'Connect Codex CLI…' : 'Codex CLI 연결…', () => void run(async signal => (await client.connectCodex(signal)).snapshot))] : []),
+      ...(snapshot?.desktopCapabilities?.codexSelection ? [button(isEn ? 'Recover / Reset Codex Connections…' : '저장된 Codex 연결 복구/초기화…', () => void run(async signal => (await client.resetCodex(signal)).snapshot), true)] : []),
       button(
-        '다음 (장치)',
+        isEn ? 'Next (Device)' : '다음 (장치)',
         () => go(2)
       ),
-      button('바로 시작 (Workspace)', () => {
+      button(isEn ? 'Start Now (Workspace)' : '바로 시작 (Workspace)', () => {
         viewMode = 'workspace';
         render();
       }, true),
-      button('Harness 다시 찾기', () => void run(async signal => {
+      button(isEn ? 'Rescan Harnesses' : 'Harness 다시 찾기', () => void run(async signal => {
         await client.scanHarness(signal);
         return client.snapshot(signal);
       }), true)
@@ -1057,22 +1333,22 @@ function renderWizard() {
 
       const c = node('div');
       c.className = 'card';
-      c.replaceChildren(node('strong', `${dev.label} [${dev.transport}]`), node('p', `상태: ${dev.state}`));
+      c.replaceChildren(node('strong', `${dev.label} [${dev.transport}]`), node('p', isEn ? `Status: ${dev.state}` : `상태: ${dev.state}`));
       c.prepend(cb);
       $('content').append(c);
     }
     for (const candidate of snapshot?.deviceCandidates ?? []) {
       const c = node('div'); c.className = 'card';
-      c.replaceChildren(node('strong', candidate.label), node('p', 'USB 후보 · 페어링 및 입력 검증 전이므로 선택/명령 불가'));
+      c.replaceChildren(node('strong', candidate.label), node('p', isEn ? 'USB candidate · Unpaired / input unverified, cannot select or control' : 'USB 후보 · 페어링 및 입력 검증 전이므로 선택/명령 불가'));
       $('content').append(c);
     }
 
     $('actions').append(
-      button('시작하기 (Workspace)', () => {
+      button(isEn ? 'Start (Workspace)' : '시작하기 (Workspace)', () => {
         viewMode = 'workspace';
         render();
       }),
-      button('이전 (Harness)', () => go(1), true)
+      button(isEn ? 'Previous (Harness)' : '이전 (Harness)', () => go(1), true)
     );
     return;
   }
@@ -1085,8 +1361,13 @@ function renderWizard() {
 
 // --- Main Render Dispatcher ---
 function render() {
+  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
   const hostBadge = $('host-badge');
-  if (hostBadge) hostBadge.textContent = `${activeHost} · 로컬 제어`;
+  if (hostBadge) {
+    hostBadge.textContent = activeHost
+      ? (isEn ? `${activeHost} · Local Control` : `${activeHost} · 로컬 제어`)
+      : (isEn ? 'This Computer · Local Control' : '이 컴퓨터 · 로컬 제어');
+  }
   renderDeviceStatus();
   const wsContainer = $('workspace-container');
   const wizContainer = $('wizard-container');
@@ -1135,6 +1416,7 @@ async function followChanges() {
 }
 window.addEventListener('pagehide', () => { liveAbort.abort(); clearTimeout(refreshTimer); });
 void (async () => {
+  setLanguage(currentLanguage, false);
   initSettingsModal();
   try {
     let result = await client.snapshot();
