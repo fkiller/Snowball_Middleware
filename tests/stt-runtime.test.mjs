@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { LocalWhisperProvider } from '../../Snowball_Control/host/dist/audio/local-whisper.js';
 
 test('STT Runtime: ensure_stt_runtime.py check outputs valid JSON status', async () => {
   const script = path.resolve('scripts/ensure_stt_runtime.py');
@@ -17,7 +16,8 @@ test('STT Runtime: ensure_stt_runtime.py check outputs valid JSON status', async
   assert.ok(['cuda', 'cpu'].includes(status.optimal_backend));
 });
 
-test('STT Runtime: LocalWhisperProvider.ensureDependencies runs and returns status', async () => {
+test('STT Runtime: LocalWhisperProvider.ensureDependencies runs and returns status', {skip:process.env.SNOWBALL_TEST_STT !== '1'}, async () => {
+  const { LocalWhisperProvider }=await import('../../Snowball_Control/host/dist/audio/local-whisper.js');
   const result = await LocalWhisperProvider.ensureDependencies();
   assert.equal(result.ok, true);
   assert.ok(result.status);
@@ -63,4 +63,3 @@ test('STT Fallback: simulated Apple Silicon Metal failure falls back to CPU', as
   assert.equal(assess.selected_backend, 'cpu');
   assert.ok(assess.fallback_path.includes('metal_fail'));
 });
-

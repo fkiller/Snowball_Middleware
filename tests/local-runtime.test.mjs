@@ -18,7 +18,7 @@ test('startup recovers only stopped-owner private journal locks and refuses a li
   const departed=spawn(process.execPath,['-e',''],{windowsHide:true,stdio:'ignore'});
   const stoppedPid=departed.pid; await once(departed,'exit');
   for(const name of ['commands','workspaces','session-metadata','session-creates'])
-    fs.writeFileSync(path.join(dataDir,name,'commands.lock'),JSON.stringify({pid:stoppedPid,token:`stopped-${name}`}));
+    fs.writeFileSync(path.join(dataDir,name,'commands.lock'),JSON.stringify({pid:stoppedPid,token:`stopped-${name}`}),{mode:0o600});
   recovered=await startLocalRuntime({dataDir});
   assert.equal((await new LocalClient(recovered.origin).snapshot()).accessMode,'local-no-auth');
   await assert.rejects(startLocalRuntime({dataDir}),error=>error.code==='locked');

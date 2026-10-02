@@ -42,19 +42,24 @@ test('J01 onboarding journey: local status -> harness survey -> workspace select
   assert.equal(initialSnapshot.devices.length, 0);
 
   // Step 2: Harness survey
-  assert.ok(initialSnapshot.harness, 'Harness survey should be available');
-  assert.equal(typeof initialSnapshot.harness.status, 'string');
-  assert.ok(Array.isArray(initialSnapshot.harness.candidates));
+  const supportsSurvey=['win32','darwin'].includes(process.platform);
+  if(supportsSurvey) {
+    assert.ok(initialSnapshot.harness, 'Harness survey should be available');
+    assert.equal(typeof initialSnapshot.harness.status, 'string');
+    assert.ok(Array.isArray(initialSnapshot.harness.candidates));
+  } else assert.equal(initialSnapshot.harness,null,'Unsupported survey must not claim discovery');
   // A2 check: discovered/authenticated/controllable differentiation
-  for (const candidate of initialSnapshot.harness.candidates) {
+  for (const candidate of initialSnapshot.harness?.candidates || []) {
     assert.equal(candidate.connection, 'unprobed');
     assert.equal(candidate.controllable, false, 'Candidate without verified session must not claim controllable');
     assert.equal(candidate.version, null);
   }
 
   // Rescan harness succeeds
-  const scanned = await client.scanHarness();
-  assert.equal(typeof scanned.generation, 'number');
+  if(supportsSurvey) {
+    const scanned = await client.scanHarness();
+    assert.equal(typeof scanned.generation, 'number');
+  } else await assert.rejects(client.scanHarness());
 
   // Step 3: Workspace selection
   const selectionResult = await client.selectWorkspace();

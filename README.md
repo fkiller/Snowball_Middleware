@@ -28,7 +28,7 @@
 
 It provides developers with:
 - **Web Supervisor (`http://127.0.0.1:8765/`)**: Local-loopback dashboard without a login/PIN. Available control operations depend on the native adapters connected to the selected runtime; discovery alone does not grant execution or approval capabilities.
-- **Native Desktop System Tray**: Electron tray shell for managing the local runtime. Packaging targets Windows, macOS and Linux; this review's installed harness baseline is Windows.
+- **Native Desktop System Tray**: Electron tray shell for managing the local runtime. The package builder currently supports Windows and macOS; this review's installed harness baseline is Windows.
 - **MK20 integration**: The companion **Snowball_Control** checkout supplies the device transport and local STT implementation for `scripts/start-all.mjs`. Native approval, cancellation and recovery still require the checks listed in the architecture document.
 
 > 💡 **Looking for MK20 Firmware and Hardware Tooling?**  
@@ -64,7 +64,7 @@ Current component ownership, transport paths, security boundaries and implementa
 
 ### Prerequisites
 - **Node.js**: `>= 22.12.0`
-- **Operating Systems**: Windows 10/11 x64, macOS 12+ (Apple Silicon & Intel), Linux (Kernel 5.4+)
+- **Current validation**: Windows review host. Automated core tests also run on Ubuntu; Linux Supervisor currently has no default harness survey or native tray package target.
 
 ### 1. Setup & Build
 ```bash
@@ -94,7 +94,7 @@ npm run start:tray
 
 ### 4. Desktop Packaging (Multi-Platform Releases)
 ```bash
-# Build standalone desktop app bundles (Windows, macOS ARM64/x64, Linux)
+# Build on the target Windows or macOS host
 npm run package:desktop
 
 # (Windows) Build NSIS per-user installer (.exe)

@@ -31,7 +31,7 @@ test('native connection selections are private, bounded and restore with exact i
   if(process.platform!=='win32')assert.equal(fs.statSync(file).mode&0o077,0);
   if(process.platform==='win32')execFileSync(path.join(process.env.SystemRoot,'System32','icacls.exe'),[file,'/grant','*S-1-1-0:(R)'],{windowsHide:true,stdio:'pipe'});
   else fs.chmodSync(file,0o644);
-  assert.throws(()=>loadCodexConnections(dir),/private|accessible/i);
+  assert.throws(()=>loadCodexConnections(dir),/private|accessible|owner\/mode/i);
 });
 
 test('loopback browser can trigger only pathless native connection; cancellation is not success', async t => {
