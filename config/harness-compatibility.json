@@ -16,6 +16,6 @@
     "OpenCode desktop is installed; its separate CLI was not found. No CLI compatibility claim is made.",
     "This baseline records installations, not end-to-end certification or a model catalog.",
     "There are no version-specific adapters yet. Compare native schemas and release notes before expanding support.",
-    "MK20 requires patched QMK standalone startup firmware. Factory rollback remains unverified; back up the SD card."
+    "MK20 requires patched QMK standalone startup firmware. Back up the entire SD card before applying the Snowball image; restore that backup if needed. Prior SD contents and factory restoration are outside scope."
   ]
 }
