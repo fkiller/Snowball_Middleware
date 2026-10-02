@@ -4,7 +4,7 @@
 
 <h1 align="center">
   <img src="assets/icon.png" width="48" height="48" valign="middle" alt="Snowball Icon">
-  Snowball Middleware
+  Snowball Middleware — Preview
 </h1>
 
 <p align="center">
@@ -15,7 +15,6 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
   <img src="https://img.shields.io/badge/Node.js-%3E%3D22.12-green.svg" alt="Node.js">
   <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux-orange.svg" alt="Platforms">
-  <img src="https://img.shields.io/badge/Tests-237%2F237%20Passing-brightgreen.svg" alt="Tests">
   <a href="https://github.com/fkiller/Snowball_Control"><img src="https://img.shields.io/badge/Hardware-MK20%20Control%20Panel-purple.svg" alt="Companion Repo"></a>
 </p>
 
@@ -23,12 +22,14 @@
 
 ## 🌟 Overview
 
+**Preview:** 개인 PC와 신뢰하는 내부 네트워크 전용입니다. 루프백 Web UI에는 로그인/PIN을 요구하지 않습니다. MK20 UDP/개발 ADB의 인증·암호화 생략은 [현재 설계와 공개 전 확인 사항](docs/ARCHITECTURE.md)에 명시합니다.
+
 **Snowball Middleware** is the host-side control plane that unifies local AI coding agents—**OpenAI Codex**, **Google Antigravity (AGY)**, and **OpenCode**—into a single, low-latency desktop interface.
 
 It provides developers with:
-- **Web Supervisor (`http://127.0.0.1:8765/`)**: Zero-auth, local-loopback web dashboard for inspecting live turns, reviewing diffs, granting tool approvals, dictating prompts, and adjusting model/effort variants in real time.
-- **Native Desktop System Tray**: Lightweight cross-platform tray runtime (Windows, macOS, Linux) managing background daemon workers, hotkeys, and quick status monitoring.
-- **Hardware Agnostic**: Fully functional as a standalone desktop control plane. When connected to the **MK20 hardware desk terminal**, it streams LCD framebuffers and binds physical mechanical keys and rotary encoders instantly.
+- **Web Supervisor (`http://127.0.0.1:8765/`)**: Local-loopback dashboard without a login/PIN. Available control operations depend on the native adapters connected to the selected runtime; discovery alone does not grant execution or approval capabilities.
+- **Native Desktop System Tray**: Electron tray shell for managing the local runtime. Packaging targets Windows, macOS and Linux; this review's installed harness baseline is Windows.
+- **MK20 integration**: The companion **Snowball_Control** checkout supplies the device transport and local STT implementation for `scripts/start-all.mjs`. Native approval, cancellation and recovery still require the checks listed in the architecture document.
 
 > 💡 **Looking for MK20 Firmware and Hardware Tooling?**  
 > Check out the companion repository: 👉 **[`Snowball_Control`](https://github.com/fkiller/Snowball_Control)** (QMK firmware, Tina Linux OS/BSP, and C HUD daemon).
@@ -44,7 +45,7 @@ It provides developers with:
    - Models, efforts (variants), sessions, and workspaces are dynamically discovered from native tools and local caches. Zero static hardcoding.
 3. **Local-First & Security Boundary**
    - Web Supervisor runs strictly on `127.0.0.1` loopback with zero mandatory cloud dependencies.
-   - Network hardware connections (LAN UDP / USB HID) require explicit physical proof of presence.
+   - Production device transports require their own reviewed pairing. The MK20 lab Preview uses a trusted private LAN and does not provide cryptographic device authentication.
 4. **Plugin Sandbox Isolation**
    - Device and harness plugins run in security-isolated sandboxes, preventing arbitrary file system access while preserving native host dispatching.
 
@@ -55,27 +56,7 @@ It provides developers with:
 For the complete architectural specification, protocol definitions, and security model, see:  
 👉 **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)**
 
-```text
- ┌────────────────────────────────────────────────────────┐
- │                   Web Supervisor                       │
- │               http://127.0.0.1:8765/                   │
- └──────────────────────────┬─────────────────────────────┘
-                            │ REST / SSE
- ┌──────────────────────────▼─────────────────────────────┐
- │                Core Middleware Engine                  │
- │   - ContextManager (State Engine & Mode Machine)       │
- │   - DeviceRegistry & SessionManager                    │
- │   - Resident Whisper Worker (Metal / CUDA / CPU STT)   │
- │   - Living Catalog & DB Scanners                       │
- └──────────────┬──────────────────────────┬──────────────┘
-                │ Native Dispatch          │ UDP 7701 / HID
- ┌──────────────▼─────────────┐   ┌────────▼─────────────┐
- │   AI Coding Harnesses      │   │  MK20 Desk Terminal  │
- │   - OpenAI Codex           │   │  (via companion repo │
- │   - Google Antigravity     │   │   Snowball_Control)  │
- │   - OpenCode               │   └──────────────────────┘
- └────────────────────────────┘
-```
+Current component ownership, transport paths, security boundaries and implementation limits are maintained in the [single architecture document](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.md).
 
 ---
 
@@ -107,6 +88,7 @@ Open **`http://127.0.0.1:8765/`** in your browser. The dashboard connects immedi
 ### 3. Running Native Desktop Tray
 ```bash
 # Windows / macOS / Linux System Tray runtime
+npm run install:desktop
 npm run start:tray
 ```
 
@@ -123,7 +105,7 @@ npm run package:windows-installer
 
 ## 🧪 Verification & Test Suite
 
-Run the full automated test suite (237 unit, integration, and platform tests):
+Run the full automated test suite and inspect its reported pass/skip totals:
 
 ```bash
 # Run full regression test suite
@@ -147,7 +129,7 @@ Snowball_Middleware/
 │   └── icon.png
 ├── config/                     # Configuration schemas (STT models, etc.)
 ├── docs/                       # Comprehensive architecture documentation
-│   └── ARCHITECTURE.md         # Single Source of Truth architecture specification
+│   └── ARCHITECTURE.md         # Pointer to Snowball_Control/docs/ARCHITECTURE.md
 ├── packages/
 │   ├── api/                    # Local HTTP & WebSocket API server
 │   ├── client-sdk/             # TypeScript client SDK for Supervisor
@@ -165,3 +147,5 @@ Snowball_Middleware/
 ## 📄 License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+현재 리뷰 PC의 설치 버전은 [config/harness-compatibility.json](config/harness-compatibility.json)에서 확인합니다. 설치 버전 기록은 전체 호환성 인증이 아닙니다. MK20 전체 통합(`node scripts/start-all.mjs`)은 같은 부모 폴더의 Snowball_Control checkout과 빌드한 `host/dist`를 참조합니다. 변경 전 SD 백업과 수정 QMK 업데이트가 필요합니다.

@@ -106,12 +106,8 @@ export function scanAllHarnessSessions() {
             }
           }
 
-          let projName = 'Snowball_Control';
-          if (cwd.includes('GnuNae') || cwd.includes('Gnune')) projName = 'GnuNae';
-          else if (cwd.includes('GimMyTwitterB')) projName = 'GimMyTwitterB';
-          else if (item.thread_name && item.thread_name.includes('새 프로젝트')) projName = 'Snowball';
-          else if (cwd.includes('Snowball_Control') || cwd.includes('Snowball_Middleware') || !cwd) projName = 'Snowball_Control';
-          else continue;
+          if (!cwd || !path.isAbsolute(cwd)) continue;
+          const projName = path.basename(cwd);
 
           if (!result['snowball.codex'][projName]) {
             result['snowball.codex'][projName] = [];
@@ -120,54 +116,24 @@ export function scanAllHarnessSessions() {
           const sessionKey = `host_minime/snowball.codex/default/${item.id}`;
           result['snowball.codex'][projName].push({
             id: item.id,
+            cwd,
             sessionKey,
             title: item.thread_name,
             updatedAt: item.updated_at,
             readOnly: true,
             ownerId: null,
-            model: sessModel || 'gpt-6-astra',
-            effort: sessEffort || 'low',
+            model: sessModel,
+            effort: sessEffort,
             access: sessAccess || 'on-request'
           });
 
-          const savedTurns = turns.length > 0 ? turns.slice(-15) : [
-            { role: 'user', userPrompt: item.thread_name, text: item.thread_name, time: '최근' },
-            { role: 'agent', agentResponse: '세션이 준비되었습니다.', text: '세션이 준비되었습니다.', time: '최근', processDetails: ['session-ready'] }
-          ];
+          const savedTurns = turns.slice(-15);
           turnsStore[sessionKey] = savedTurns;
           turnsStore[item.id] = savedTurns;
         } catch {}
       }
 
-      // Add missing items from screenshot if not indexed yet
-      const fallbackTurns = [
-        { role: 'user', userPrompt: '새 프로젝트 음성 기능 및 보안 요구사항 정리', text: '새 프로젝트 음성 기능 및 보안 요구사항 정리', time: '최근', processDetails: ['audio-pipeline', 'local-policy'] },
-        { role: 'agent', agentResponse: '오디오 입력 파이프라인 및 로컬 세션 보안 정책을 수립했습니다.', text: '오디오 입력 파이프라인 및 로컬 세션 보안 정책을 수립했습니다.', time: '최근', processDetails: ['verify-audio', 'secure-channel'] }
-      ];
-      turnsStore['host_minime/snowball.codex/default/codex-snowball-remote-01'] = fallbackTurns;
-      turnsStore['codex-snowball-remote-01'] = fallbackTurns;
 
-      // Add Host PC issue session if missing
-      const sbCtrlList = result['snowball.codex']['Snowball_Control'] || [];
-      if (!sbCtrlList.some(s => s.title.includes('Host PC가 있어야만'))) {
-        const hidSessKey = 'host_minime/snowball.codex/default/codex-sb-hostpc-qmk';
-        sbCtrlList.push({
-          id: 'codex-sb-hostpc-qmk',
-          sessionKey: hidSessKey,
-          title: 'Host PC가 있어야만 키보드가 작동하는 문제를 해결해줘...',
-          readOnly: true,
-          ownerId: null,
-          model: 'gpt-6-astra',
-          effort: 'low',
-          access: 'on-request'
-        });
-        const hostPcTurns = [
-          { role: 'user', userPrompt: 'Host PC가 있어야만 키보드가 작동하는 문제를 해결해줘. QMK소스 코드 확보 후 수정, 플래시하면 어떨까? 다른 더 쉬운 방법이 있을까?', text: 'Host PC가 있어야만 키보드가 작동하는 문제를 해결해줘. QMK소스 코드 확보 후 수정, 플래시하면 어떨까? 다른 더 쉬운 방법이 있을까?', time: '1주 전' },
-          { role: 'agent', agentResponse: 'QMK 펌웨어에서 Host 통신 대기 루프를 해제하고, standalone fallback 모드로 전환되도록 수정하는 방안을 검토했습니다.', text: 'QMK 펌웨어에서 Host 통신 대기 루프를 해제하고, standalone fallback 모드로 전환되도록 수정하는 방안을 검토했습니다.', time: '1주 전', processDetails: ['qmk-firmware-check', 'disable-host-wait-loop'] }
-        ];
-        turnsStore[hidSessKey] = hostPcTurns;
-        turnsStore['codex-sb-hostpc-qmk'] = hostPcTurns;
-      }
     }
   } catch (e) {
     console.error('Codex session scan error:', e);

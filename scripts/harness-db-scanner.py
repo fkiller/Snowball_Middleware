@@ -21,7 +21,7 @@ try:
 
     # Read cli db first
     if os.path.exists(agy_cli_db):
-        con_cli = sqlite3.connect(agy_cli_db)
+        con_cli = sqlite3.connect(Path(agy_cli_db).as_uri() + '?mode=ro', uri=True)
         cur_cli = con_cli.cursor()
         cur_cli.execute('SELECT conversation_id, title, preview, workspace_uris, project_id, last_modified_time FROM conversation_summaries ORDER BY last_modified_time DESC;')
         for cid, title, prev, uris_str, pid, mtime in cur_cli.fetchall():
@@ -33,7 +33,7 @@ try:
 
     # Read app db (takes precedence or updates)
     if os.path.exists(agy_app_db):
-        con_app = sqlite3.connect(agy_app_db)
+        con_app = sqlite3.connect(Path(agy_app_db).as_uri() + '?mode=ro', uri=True)
         cur_app = con_app.cursor()
         cur_app.execute('SELECT conversation_id, title, preview, workspace_uris, project_id, last_modified_time FROM conversation_summaries ORDER BY last_modified_time DESC;')
         for cid, title, prev, uris_str, pid, mtime in cur_app.fetchall():
@@ -43,34 +43,6 @@ try:
                     'pid': pid, 'mtime': mtime, 'source_db': 'app'
                 }
         con_app.close()
-
-    # Auto-sync any CLI-only conversations to Desktop App DB and brain dir
-    if os.path.exists(agy_cli_db) and os.path.exists(agy_app_db):
-        try:
-            con_cli = sqlite3.connect(agy_cli_db)
-            con_cli.row_factory = sqlite3.Row
-            con_app = sqlite3.connect(agy_app_db)
-            for cid, item in list(db_entries.items()):
-                if item.get('source_db') == 'cli':
-                    cli_brain = os.path.join(agy_cli_brain, cid)
-                    app_brain = os.path.join(agy_app_brain, cid)
-                    if os.path.exists(cli_brain) and not os.path.exists(app_brain):
-                        try:
-                            shutil.copytree(cli_brain, app_brain, dirs_exist_ok=True)
-                        except: pass
-                    row = con_cli.execute("SELECT * FROM conversation_summaries WHERE conversation_id = ?", (cid,)).fetchone()
-                    if row:
-                        cols = list(row.keys())
-                        vals = list(row)
-                        if 'app_data_dir' in cols:
-                            vals[cols.index('app_data_dir')] = 'antigravity'
-                        col_str = ','.join([f'`{c}`' for c in cols])
-                        placeholders = ','.join(['?'] * len(cols))
-                        con_app.execute(f"INSERT OR REPLACE INTO conversation_summaries ({col_str}) VALUES ({placeholders})", vals)
-            con_app.commit()
-            con_app.close()
-            con_cli.close()
-        except: pass
 
     # Sort conversations by last_modified_time descending
     sorted_convs = sorted(db_entries.values(), key=lambda x: str(x.get('mtime') or ''), reverse=True)
@@ -84,25 +56,19 @@ try:
         uris = []
         try: uris = json.loads(uris_str)
         except: pass
+        uri_first = uris[0] if isinstance(uris, list) and uris else ''
 
-        proj_name = 'Snowball_Control'
-        uri_first = uris[0] if uris else ''
-        if 'Snowball_Control' in uri_first or 'Snowball_Middleware' in uri_first:
-            proj_name = 'Snowball_Control'
-        elif 'GnuNae' in uri_first:
-            proj_name = 'GnuNae'
-        elif 'GimMyTwitterB' in uri_first:
-            proj_name = 'GimMyTwitterB'
-        elif 'descentVR' in uri_first:
-            proj_name = 'descentVR'
-        elif uri_first:
-            proj_name = uri_first.split('/')[-1] or 'Snowball_Control'
+        from urllib.parse import urlparse, unquote
+        parsed_uri = urlparse(uri_first)
+        cwd = unquote(parsed_uri.path) if parsed_uri.scheme == 'file' else uri_first
+        if os.name == 'nt' and len(cwd) > 2 and cwd[0] == '/' and cwd[2] == ':': cwd = cwd[1:]
+        if not os.path.isabs(cwd): continue
+        proj_name = os.path.basename(cwd.rstrip('/\\'))
+        session_key = f'antigravity/{cid}'
+        clean_title = title or prev or cid
 
-        clean_title = (title or prev or 'Conversation ' + cid[:8]).strip()
-        session_key = f'host_minime/snowball.antigravity/default/{cid}'
-
-        sess_model = 'gemini-3.8-flash-high'
-        sess_effort = 'high'
+        sess_model = None
+        sess_effort = None
 
         # Load turns from transcript.jsonl if exists
         turns = []
@@ -115,12 +81,7 @@ try:
                 with open(transcript_path, 'r', encoding='utf-8', errors='ignore') as f:
                     for line in f:
                         if not line.strip(): continue
-                        if 'Claude Opus 4.6' in line: sess_model = 'claude-opus-4-6-thinking'
-                        elif 'Claude Sonnet 4.6' in line: sess_model = 'claude-sonnet-4-6'
-                        elif 'Gemini 3.7 Flash' in line: sess_model = 'gemini-3.7-flash-medium'; sess_effort = 'medium'
-                        elif 'Gemini 3.6 Flash' in line: sess_model = 'gemini-3.6-flash-medium'; sess_effort = 'medium'
-                        elif 'Gemini 3.1 Pro' in line: sess_model = 'gemini-3.1-pro-low'; sess_effort = 'low'
-                        elif 'GPT-OSS 120B' in line: sess_model = 'gpt-oss-120b-medium'; sess_effort = 'medium'
+
                         step = json.loads(line)
                         if step.get('type') == 'USER_INPUT' and step.get('content'):
                             raw_c = str(step['content'])
@@ -164,6 +125,7 @@ try:
 
         result['antigravity'][proj_name].append({
             'id': cid,
+            'cwd': cwd,
             'sessionKey': session_key,
             'title': clean_title,
             'preview': prev or clean_title,
@@ -173,11 +135,6 @@ try:
             'effort': sess_effort,
             'access': 'on-request'
         })
-        if not turns:
-            turns = [
-                {'role': 'user', 'text': clean_title, 'userPrompt': clean_title, 'time': '최근'},
-                {'role': 'agent', 'text': '대화가 준비되었습니다.', 'agentResponse': '대화가 준비되었습니다.', 'time': '최근', 'processDetails': ['antigravity-active']}
-            ]
         result['turns'][session_key] = turns[-15:]
         result['turns'][cid] = turns[-15:]
 except Exception as e:
@@ -195,34 +152,24 @@ try:
         except: pass
 
     if os.path.exists(oc_db):
-        con = sqlite3.connect(oc_db)
+        con = sqlite3.connect(Path(oc_db).as_uri() + '?mode=ro', uri=True)
         cur = con.cursor()
         cur.execute('SELECT s.id, s.title, s.directory, s.model, s.time_updated FROM session s ORDER BY s.time_updated DESC;')
         
         for sid, title, directory, model_str, tu in cur.fetchall():
             proj_name = 'Snowball_Control'
             dir_norm = (directory or '').replace('\\', '/')
-            if 'Snowball_Control' in dir_norm:
-                proj_name = 'Snowball_Control'
-            elif 'TuneStairs' in dir_norm:
-                proj_name = 'TuneStairs'
-            elif 'Default Project' in dir_norm:
-                proj_name = 'Default Project'
-            elif 'Snowball_Middleware' in dir_norm:
-                proj_name = 'Snowball_Control'
-            elif dir_norm:
-                proj_name = os.path.basename(dir_norm) or 'Snowball_Control'
-                
+            proj_name = os.path.basename(dir_norm)
             model_info = {}
             try: model_info = json.loads(model_str or '{}')
             except: pass
             
-            model_id = model_info.get('id') or 'muse-spark-1.3-contributor-free'
-            provider_id = model_info.get('providerID') or 'opencode'
-            variant = model_info.get('variant') or 'xhigh'
+            model_id = model_info.get('id') or ''
+            provider_id = model_info.get('providerID') or ''
+            variant = model_info.get('variant')
             if variant == 'default': variant = 'xhigh'
             
-            full_model_key = f'{provider_id}/{model_id}' if '/' not in model_id else model_id
+            full_model_key = (f'{provider_id}/{model_id}' if provider_id and model_id else None)
             p_meta = oc_models_cache.get(provider_id, {}).get('models', {}).get(model_id, {})
             disp_model = p_meta.get('name') or model_id
             
@@ -234,6 +181,7 @@ try:
                 
             result['opencode'][proj_name].append({
                 'id': sid,
+                'cwd': directory,
                 'sessionKey': session_key,
                 'title': clean_title,
                 'preview': clean_title,
@@ -268,11 +216,6 @@ try:
                             turns.append({'role': 'agent', 'text': combined_text[:800], 'agentResponse': combined_text[:800], 'time': '최근', 'processDetails': ['opencode-executed']})
                 except: pass
                 
-            if not turns:
-                turns = [
-                    {'role': 'user', 'text': clean_title, 'userPrompt': clean_title, 'time': '최근'},
-                    {'role': 'agent', 'text': 'OpenCode 세션이 준비되었습니다.', 'agentResponse': 'OpenCode 세션이 준비되었습니다.', 'time': '최근', 'processDetails': ['opencode-active']}
-                ]
             result['turns'][session_key] = turns[-15:]
             result['turns'][sid] = turns[-15:]
 except Exception as e:

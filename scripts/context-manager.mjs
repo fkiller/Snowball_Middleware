@@ -111,23 +111,19 @@ export function sliceLineIntoChunks(line, chunkCount = 4, chunkWidth = 15) {
 
 export class GitProvider {
   static async getChangedFiles(cwd = process.cwd()) {
-    return new Promise((resolve) => {
-      cp.exec('git status --porcelain -u', { cwd, windowsHide: true }, (err, stdout) => {
-        if (err || !stdout) return resolve([]);
-        const lines = stdout.split(/\r?\n/);
+    return new Promise(resolve => {
+      cp.execFile('git', ['status', '--porcelain=v1', '-z', '-uall'],
+        { cwd, windowsHide: true, maxBuffer: 1024 * 1024, timeout: 10000 }, (err, stdout) => {
+        if (err) return resolve([]);
+        const entries = stdout.split('\0');
         const files = [];
-        for (const line of lines) {
-          if (!line || line.length < 4) continue;
-          const status = line.slice(0, 2).trim();
-          const filePath = line.slice(3).replace(/^"|"$/g, '').trim();
-          if (filePath.endsWith('/') || filePath.endsWith('\\')) continue;
-          files.push({
-            path: filePath,
-            name: path.basename(filePath),
-            status: status || 'M',
-            additions: 0,
-            deletions: 0,
-          });
+        for (let i = 0; i < entries.length; i++) {
+          const entry = entries[i];
+          if (entry.length < 4) continue;
+          const status = entry.slice(0, 2);
+          const filePath = entry.slice(3);
+          if (/[RC]/.test(status)) i++; // -z emits destination then source.
+          files.push({ path: filePath, name: path.basename(filePath), status: status.trim(), additions: 0, deletions: 0 });
         }
         resolve(files);
       });
@@ -135,24 +131,21 @@ export class GitProvider {
   }
 
   static async getFileDiff(filePath, cwd = process.cwd()) {
-    return new Promise((resolve) => {
-      const cmd = `git diff HEAD -- "${filePath}"`;
-      cp.exec(cmd, { cwd, windowsHide: true }, (err, stdout) => {
-        if (!err && stdout && stdout.trim()) {
-          return resolve(stdout.split('\n').map(l => l.replace(/\r$/, '')));
-        }
-        cp.exec(`git diff --no-index /dev/null "${filePath}"`, { cwd, windowsHide: true }, (_err2, stdout2) => {
-          if (stdout2 && stdout2.trim()) {
-            return resolve(stdout2.split('\n').map(l => l.replace(/\r$/, '')));
-          }
-          try {
-            const fullPath = path.isAbsolute(filePath) ? filePath : path.join(cwd, filePath);
-            if (syncFs.existsSync(fullPath) && syncFs.statSync(fullPath).isFile()) {
-              const content = syncFs.readFileSync(fullPath, 'utf8');
-              const lines = content.split('\n').slice(0, 300).map(l => `+ ${l.replace(/\r$/, '')}`);
-              return resolve([`+++ ${filePath}`, '@@ -0,0 +1,' + lines.length + ' @@', ...lines]);
-            }
-          } catch {}
+    const root = path.resolve(cwd);
+    const fullPath = path.resolve(root, filePath);
+    const within = target => {
+      const rel = path.relative(root, target);
+      return rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel);
+    };
+    if (typeof filePath !== 'string' || filePath.includes('\0') || !within(fullPath)) return ['File is outside the selected project'];
+    try { if (!within(syncFs.realpathSync(fullPath))) return ['File is outside the selected project']; } catch {}
+    return new Promise(resolve => {
+      const options = { cwd: root, windowsHide: true, maxBuffer: 1024 * 1024, timeout: 10000 };
+      const lines = output => output.split('\n').map(line => line.replace(/\r$/, ''));
+      cp.execFile('git', ['--literal-pathspecs', 'diff', '--no-ext-diff', '--no-textconv', 'HEAD', '--', filePath], options, (err, stdout) => {
+        if (!err && stdout.trim()) return resolve(lines(stdout));
+        cp.execFile('git', ['diff', '--no-index', '--no-ext-diff', '--no-textconv', '--', process.platform === 'win32' ? 'NUL' : '/dev/null', fullPath], options, (_err, output) => {
+          if (output.trim()) return resolve(lines(output));
           resolve([`No changes detected for ${filePath}`]);
         });
       });
@@ -333,12 +326,12 @@ export class ContextManager {
     if (this.projectsByScope[key] && this.projectsByScope[key].length > 0) {
       return this.projectsByScope[key];
     }
-    return [{ id: 'Snowball_Control', name: 'Snowball_Control', path: process.cwd() }];
+    return [];
   }
 
   getCurrentProject() {
     const projs = this.getProjectsForCurrentScope();
-    return projs[this.selectedProjectIdx % projs.length] || projs[0] || { id: 'none', name: 'None', path: '/' };
+    return projs[this.selectedProjectIdx % projs.length] || projs[0] || { id: 'none', name: 'None', path: '' };
   }
 
   getSessionsForCurrentScope() {
@@ -346,7 +339,7 @@ export class ContextManager {
     if (this.sessionsByScope[key] && this.sessionsByScope[key].length > 0) {
       return this.sessionsByScope[key];
     }
-    return [{ id: 'none', title: 'No active session', preview: '', createdAt: Date.now() }];
+    return [];
   }
 
   getCurrentSession() {
@@ -597,15 +590,16 @@ export class ContextManager {
   }
 
   // --- Files Modal ---
-  async readWorkspaceFiles(directory = this.getCurrentProject().path || process.cwd()) {
+  async readWorkspaceFiles(directory = this.getCurrentProject().path) {
     try {
-      const root = await fs.realpath(this.getCurrentProject().path || process.cwd());
+      const project = this.getCurrentProject();
+      if (project.id === 'none' || !project.path || !path.isAbsolute(project.path)) throw new Error('Select a real project before browsing files');
+      const root = await fs.realpath(project.path);
       let target = directory;
       try { target = await fs.realpath(directory); } catch { target = root; }
       
-      const normRoot = path.normalize(root).toLowerCase();
-      const normTarget = path.normalize(target).toLowerCase();
-      if (normTarget !== normRoot && !normTarget.startsWith(normRoot + path.sep.toLowerCase())) {
+      const relative = path.relative(root, target);
+      if (relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
         target = root;
       }
 
@@ -619,7 +613,7 @@ export class ContextManager {
         .sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name))
         .map(e => ({ name: e.name, isDir: e.isDirectory() }));
 
-      if (normTarget !== normRoot) {
+      if (path.relative(root, target) !== '') {
         this.workspaceFiles = [{ name: '..', isDir: true }, ...mapped];
       } else {
         this.workspaceFiles = mapped;
@@ -649,7 +643,12 @@ export class ContextManager {
 
   async openFileContent(fileIdx, fileName) {
     try {
+      const project = this.getCurrentProject();
+      if (project.id === 'none' || !project.path || !path.isAbsolute(project.path)) throw new Error('Select a real project before previewing files');
+      const root = await fs.realpath(project.path);
       const full = await fs.realpath(path.join(this.filePath, fileName));
+      const relative = path.relative(root, full);
+      if (relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) throw new Error('File is outside the selected project');
       const stat = await fs.stat(full);
       if (stat.size > 256000) throw new Error('File exceeds 256KB preview limit');
       const text = await fs.readFile(full, 'utf8');

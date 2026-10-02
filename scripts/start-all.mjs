@@ -27,6 +27,7 @@ import os from 'node:os';
 import { scanHarnessProjects } from './harness-project-scanner.mjs';
 import { scanAllHarnessSessions } from './harness-session-scanner.mjs';
 import { scanAllHarnessCatalogs } from './harness-catalog-scanner.mjs';
+import { installedHarnessVersions } from './harness-runtime.mjs';
 import { dispatchHarnessTurn } from './harness-dispatch.mjs';
 
 const directory = ensurePrivateStateDirectory(resolveUserDataDir());
@@ -74,23 +75,6 @@ try {
   await discovery.scan(providers, { platform: process.platform, pathValue: process.env.PATH ?? '' });
 } catch {}
 
-// Register default local projects if not already registered
-const defaultProjects = [
-  { root: 'e:\\developments\\projects\\Snowball_Control', name: 'Snowball_Control' },
-  { root: 'e:\\developments\\projects\\Snowball_Middleware', name: 'Snowball_Middleware' }
-];
-const existingNames = new Set(store.list().map(w => w.displayName));
-for (const p of defaultProjects) {
-  if (!existingNames.has(p.name) && fs.existsSync(p.root)) {
-    try {
-      await store.registerSelected(p.root, p.name);
-      console.log(`  Registered Project : ${p.name}`);
-    } catch (err) {
-      console.log(`  Project register note (${p.name}):`, err.message);
-    }
-  }
-}
-
 // Refresh all workspaces on startup so restored entries transition to 'ready'
 for (const ws of store.list()) {
   try {
@@ -116,8 +100,8 @@ try {
 }
 
 // Register real sessions discovered from Codex, Antigravity, and OpenCode
-let realSessionsData = null;
-let realTurnsData = null;
+let realSessionsData = {};
+let realTurnsData = {};
 try {
   const { sessionsByHarness, turnsStore } = scanAllHarnessSessions();
   realSessionsData = sessionsByHarness;
@@ -147,11 +131,12 @@ try {
   console.log('  Harness session scan note:', err.message);
 }
 
-const connectedHarnesses = [
-  { pluginId: 'snowball.codex', instanceId: 'default', connected: true, canCreate: true, canAttach: true, canListModels: true },
-  { pluginId: 'snowball.antigravity', instanceId: 'default', connected: true, canCreate: true, canAttach: true, canListModels: true },
-  { pluginId: 'snowball.opencode', instanceId: 'default', connected: true, canCreate: true, canAttach: true, canListModels: true },
-];
+const installedVersions = installedHarnessVersions();
+console.log('Harness installations:', installedVersions);
+const connectedHarnesses = Object.entries(installedVersions).map(([kind, info]) => ({
+  pluginId: `snowball.${kind}`, instanceId: 'default', connected: info.available,
+  canCreate: false, canAttach: info.available, canListModels: info.available,
+}));
 
 async function handleListModels(pluginId, instanceId) {
   const catalogs = scanAllHarnessCatalogs();
@@ -159,34 +144,12 @@ async function handleListModels(pluginId, instanceId) {
   return list.map(m => ({
     model: m.model,
     displayName: m.displayName,
-    efforts: m.efforts || ['medium']
+    efforts: m.efforts || []
   }));
 }
 
-async function handleCreateSession(pluginId, workspaceCanonical, options, instanceId) {
-  const newId = 's-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const sessionKey = formatSessionKey({
-    hostId,
-    harness: { pluginId, instanceId: instanceId || 'default' },
-    nativeSessionId: newId,
-  });
-  journal.registerSession(sessionKey, 'user');
-  const projDisplayName = path.basename(workspaceCanonical) || 'Snowball_Control';
-  if (!realSessionsData[pluginId]) realSessionsData[pluginId] = {};
-  if (!realSessionsData[pluginId][projDisplayName]) realSessionsData[pluginId][projDisplayName] = [];
-  const sessObj = {
-    id: newId,
-    sessionKey,
-    title: options.title || 'New conversation',
-    updatedAt: new Date().toISOString(),
-    readOnly: false,
-    ownerId: 'user',
-    model: options.model || (pluginId === 'snowball.codex' ? 'gpt-5.6-sol' : 'gemini-3.8-flash-high'),
-    effort: 'medium',
-    access: 'immediate'
-  };
-  realSessionsData[pluginId][projDisplayName].unshift(sessObj);
-  return { sessionKey, ownerId: 'user', title: sessObj.title };
+async function handleCreateSession() {
+  throw new Error('Native session creation is not available through this Preview API. Use the native harness, then refresh; MK20 New creates a local draft until its first native turn.');
 }
 
 async function handleCommandQueued(sessionKey) {
@@ -204,15 +167,19 @@ async function handleCommandQueued(sessionKey) {
         const harnessPluginId = parsed.harness.pluginId;
         const nativeSessionId = parsed.nativeSessionId;
         const dispatchHarness = harnessPluginId.replace('snowball.', '');
-        const projectPath = 'E:\\developments\\projects\\Snowball_Control';
+        const sessions = Object.values(realSessionsData[harnessPluginId] || {}).flat();
+        const target = sessions.find(session => session.id === nativeSessionId);
+        const projectPath = target?.cwd;
+        if (!projectPath || !path.isAbsolute(projectPath) || !fs.existsSync(projectPath)) throw new Error('Native session workspace is unavailable; dispatch refused');
 
         console.log(`[WebUI Dispatch] Dispatching turn for [${dispatchHarness}] session [${nativeSessionId}] prompt: "${promptText}"`);
 
         const result = await dispatchHarnessTurn({
-          harness: dispatchHarness,
-          projectPath,
+          signal,
+          harnessId: harnessPluginId,
+          cwd: projectPath,
           sessionId: nativeSessionId.startsWith('s-') ? undefined : nativeSessionId,
-          prompt: promptText,
+          promptText,
           model,
           effort,
           onDelta: () => {}
@@ -509,6 +476,7 @@ let currentVoiceCaptureId = null;
 voice.status().catch(() => {});
 
 const context = new ContextManager();
+const nativeDispatches = new Map();
 const shortGpu = backendDeviceName.includes('GeForce') ? 'RTX ' + backendDeviceName.split('GeForce')[1].trim().split(' ')[0] : (backendDeviceName.split(' ')[0] || '');
 context.sttEngineLabel = `${selectedSttModel.toUpperCase()} ${selectedBackend.toUpperCase()}${shortGpu ? ' (' + shortGpu + ')' : ''}`;
 
@@ -517,9 +485,9 @@ context.machines = [{ id: 'dev-pc', name: os.hostname().split('.')[0] || 'DEV-PC
 
 // Configure harnesses
 context.harnesses = [
-  { id: 'snowball.codex', name: 'Codex', isEnabled: true },
-  { id: 'snowball.antigravity', name: 'Antigrav', isEnabled: true },
-  { id: 'snowball.opencode', name: 'OpenCode', isEnabled: true }
+  { id: 'snowball.codex', name: 'Codex', isEnabled: installedVersions.codex.available },
+  { id: 'snowball.antigravity', name: 'Antigrav', isEnabled: installedVersions.antigravity.available },
+  { id: 'snowball.opencode', name: 'OpenCode', isEnabled: installedVersions.opencode.available }
 ];
 
 // Discover and configure genuine living model catalogs dynamically for each harness
@@ -527,7 +495,7 @@ function refreshHarnessCatalogs() {
   try {
     const catalogs = scanAllHarnessCatalogs();
     for (const [pluginId, cat] of Object.entries(catalogs)) {
-      if (cat && cat.length > 0) {
+      if (Array.isArray(cat)) {
         context.setModelCatalog(cat, `dev-pc/${pluginId}`);
       }
     }
@@ -537,7 +505,7 @@ function refreshHarnessCatalogs() {
 }
 refreshHarnessCatalogs();
 
-context.accessLevels = ['on-request', 'auto-approve', 'read-only'];
+context.accessLevels = ['Native policy'];
 
 // Configure projects and sessions from real scanner data
 if (realSessionsData) {
@@ -555,14 +523,8 @@ if (realSessionsData) {
       return a.localeCompare(b);
     });
     for (const [projName, sessList] of projEntries) {
-      let projPath = process.cwd();
-      const cand1 = path.join('E:\\developments\\projects', projName);
-      const cand2 = path.join('e:\\developments\\projects', projName);
-      if (fs.existsSync(cand1)) {
-        projPath = cand1;
-      } else if (fs.existsSync(cand2)) {
-        projPath = cand2;
-      }
+      const projPath = sessList.find(session => session.cwd && path.isAbsolute(session.cwd))?.cwd;
+      if (!projPath || !fs.existsSync(projPath)) continue;
       projs.push({ id: projName, name: projName, path: projPath });
       context.sessionsByScope[`${scopeKey}/${projName}`] = sessList.map(s => ({
         id: s.id,
@@ -853,6 +815,11 @@ mk20.on('lab.input', async (input) => {
   if (input.kind === 'button' && input.pressed) {
     const kid = parseInt(input.button.replace('key-', ''), 10);
     if (!kid || isNaN(kid)) return;
+    if (context.viewMode === 'session' && [1, 20, 16].includes(kid) &&
+        (!context.getCurrentHarness().isEnabled || context.getCurrentProject().id === 'none')) {
+      context.lastDispatchError = 'Native CLI and a real project are required';
+      context.updateReaderForCurrentSession(); await paintMk20(); return;
+    }
 
     // ViewMode = workspace (Files modal)
     if (context.viewMode === 'workspace') {
@@ -1121,22 +1088,13 @@ mk20.on('lab.input', async (input) => {
         // Reconcile delivery
         console.log('[Main] Reconciling unknown voice draft delivery...');
         const curSess = context.getCurrentSession();
+        // Reading a thread is not proof that this particular draft was delivered.
         if (desktop.isConnected && curSess?.id) {
-          try {
-            await desktop.readThread(curSess.id, 5);
-            context.voiceSubmission = 'idle';
-            context.voiceDraftText = '';
-            await loadCurrentSessionTurns();
-          } catch {
-            context.voiceSubmission = 'idle';
-            context.voiceDraftText = '';
-            context.updateReaderForCurrentSession();
-          }
-        } else {
-          context.voiceSubmission = 'idle';
-          context.voiceDraftText = '';
-          context.updateReaderForCurrentSession();
+          try { await desktop.readThread(curSess.id, 5); } catch {}
         }
+        context.lastDispatchError = 'Delivery remains unconfirmed. Check the native session; K4 discards the draft.';
+        if (curSess) curSess.lastDispatchError = context.lastDispatchError;
+        context.updateReaderForCurrentSession();
       } else if (context.voiceDraftText) {
         // Send prompt
         context.lastDispatchError = null;
@@ -1160,10 +1118,14 @@ mk20.on('lab.input', async (input) => {
           curSess.lastDispatchError = null;
         }
 
+        const dispatchAbort = new AbortController();
+        const destinationScope = context.getFullScopeKey();
+        nativeDispatches.set(curSess, dispatchAbort);
         // Non-blocking fire-and-forget background dispatch so MK20 never hangs
         void (async () => {
           try {
             const result = await dispatchHarnessTurn({
+              signal: dispatchAbort.signal,
               harnessId: curHarness.id,
               sessionId: targetSessionId,
               promptText,
@@ -1206,7 +1168,7 @@ mk20.on('lab.input', async (input) => {
               curSess.voiceDraftText = '';
               curSess.lastDispatchError = null;
 
-              const sessionScopeKey = `${context.getCurrentMachine()?.id || 'machine-primary'}/${curHarness.id}/${curProj?.id || 'Snowball_Control'}`;
+              const sessionScopeKey = destinationScope;
               curSess.sessionKey = `${sessionScopeKey}/${result.sessionId}`;
               context.memorySessionPerProject.set(sessionScopeKey, result.sessionId);
             }
@@ -1262,7 +1224,7 @@ mk20.on('lab.input', async (input) => {
               void paintMk20();
             }
           }
-        })();
+        })().finally(() => { if (nativeDispatches.get(curSess) === dispatchAbort) nativeDispatches.delete(curSess); });
       }
     } else if (kid === 4) {
       // Stop / Cancel / Discard
@@ -1305,8 +1267,9 @@ mk20.on('lab.input', async (input) => {
         if (curSess) curSess.lastDispatchError = null;
         context.updateReaderForCurrentSession();
       } else if (context.voiceSubmission === 'sending' || (curSess && curSess.voiceSubmission === 'sending')) {
-        context.voiceSubmission = 'idle';
-        if (curSess) curSess.voiceSubmission = 'idle';
+        const dispatch = nativeDispatches.get(curSess);
+        if (dispatch) dispatch.abort();
+        context.lastDispatchError = dispatch ? 'Native interruption requested; waiting for exit' : 'No owned dispatch process to interrupt';
         context.updateReaderForCurrentSession();
       } else if (context.voiceSubmission === 'unknown' || (curSess && curSess.voiceSubmission === 'unknown')) {
         context.voiceDraftText = '';

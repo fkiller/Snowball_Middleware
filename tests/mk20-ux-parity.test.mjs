@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { ContextManager, sliceLineIntoChunks, wrapText, wrapWithPrefix } from '../scripts/context-manager.mjs';
 // Hardware-source integration is opt-in; pure ContextManager tests remain portable.
 const encodeLegacyPreview = process.env.SNOWBALL_TEST_MK20 === '1' ? (await import('../../Snowball_Control/plugins/device-mk20/src/index.mjs')).encodeLegacyPreview : undefined;
@@ -174,6 +175,7 @@ test('MK20 UX Parity: Workspace dual-mode (Full File Browser & 24-line File View
 
 test('MK20 UX Parity: Workspace directory navigation and datagram capacity', { skip: !encodeLegacyPreview }, async () => {
   const context = new ContextManager();
+  context.projectsByScope[context.getScopeKey()] = [{ id: 'test-repo', name: 'Test repository', path: fileURLToPath(new URL('..', import.meta.url)) }];
   await context.readWorkspaceFiles();
   const rootPath = context.filePath;
 

@@ -1,3 +1,5 @@
+import cp from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -42,18 +44,6 @@ export function scanHarnessProjects() {
   // 2. ANTIGRAVITY
   try {
     const agProjects = new Map();
-    // Known roots from Antigravity
-    const candidatePaths = [
-      'E:\\developments\\projects\\Snowball_Control',
-      'E:\\developments\\projects\\GnuNae',
-      'C:\\Users\\wondo\\OneDrive\\Documents\\GimMyTwitterB',
-      'C:\\Users\\wondo'
-    ];
-    for (const cp of candidatePaths) {
-      if (fs.existsSync(cp)) {
-        agProjects.set(cp, path.basename(cp) || cp);
-      }
-    }
     // Also scan APPDATA/Antigravity storage.json
     const appData = process.env.APPDATA || '';
     const storageJson = path.join(appData, 'Antigravity', 'User', 'globalStorage', 'storage.json');
@@ -88,14 +78,12 @@ export function scanHarnessProjects() {
   // 3. OPENCODE
   try {
     const ocProjects = new Map();
-    // From OpenCode UI screenshot: TuneStairs, Snowball_Control, Default Project
-    const candidatePaths = [
-      { name: 'TuneStairs', path: 'E:\\developments\\projects\\TuneStairs' },
-      { name: 'Snowball_Control', path: 'E:\\developments\\projects\\Snowball_Control' },
-      { name: 'Default Project', path: process.env.USERPROFILE || 'C:\\Users\\wondo' }
-    ];
-    for (const cp of candidatePaths) {
-      ocProjects.set(cp.name, { displayName: cp.name, root: cp.path });
+    const pyScript = path.join(path.dirname(fileURLToPath(import.meta.url)), 'harness-db-scanner.py');
+    const data = JSON.parse(cp.execFileSync('python', [pyScript], { encoding: 'utf8', timeout: 12000,
+      windowsHide: true, maxBuffer: 20 * 1024 * 1024, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }));
+    for (const [name, sessions] of Object.entries(data.opencode || {})) {
+      const cwd = sessions.find(session => session.cwd && path.isAbsolute(session.cwd))?.cwd;
+      if (cwd) ocProjects.set(name, { displayName: name, root: cwd });
     }
 
     let idx = 1;

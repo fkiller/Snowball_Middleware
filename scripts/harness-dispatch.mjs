@@ -5,27 +5,26 @@ import * as fs from 'node:fs';
 import readline from 'node:readline';
 import { scanAntigravityCatalog, scanOpenCodeCatalog } from './harness-catalog-scanner.mjs';
 
-const CODEX_EXE = 'C:\\Users\\wondo\\AppData\\Local\\OpenAI\\Codex\\bin\\faa963e871dd422c\\codex.exe';
-const AGY_EXE = 'C:\\Users\\wondo\\AppData\\Local\\agy\\bin\\agy.exe';
-const OPENCODE_CMD = 'C:\\nvm4w\\nodejs\\opencode.cmd';
+import { resolveHarnessExecutable } from './harness-runtime.mjs';
 
 /**
  * Synchronizes Codex thread metadata in ~/.codex/state_5.sqlite so it is immediately visible in Codex Desktop.
  */
 export function syncCodexThread(threadId, title) {
+  if (process.env.SNOWBALL_ENABLE_LEGACY_DESKTOP_SYNC !== '1') return;
   if (!threadId) return;
   try {
-    const cleanTitle = (title || 'New conversation').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' ');
-    const pyScript = `import sqlite3, os
+    const pyScript = `import sqlite3, os, sys, json
+thread_id, title = json.loads(sys.argv[1])
 db_path = os.path.expanduser('~/.codex/state_5.sqlite')
 if os.path.exists(db_path):
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
-    cur.execute("UPDATE threads SET thread_source = 'user', originator = 'codex_work_desktop', name = ? WHERE id = ?", ('${cleanTitle}', '${threadId}'))
+    cur.execute("UPDATE threads SET thread_source = 'user', originator = 'codex_work_desktop', name = ? WHERE id = ?", (title, thread_id))
     conn.commit()
     conn.close()
 `;
-    cp.execFileSync('python', ['-c', pyScript], { windowsHide: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
+    cp.execFileSync('python', ['-c', pyScript, JSON.stringify([threadId, title || 'New conversation'])], { windowsHide: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
   } catch (err) {
     // Non-fatal note
   }
@@ -36,11 +35,11 @@ if os.path.exists(db_path):
  * so that it is immediately visible in Antigravity Desktop App.
  */
 export function syncAntigravityConversation(conversationId, title) {
+  if (process.env.SNOWBALL_ENABLE_LEGACY_DESKTOP_SYNC !== '1') return;
   if (!conversationId || conversationId.startsWith('s-')) return;
   try {
-    const cleanTitle = (title || 'New conversation').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' ');
-    const pyScript = `import sqlite3, os, shutil
-cid = '${conversationId}'
+    const pyScript = `import sqlite3, os, shutil, sys, json
+cid, title = json.loads(sys.argv[1])
 cli_db = os.path.expanduser('~/.gemini/antigravity-cli/conversation_summaries.db')
 app_db = os.path.expanduser('~/.gemini/antigravity/conversation_summaries.db')
 cli_brain = os.path.expanduser(f'~/.gemini/antigravity-cli/brain/{cid}')
@@ -59,12 +58,12 @@ if os.path.exists(cli_db) and os.path.exists(app_db):
         vals = list(row)
         if 'app_data_dir' in cols:
             vals[cols.index('app_data_dir')] = 'antigravity'
-        if 'title' in cols and '${cleanTitle}' and '${cleanTitle}' != 'New conversation':
+        if 'title' in cols and title and title != 'New conversation':
             cur_title = row['title']
             if not cur_title or cur_title == 'Starting A New Conversation':
-                vals[cols.index('title')] = '${cleanTitle}'
+                vals[cols.index('title')] = title
                 if 'preview' in cols:
-                    vals[cols.index('preview')] = '${cleanTitle}'
+                    vals[cols.index('preview')] = title
         c_app = sqlite3.connect(app_db)
         col_str = ','.join([f'\`{col}\`' for col in cols])
         placeholders = ','.join(['?'] * len(cols))
@@ -72,7 +71,7 @@ if os.path.exists(cli_db) and os.path.exists(app_db):
         c_app.commit()
         c_app.close()
 `;
-    cp.execFileSync('python', ['-c', pyScript], { windowsHide: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
+    cp.execFileSync('python', ['-c', pyScript, JSON.stringify([conversationId, title || 'New conversation'])], { windowsHide: true, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
   } catch (err) {
     // Non-fatal sync
   }
@@ -81,14 +80,16 @@ if os.path.exists(cli_db) and os.path.exists(app_db):
 /**
  * Executes a turn on Codex via stdio app-server.
  */
-export async function runCodexTurn(threadId, promptText, cwd, model = 'gpt-6-astra', effort = 'medium', onDelta) {
+export async function runCodexTurn(threadId, promptText, cwd, model, effort, onDelta, signal) {
   return new Promise((resolve, reject) => {
-    const p = cp.spawn(CODEX_EXE, ['app-server', '--listen', 'stdio://'], {
+    const p = cp.spawn(resolveHarnessExecutable('codex'), ['app-server', '--listen', 'stdio://'], {
       env: { ...process.env, CODEX_HOME: path.join(os.homedir(), '.codex') },
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, signal
     });
 
     const rl = readline.createInterface({ input: p.stdout });
+    p.stderr.resume();
+    p.on('close', code => { clearTimeout(timer); reject(new Error(`Codex exited before completion (${code})`)); });
     let agentText = '';
     let currentThreadId = threadId;
 
@@ -100,6 +101,7 @@ export async function runCodexTurn(threadId, promptText, cwd, model = 'gpt-6-ast
     rl.on('line', line => {
       try {
         const msg = JSON.parse(line);
+        if (msg.id && msg.error) { clearTimeout(timer); p.kill(); reject(new Error(msg.error.message || 'Codex RPC failed')); return; }
         if (msg.id === 1) {
           p.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'initialized' }) + '\n');
           if (!currentThreadId || currentThreadId.startsWith('s-')) {
@@ -133,6 +135,7 @@ export async function runCodexTurn(threadId, promptText, cwd, model = 'gpt-6-ast
           if (msg.result?.thread?.id) {
             currentThreadId = msg.result.thread.id;
             try {
+              if (process.env.SNOWBALL_ENABLE_LEGACY_DESKTOP_SYNC === '1') {
               const indexPath = path.join(os.homedir(), '.codex', 'session_index.jsonl');
               const entry = JSON.stringify({
                 id: currentThreadId,
@@ -140,6 +143,7 @@ export async function runCodexTurn(threadId, promptText, cwd, model = 'gpt-6-ast
                 updated_at: new Date().toISOString()
               }) + '\n';
               fs.appendFileSync(indexPath, entry, 'utf8');
+              }
             } catch {}
             syncCodexThread(currentThreadId, promptText.slice(0, 32));
           }
@@ -174,15 +178,11 @@ export async function runCodexTurn(threadId, promptText, cwd, model = 'gpt-6-ast
         }
 
         if (msg.method === 'turn/completed') {
+          if (msg.params?.turn?.status === 'failed' || msg.params?.turn?.error) { clearTimeout(timer); p.kill(); reject(new Error(msg.params.turn.error?.message || 'Codex turn failed')); return; }
           clearTimeout(timer);
           syncCodexThread(currentThreadId, promptText.slice(0, 32));
-          setTimeout(() => {
-            p.kill();
-            resolve({
-              sessionId: currentThreadId,
-              response: agentText.trim() || 'Done'
-            });
-          }, 300);
+          resolve({ sessionId: currentThreadId, response: agentText.trim() });
+          p.kill();
         }
       } catch {}
     });
@@ -191,12 +191,13 @@ export async function runCodexTurn(threadId, promptText, cwd, model = 'gpt-6-ast
       clearTimeout(timer);
       reject(err);
     });
+    p.stdin.on('error', err => { clearTimeout(timer); p.kill(); reject(err); });
 
     p.stdin.write(JSON.stringify({
       id: 1,
       jsonrpc: '2.0',
       method: 'initialize',
-      params: { clientInfo: { name: 'codex_work_desktop', title: 'Codex Desktop', version: '0.158.0' } }
+      params: { clientInfo: { name: 'codex_work_desktop', title: 'Codex Desktop', version: '0.1.0' } }
     }) + '\n');
   });
 }
@@ -204,7 +205,7 @@ export async function runCodexTurn(threadId, promptText, cwd, model = 'gpt-6-ast
 /**
  * Executes a turn on Antigravity via agy stream-json CLI.
  */
-export async function runAntigravityTurn(conversationId, promptText, cwd, model, effort, onDelta) {
+export async function runAntigravityTurn(conversationId, promptText, cwd, model, effort, onDelta, signal) {
   return new Promise((resolve, reject) => {
     const args = ['--input-format', 'stream-json', '--output-format', 'stream-json'];
     if (conversationId && !conversationId.startsWith('s-')) {
@@ -246,9 +247,9 @@ export async function runAntigravityTurn(conversationId, promptText, cwd, model,
       }
     }
 
-    const p = cp.spawn(AGY_EXE, args, {
+    const p = cp.spawn(resolveHarnessExecutable('antigravity'), args, {
       cwd: cwd || process.cwd(),
-      stdio: ['pipe', 'pipe', 'pipe']
+      stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, signal
     });
 
     const timer = setTimeout(() => {
@@ -256,6 +257,8 @@ export async function runAntigravityTurn(conversationId, promptText, cwd, model,
       reject(new Error('Antigravity turn timed out after 45s'));
     }, 45000);
 
+    p.stderr.resume();
+    p.on('close', code => { clearTimeout(timer); reject(new Error(`Antigravity exited before completion (${code})`)); });
     let currentConvId = conversationId;
     let agentText = '';
 
@@ -278,15 +281,12 @@ export async function runAntigravityTurn(conversationId, promptText, cwd, model,
           p.kill();
           const finalId = msg.result?.conversation_id || currentConvId;
           syncAntigravityConversation(finalId, promptText.slice(0, 32));
-          setTimeout(() => {
-            syncAntigravityConversation(finalId, promptText.slice(0, 32));
-          }, 300);
           if (msg.result?.status === 'ERROR') {
             reject(new Error(msg.result.error || 'Antigravity turn error'));
           } else {
             resolve({
               sessionId: finalId,
-              response: msg.result?.response?.trim() || agentText.trim() || 'Done'
+              response: msg.result?.response?.trim() || agentText.trim()
             });
           }
         }
@@ -297,13 +297,14 @@ export async function runAntigravityTurn(conversationId, promptText, cwd, model,
       clearTimeout(timer);
       reject(err);
     });
+    p.stdin.on('error', err => { clearTimeout(timer); p.kill(); reject(err); });
   });
 }
 
 /**
  * Executes a turn on OpenCode via opencode run CLI.
  */
-export async function runOpenCodeTurn(sessionId, promptText, cwd, model = 'opencode/muse-spark-1.3-contributor-free', variant, onDelta) {
+export async function runOpenCodeTurn(sessionId, promptText, cwd, model, variant, onDelta, signal) {
   return new Promise((resolve, reject) => {
     let ocModel = model;
     let allowedVariants = [];
@@ -323,12 +324,11 @@ export async function runOpenCodeTurn(sessionId, promptText, cwd, model = 'openc
         }
       } catch {}
     }
-    if (!ocModel) ocModel = 'opencode/muse-spark-1.3-contributor-free';
 
     const args = [
-      '/c', OPENCODE_CMD, 'run',
+      'run',
       '--format', 'json',
-      '--model', ocModel,
+      ...(ocModel ? ['--model', ocModel] : []),
       '--dir', cwd || process.cwd()
     ];
     if (sessionId && !sessionId.startsWith('s-')) {
@@ -342,8 +342,8 @@ export async function runOpenCodeTurn(sessionId, promptText, cwd, model = 'openc
     }
     args.push(promptText);
 
-    const p = cp.spawn('cmd.exe', args, {
-      stdio: ['ignore', 'pipe', 'pipe']
+    const p = cp.spawn(resolveHarnessExecutable('opencode'), args, {
+      stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, signal
     });
 
     const timer = setTimeout(() => {
@@ -351,6 +351,7 @@ export async function runOpenCodeTurn(sessionId, promptText, cwd, model = 'openc
       reject(new Error('OpenCode turn timed out after 45s'));
     }, 45000);
 
+    p.stderr.resume();
     let activeSessionId = sessionId;
     let agentText = '';
 
@@ -371,12 +372,12 @@ export async function runOpenCodeTurn(sessionId, promptText, cwd, model = 'openc
 
     p.on('close', code => {
       clearTimeout(timer);
-      if (code !== 0 && !agentText) {
+      if (code !== 0) {
         reject(new Error(`OpenCode exited with code ${code}`));
       } else {
         resolve({
           sessionId: activeSessionId,
-          response: agentText.trim() || 'Done'
+          response: agentText.trim()
         });
       }
     });
@@ -391,13 +392,14 @@ export async function runOpenCodeTurn(sessionId, promptText, cwd, model = 'openc
 /**
  * Dispatches a prompt to whichever harness is active.
  */
-export async function dispatchHarnessTurn({ harnessId, sessionId, promptText, cwd, model, effort, onDelta }) {
+export async function dispatchHarnessTurn({ harnessId, sessionId, promptText, cwd, model, effort, onDelta, signal }) {
+  signal?.throwIfAborted();
   if (harnessId === 'snowball.codex') {
-    return runCodexTurn(sessionId, promptText, cwd, model, effort, onDelta);
+    return runCodexTurn(sessionId, promptText, cwd, model, effort, onDelta, signal);
   } else if (harnessId === 'snowball.antigravity') {
-    return runAntigravityTurn(sessionId, promptText, cwd, model, effort, onDelta);
+    return runAntigravityTurn(sessionId, promptText, cwd, model, effort, onDelta, signal);
   } else if (harnessId === 'snowball.opencode') {
-    return runOpenCodeTurn(sessionId, promptText, cwd, model, effort, onDelta);
+    return runOpenCodeTurn(sessionId, promptText, cwd, model, effort, onDelta, signal);
   } else {
     throw new Error(`Unsupported harness: ${harnessId}`);
   }

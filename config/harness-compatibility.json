@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-02",
+  "status": "Preview",
+  "platform": "win32-x64",
+  "scope": ["codex", "antigravity", "opencode", "mk20", "web-supervisor"],
+  "baseline": {
+    "codexCli": "0.160.0",
+    "codexDesktopAppServer": "0.159.2",
+    "antigravityCli": "1.2.13",
+    "opencodeDesktop": "1.18.33",
+    "opencodeCli": null
+  },
+  "notes": [
+    "Versions read from the current review host, not inferred from another PC.",
+    "OpenCode desktop is installed; its separate CLI was not found. No CLI compatibility claim is made.",
+    "This baseline records installations, not end-to-end certification or a model catalog.",
+    "There are no version-specific adapters yet. Compare native schemas and release notes before expanding support.",
+    "MK20 requires patched QMK standalone startup firmware. Factory rollback remains unverified; back up the SD card."
+  ]
+}
