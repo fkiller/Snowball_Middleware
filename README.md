@@ -40,6 +40,26 @@ It provides developers with:
 
 ---
 
+## 🖥️ Visual Showcase
+
+### Web Supervisor Dashboard
+The local-loopback Web Supervisor (`http://127.0.0.1:8765/`) provides zero-cloud oversight, workspace project discovery, active harness monitoring (Codex, AGY, OpenCode), and real-time physical device connectivity:
+
+<p align="center">
+  <img src="assets/screenshots/web_supervisor_dashboard.png" width="100%" alt="Snowball Web Supervisor Dashboard">
+</p>
+
+### Physical MK20 Terminal Integration
+The companion **[`Snowball_Control`](https://github.com/fkiller/Snowball_Control)** repository connects the desktop middleware to the MK20 hardware terminal, featuring physical breadcrumb navigation (`Device > Harness > Project > Session`), built-in mic speech prompt capture, and low-latency display updates:
+
+<p align="center">
+  <img src="assets/screenshots/mk20_navigation_demo.gif" width="480" alt="MK20 Live Navigation Demo"><br>
+  <em>Physical MK20 hardware terminal driven by Snowball Middleware.</em><br>
+  <a href="https://github.com/fkiller/Snowball_Control">👉 Visit Snowball_Control Repository</a> &nbsp;|&nbsp; <a href="https://x.com/fkiller/status/2099345561627382015">🔗 Original Post on X</a>
+</p>
+
+---
+
 ## ⚡ Non-Negotiable Core Principles
 
 1. **Zero Simulation**
@@ -130,7 +150,14 @@ Snowball_Middleware/
 │   └── supervisor/             # Web Supervisor UI (HTML, CSS, JS runtime)
 ├── assets/                     # Official brand artwork, icon, and banner
 │   ├── banner.png
-│   └── icon.png
+│   ├── icon.png
+│   ├── screenshots/            # Web Supervisor dashboard & MK20 hardware captures
+│   │   ├── web_supervisor_dashboard.png
+│   │   ├── mk20_navigation_demo.gif
+│   │   └── mk20_ui_elements_test.gif
+│   └── videos/                 # Demonstration recordings
+│       ├── mk20_navigation_demo.mp4
+│       └── mk20_ui_elements_test.mp4
 ├── config/                     # Configuration schemas (STT models, etc.)
 ├── docs/                       # Comprehensive architecture documentation
 │   ├── ARCHITECTURE.md         # English architecture pointer (default)

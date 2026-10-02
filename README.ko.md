@@ -40,6 +40,26 @@
 
 ---
 
+## 🖥️ 비주얼 쇼케이스 (Visual Showcase)
+
+### 웹 수퍼바이저 대시보드 (Web Supervisor)
+로컬 루프백 웹 수퍼바이저(`http://127.0.0.1:8765/`)는 외부 클라우드 의존성 없이 탐색된 작업공간, 활성 하네스(Codex, AGY, OpenCode), 그리고 실시간 하드웨어 연결 상태를 직관적으로 제공합니다:
+
+<p align="center">
+  <img src="assets/screenshots/web_supervisor_dashboard.png" width="100%" alt="Snowball 웹 수퍼바이저 대시보드">
+</p>
+
+### 물리 MK20 터미널 연동 (Hardware Terminal)
+동반 저장소인 **[`Snowball_Control`](https://github.com/fkiller/Snowball_Control)**과 연동하여 MK20 하드웨어 데스크 터미널에서 브레드크럼 계층 탐색(`기기 > 하네스 > 프로젝트 > 세션`), 내장 마이크 음성 프롬프트 캡처, 초저지연 상태 동기화를 구동합니다:
+
+<p align="center">
+  <img src="assets/screenshots/mk20_navigation_demo.gif" width="480" alt="MK20 네비게이션 시연"><br>
+  <em>Snowball Middleware로 구동되는 실물 MK20 하드웨어 데스크 터미널.</em><br>
+  <a href="https://github.com/fkiller/Snowball_Control">👉 Snowball_Control 저장소 바로가기</a> &nbsp;|&nbsp; <a href="https://x.com/fkiller/status/2099345561627382015">🔗 X (Twitter) 원본 글</a>
+</p>
+
+---
+
 ## ⚡ 불변의 핵심 원칙 (Core Principles)
 
 1. **Zero Simulation (시뮬레이션 전면 금지)**
@@ -130,7 +150,14 @@ Snowball_Middleware/
 │   └── supervisor/             # 웹 수퍼바이저 UI (HTML, CSS, JS 런타임)
 ├── assets/                     # 공식 브랜드 아트워크, 아이콘 및 배너
 │   ├── banner.png
-│   └── icon.png
+│   ├── icon.png
+│   ├── screenshots/            # 웹 수퍼바이저 대시보드 및 하드웨어 캡처
+│   │   ├── web_supervisor_dashboard.png
+│   │   ├── mk20_navigation_demo.gif
+│   │   └── mk20_ui_elements_test.gif
+│   └── videos/                 # 시연 녹화 영상
+│       ├── mk20_navigation_demo.mp4
+│       └── mk20_ui_elements_test.mp4
 ├── config/                     # 설정 스키마 (STT 모델 등)
 ├── docs/                       # 아키텍처 문서
 │   ├── ARCHITECTURE.md         # 영문 아키텍처 포인터 (기본)
