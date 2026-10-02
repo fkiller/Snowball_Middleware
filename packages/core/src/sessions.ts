@@ -7,8 +7,25 @@ import type { CommandRecord, DecisionRecord } from './journal-model.js';
 
 export interface HarnessAdapter extends DispatchPort {
   status?(): Record<string, unknown>;
-  listSessions?(): Promise<Array<{ nativeId: string; sessionKey?: string; ownerId?: string | null; readOnly?: boolean; cwd?: string; preview?: string }>>;
-  readSession?(id: string): Promise<{ nativeId: string; readOnly?: boolean; turns?: unknown[] }>;
+  listSessions?(): Promise<Array<{
+    nativeId: string;
+    sessionKey?: string;
+    ownerId?: string | null;
+    readOnly?: boolean;
+    cwd?: string;
+    preview?: string;
+    model?: string;
+    effort?: string;
+    access?: string;
+  }>>;
+  readSession?(id: string): Promise<{
+    nativeId: string;
+    readOnly?: boolean;
+    turns?: unknown[];
+    model?: string;
+    effort?: string;
+    access?: string;
+  }>;
   createSession?(root: string, options?: Record<string, unknown>): Promise<{ sessionKey: string; ownerId: string }>;
   listModels?(): Promise<Array<{ model: string; displayName: string; efforts: string[]; defaultEffort: string | null }>>;
   attachSession?(nativeId: string): Promise<{ sessionKey: string; ownerId: string }>;
@@ -31,6 +48,9 @@ export interface SessionSummary {
   activeTurnId?: string;
   createdAt: number;
   updatedAt: number;
+  model?: string;
+  effort?: string;
+  access?: string;
 }
 
 export interface SessionMessage { role: 'agent'; text: string; turnId: string; receivedAt: number; truncated: boolean }
@@ -43,7 +63,7 @@ export interface SessionServiceOptions {
 }
 
 export interface SessionMetadataPort {
-  get(sessionKey: string): Pick<SessionSummary, 'title' | 'cwd' | 'createdAt' | 'workspaceId'> | undefined;
+  get(sessionKey: string): Pick<SessionSummary, 'title' | 'cwd' | 'createdAt' | 'workspaceId' | 'model' | 'effort' | 'access'> | undefined;
   remember(summary: SessionSummary): void;
 }
 
@@ -95,6 +115,9 @@ export class SessionService extends EventEmitter {
         harnessPluginId: parts.harness.pluginId, harnessInstanceId: parts.harness.instanceId,
         title: metadata?.title ?? `Session ${parts.nativeSessionId.slice(0, 8)}`, preview: '', cwd: metadata?.cwd ?? '',
         ...(metadata?.workspaceId ? { workspaceId: metadata.workspaceId } : {}),
+        ...(metadata?.model ? { model: metadata.model } : {}),
+        ...(metadata?.effort ? { effort: metadata.effort } : {}),
+        ...(metadata?.access ? { access: metadata.access } : {}),
         readOnly: true, ownerId: null, status: 'error',
         createdAt: metadata?.createdAt ?? this.now(), updatedAt: this.now(),
       });
@@ -278,7 +301,7 @@ export class SessionService extends EventEmitter {
   async createSession(
     pluginId: string,
     root: string,
-    options: { title?: string; model?: string; ephemeral?: boolean; workspaceId?: string } = {},
+    options: { title?: string; model?: string; effort?: string; access?: string; ephemeral?: boolean; workspaceId?: string } = {},
     instanceId?: string
   ): Promise<{ sessionKey: string; ownerId: string }> {
     const adapter = this.getAdapter(pluginId, instanceId);
@@ -309,6 +332,9 @@ export class SessionService extends EventEmitter {
       preview: '',
       cwd: root,
       ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}),
+      ...(options.model ? { model: options.model } : {}),
+      ...(options.effort ? { effort: options.effort } : {}),
+      ...(options.access ? { access: options.access } : {}),
       readOnly: false,
       ownerId,
       status: 'idle',
@@ -333,7 +359,24 @@ export class SessionService extends EventEmitter {
     if (this.getAdapter(parts.harness.pluginId, parts.harness.instanceId) !== adapter || attached.sessionKey !== sessionKey || attached.ownerId !== adapter.ownerId) throw new SessionFault('adapter_identity_mismatch');
     this.journal.registerSession(sessionKey, attached.ownerId);
     const existing = this.sessions.get(sessionKey);
-    const summary: SessionSummary = { sessionKey, nativeSessionId: parts.nativeSessionId, harnessPluginId: parts.harness.pluginId, harnessInstanceId: parts.harness.instanceId, title: existing?.title ?? parts.nativeSessionId, preview: existing?.preview ?? '', cwd: existing?.cwd ?? '', ...(existing?.workspaceId ? { workspaceId: existing.workspaceId } : {}), readOnly: false, ownerId: attached.ownerId, status: 'idle', createdAt: existing?.createdAt ?? this.now(), updatedAt: this.now() };
+    const summary: SessionSummary = {
+      sessionKey,
+      nativeSessionId: parts.nativeSessionId,
+      harnessPluginId: parts.harness.pluginId,
+      harnessInstanceId: parts.harness.instanceId,
+      title: existing?.title ?? parts.nativeSessionId,
+      preview: existing?.preview ?? '',
+      cwd: existing?.cwd ?? '',
+      ...(existing?.workspaceId ? { workspaceId: existing.workspaceId } : {}),
+      ...(existing?.model ? { model: existing.model } : {}),
+      ...(existing?.effort ? { effort: existing.effort } : {}),
+      ...(existing?.access ? { access: existing.access } : {}),
+      readOnly: false,
+      ownerId: attached.ownerId,
+      status: 'idle',
+      createdAt: existing?.createdAt ?? this.now(),
+      updatedAt: this.now(),
+    };
     this.sessions.set(sessionKey, summary);
     this.metadata?.remember(summary);
     return attached;
@@ -369,6 +412,9 @@ export class SessionService extends EventEmitter {
             if (known?.readOnly) {
               known.cwd = s.cwd || known.cwd;
               known.preview = s.preview || known.preview;
+              if (s.model) known.model = s.model;
+              if (s.effort) known.effort = s.effort;
+              if (s.access) known.access = s.access;
               known.status = 'idle'; known.updatedAt = this.now();
             } else if (!known) {
               const parts = parseSessionKey(sessionKey);
@@ -385,7 +431,14 @@ export class SessionService extends EventEmitter {
                 status: 'idle',
                 createdAt: this.now(),
                 updatedAt: this.now(),
+                ...(s.model ? { model: s.model } : {}),
+                ...(s.effort ? { effort: s.effort } : {}),
+                ...(s.access ? { access: s.access } : {}),
               });
+            } else {
+              if (s.model && !known.model) known.model = s.model;
+              if (s.effort && !known.effort) known.effort = s.effort;
+              if (s.access && !known.access) known.access = s.access;
             }
           }
         } catch {}

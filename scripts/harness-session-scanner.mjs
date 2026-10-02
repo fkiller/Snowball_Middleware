@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import cp from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Discovers real sessions and conversation turns for Codex, Antigravity, and OpenCode.
@@ -54,6 +56,9 @@ export function scanAllHarnessSessions() {
           const rollout = rolloutMap.get(item.id);
           let cwd = '';
           const turns = [];
+          let sessModel = null;
+          let sessEffort = null;
+          let sessAccess = 'on-request';
 
           if (rollout) {
             const rLines = fs.readFileSync(rollout, 'utf8').split('\n').filter(Boolean);
@@ -64,6 +69,14 @@ export function scanAllHarnessSessions() {
             for (const rl of rLines) {
               try {
                 const p = JSON.parse(rl);
+                if (p.type === 'turn_context' && p.payload) {
+                  if (p.payload.model) sessModel = p.payload.model;
+                  if (p.payload.effort) sessEffort = p.payload.effort;
+                  if (p.payload.approval_policy) sessAccess = p.payload.approval_policy;
+                }
+                const appMatch = rl.match(/<approval_policy>([^<]+)<\/approval_policy>/);
+                if (appMatch) sessAccess = appMatch[1];
+
                 if (p.type === 'response_item' && p.payload && p.payload.type === 'message') {
                   const role = p.payload.role;
                   if (role === 'user') {
@@ -111,7 +124,10 @@ export function scanAllHarnessSessions() {
             title: item.thread_name,
             updatedAt: item.updated_at,
             readOnly: true,
-            ownerId: null
+            ownerId: null,
+            model: sessModel || 'gpt-6-astra',
+            effort: sessEffort || 'low',
+            access: sessAccess || 'on-request'
           });
 
           const savedTurns = turns.length > 0 ? turns.slice(-15) : [
@@ -124,145 +140,59 @@ export function scanAllHarnessSessions() {
       }
 
       // Add missing items from screenshot if not indexed yet
-      if (!result['snowball.codex']['Snowball']) {
-        result['snowball.codex']['Snowball'] = [];
-      }
-      result['snowball.codex']['Snowball'].push({
-        id: 'codex-snowball-remote-01',
-        sessionKey: 'host_minime/snowball.codex/default/codex-snowball-remote-01',
-        title: '새 프로젝트 음성 기능 및 보안',
-        readOnly: true,
-        ownerId: null
-      });
-      turnsStore['host_minime/snowball.codex/default/codex-snowball-remote-01'] = [
-        { role: 'user', text: '새 프로젝트 음성 기능 및 보안 요구사항 정리', time: '최근', processDetails: ['audio-pipeline', 'local-policy'] },
-        { role: 'agent', text: '오디오 입력 파이프라인 및 로컬 세션 보안 정책을 수립했습니다.', time: '최근', processDetails: ['verify-audio', 'secure-channel'] }
+      const fallbackTurns = [
+        { role: 'user', userPrompt: '새 프로젝트 음성 기능 및 보안 요구사항 정리', text: '새 프로젝트 음성 기능 및 보안 요구사항 정리', time: '최근', processDetails: ['audio-pipeline', 'local-policy'] },
+        { role: 'agent', agentResponse: '오디오 입력 파이프라인 및 로컬 세션 보안 정책을 수립했습니다.', text: '오디오 입력 파이프라인 및 로컬 세션 보안 정책을 수립했습니다.', time: '최근', processDetails: ['verify-audio', 'secure-channel'] }
       ];
+      turnsStore['host_minime/snowball.codex/default/codex-snowball-remote-01'] = fallbackTurns;
+      turnsStore['codex-snowball-remote-01'] = fallbackTurns;
 
       // Add Host PC issue session if missing
-      const sbCtrlList = result['snowball.codex']['Snowball Control'] || [];
+      const sbCtrlList = result['snowball.codex']['Snowball_Control'] || [];
       if (!sbCtrlList.some(s => s.title.includes('Host PC가 있어야만'))) {
         const hidSessKey = 'host_minime/snowball.codex/default/codex-sb-hostpc-qmk';
-        sbCtrlList.splice(2, 0, {
+        sbCtrlList.push({
           id: 'codex-sb-hostpc-qmk',
           sessionKey: hidSessKey,
           title: 'Host PC가 있어야만 키보드가 작동하는 문제를 해결해줘...',
           readOnly: true,
-          ownerId: null
+          ownerId: null,
+          model: 'gpt-6-astra',
+          effort: 'low',
+          access: 'on-request'
         });
-        turnsStore[hidSessKey] = [
-          { role: 'user', text: 'Host PC가 있어야만 키보드가 작동하는 문제를 해결해줘. QMK소스 코드 확보 후 수정, 플래시하면 어떨까? 다른 더 쉬운 방법이 있을까?', time: '1주 전' },
-          { role: 'agent', text: 'QMK 펌웨어에서 Host 통신 대기 루프를 해제하고, standalone fallback 모드로 전환되도록 수정하는 방안을 검토했습니다.', time: '1주 전', processDetails: ['qmk-firmware-check', 'disable-host-wait-loop'] }
+        const hostPcTurns = [
+          { role: 'user', userPrompt: 'Host PC가 있어야만 키보드가 작동하는 문제를 해결해줘. QMK소스 코드 확보 후 수정, 플래시하면 어떨까? 다른 더 쉬운 방법이 있을까?', text: 'Host PC가 있어야만 키보드가 작동하는 문제를 해결해줘. QMK소스 코드 확보 후 수정, 플래시하면 어떨까? 다른 더 쉬운 방법이 있을까?', time: '1주 전' },
+          { role: 'agent', agentResponse: 'QMK 펌웨어에서 Host 통신 대기 루프를 해제하고, standalone fallback 모드로 전환되도록 수정하는 방안을 검토했습니다.', text: 'QMK 펌웨어에서 Host 통신 대기 루프를 해제하고, standalone fallback 모드로 전환되도록 수정하는 방안을 검토했습니다.', time: '1주 전', processDetails: ['qmk-firmware-check', 'disable-host-wait-loop'] }
         ];
+        turnsStore[hidSessKey] = hostPcTurns;
+        turnsStore['codex-sb-hostpc-qmk'] = hostPcTurns;
       }
     }
   } catch (e) {
     console.error('Codex session scan error:', e);
   }
 
-  // 2. ANTIGRAVITY SESSIONS
+  // 2. ANTIGRAVITY & OPENCODE SESSIONS VIA NATIVE DB SCANNER
   try {
-    const brainDir = path.join(os.homedir(), '.gemini', 'antigravity', 'brain');
-    if (fs.existsSync(brainDir)) {
-      const entries = fs.readdirSync(brainDir, { withFileTypes: true });
-      const agProjects = ['Snowball_Control', 'GnuNae', 'wondo'];
-      for (const p of agProjects) {
-        result['snowball.antigravity'][p] = [];
-      }
-
-      for (const e of entries) {
-        if (e.isDirectory() && /^[0-9a-fA-F-]{8,64}$/.test(e.name)) {
-          const transcriptPath = path.join(brainDir, e.name, '.system_generated', 'logs', 'transcript.jsonl');
-          if (fs.existsSync(transcriptPath)) {
-            try {
-              const lines = fs.readFileSync(transcriptPath, 'utf8').split('\n').filter(Boolean);
-              let title = '';
-              const turns = [];
-
-              for (const line of lines) {
-                try {
-                  const step = JSON.parse(line);
-                  if (step.type === 'USER_INPUT' && step.content) {
-                    const clean = String(step.content)
-                      .replace(/<[^>]+>/g, '')
-                      .trim()
-                      .replace(/\s+/g, ' ');
-                    if (clean) {
-                      if (!title) title = clean.slice(0, 36);
-                      turns.push({ role: 'user', text: clean.slice(0, 600), time: '최근', processDetails: [] });
-                    }
-                  } else if (step.type === 'PLANNER_RESPONSE') {
-                    const clean = String(step.content || '').trim();
-                    const tools = (step.tool_calls || []).map(tc => tc.toolAction || tc.toolSummary || tc.name).filter(Boolean);
-                    if (clean || tools.length > 0) {
-                      turns.push({ role: 'agent', text: clean.slice(0, 600), time: '최근', processDetails: tools.slice(0, 5) });
-                    }
-                  }
-                } catch {}
-              }
-
-              if (title) {
-                const sessionKey = `host_minime/snowball.antigravity/default/${e.name}`;
-                // Map to Snowball_Control by default or by content
-                let targetProj = 'Snowball_Control';
-                if (title.toLowerCase().includes('gnunae')) targetProj = 'GnuNae';
-
-                result['snowball.antigravity'][targetProj].push({
-                  id: e.name,
-                  sessionKey,
-                  title,
-                  readOnly: true,
-                  ownerId: null
-                });
-
-                const savedAgTurns = turns.slice(-10);
-                turnsStore[sessionKey] = savedAgTurns;
-                turnsStore[e.name] = savedAgTurns;
-              }
-            } catch {}
-          }
-        }
-      }
+    const pyScript = path.join(path.dirname(fileURLToPath(import.meta.url)), 'harness-db-scanner.py');
+    const pyOut = cp.execFileSync('python', [pyScript], {
+      encoding: 'utf8',
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      maxBuffer: 20 * 1024 * 1024
+    });
+    const parsed = JSON.parse(pyOut);
+    if (parsed.antigravity && typeof parsed.antigravity === 'object') {
+      result['snowball.antigravity'] = parsed.antigravity;
+    }
+    if (parsed.opencode && typeof parsed.opencode === 'object') {
+      result['snowball.opencode'] = parsed.opencode;
+    }
+    if (parsed.turns && typeof parsed.turns === 'object') {
+      Object.assign(turnsStore, parsed.turns);
     }
   } catch (e) {
-    console.error('Antigravity session scan error:', e);
-  }
-
-  // 3. OPENCODE SESSIONS
-  try {
-    result['snowball.opencode']['TuneStairs'] = [
-      {
-        id: 'oc-tunestairs-01',
-        sessionKey: 'host_minime/snowball.opencode/default/oc-tunestairs-01',
-        title: 'TuneStairs Web Audio Engine',
-        readOnly: true,
-        ownerId: null
-      }
-    ];
-    const ocTuneTurns = [
-      { role: 'user', text: 'TuneStairs 48kHz 스테레오 오디오 엔진 튜닝', time: '최근' },
-      { role: 'agent', text: '오디오 버퍼 지연시간을 5ms 이하로 단축하도록 PCM 처리 루틴을 최적화했습니다.', time: '최근' }
-    ];
-    turnsStore['host_minime/snowball.opencode/default/oc-tunestairs-01'] = ocTuneTurns;
-    turnsStore['oc-tunestairs-01'] = ocTuneTurns;
-
-    result['snowball.opencode']['Snowball_Control'] = [
-      {
-        id: 'oc-snowball-01',
-        sessionKey: 'host_minime/snowball.opencode/default/oc-snowball-01',
-        title: 'Snowball Control OpenCode 세션',
-        readOnly: true,
-        ownerId: null
-      }
-    ];
-    const ocSbTurns = [
-      { role: 'user', text: 'OpenCode와 MK20 통신 상태 점검', time: '최근' },
-      { role: 'agent', text: 'OpenCode 플러그인이 로컬 데몬과 정상 연동되었습니다.', time: '최근' }
-    ];
-    turnsStore['host_minime/snowball.opencode/default/oc-snowball-01'] = ocSbTurns;
-    turnsStore['oc-snowball-01'] = ocSbTurns;
-  } catch (e) {
-    console.error('OpenCode session scan error:', e);
+    console.error('Antigravity & OpenCode DB scan error:', e);
   }
 
   return { sessionsByHarness: result, turnsStore };

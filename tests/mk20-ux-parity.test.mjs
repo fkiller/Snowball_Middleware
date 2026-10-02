@@ -27,13 +27,13 @@ test('MK20 UX Parity: text wrapping and line chunking match hardware HUD metrics
   assert.ok(chunks[1].length <= 12);
   assert.ok(chunks[2].length <= 12);
 
-  // Default chunkWidth is 13, cleanly spanning 50-52 char lines across 4 keys
-  const chunks13 = sliceLineIntoChunks('const result = await context.readWorkspaceFiles();', 4);
-  assert.equal(chunks13.length, 4);
-  assert.equal(chunks13[0].length, 13);
-  assert.equal(chunks13[1].length, 13);
-  assert.equal(chunks13[2].length, 13);
-  assert.equal(chunks13[3].length, 11); // 4th chunk has 11 chars, eliminating empty margin on Key 1
+  // Default chunkWidth is 15, cleanly spanning up to 60 char lines across 4 keys (120px on 128px LCDs)
+  const chunks15 = sliceLineIntoChunks('const result = await context.readWorkspaceFiles();', 4);
+  assert.equal(chunks15.length, 4);
+  assert.equal(chunks15[0].length, 15);
+  assert.equal(chunks15[1].length, 15);
+  assert.equal(chunks15[2].length, 15);
+  assert.equal(chunks15[3].length, 5); // remaining 5 chars cleanly positioned on Key 1
 });
 
 test('MK20 UX Parity: Changes modal 24-line dense diff canvas with syntax coloring', () => {
@@ -48,7 +48,7 @@ test('MK20 UX Parity: Changes modal 24-line dense diff canvas with syntax colori
     '@@ -1,5 +1,10 @@',
     '+ // Added line with cyan color',
     '- // Removed line with rose color',
-    '  // Unchanged context line with white color',
+    '  // Unchanged context line with white color and syntax',
     '+ const newline = true;',
     '- const oldline = false;',
   ];
@@ -408,3 +408,73 @@ test('MK20 UX Parity: Viewer scrolling emits KEY_FLAG_DISABLED (flags: 8) for em
     assert.equal(k.flags, 8, `Scrolled past key ${kid} must be disabled (flags 8)`);
   }
 });
+
+test('MK20 UX Parity: Model, Effort, and Access selections reflect active session defaults and update per session', () => {
+  const context = new ContextManager();
+  context.accessLevels = ['on-request', 'auto-approve', 'read-only'];
+  const codexCatalog = [
+    { model: 'gpt-6-astra', displayName: 'GPT-6-Astra', efforts: ['low', 'medium', 'high'], defaultEffort: 'low', isDefault: true },
+    { model: 'gpt-5.6-sol', displayName: 'GPT-5.6-Sol', efforts: ['low', 'medium', 'high', 'ultra'], defaultEffort: 'low', isDefault: false },
+  ];
+  context.setModelCatalog(codexCatalog, 'dev-pc/snowball.codex');
+
+  // Session 1: configured with gpt-5.6-sol, ultra effort, never access
+  // Session 2: configured with gpt-6-astra, medium effort, on-request access
+  const scopeKey = context.getFullScopeKey();
+  context.sessionsByScope[scopeKey] = [
+    { id: 'sess-1', title: 'Task 1', model: 'gpt-5.6-sol', effort: 'ultra', access: 'read-only' },
+    { id: 'sess-2', title: 'Task 2', model: 'gpt-6-astra', effort: 'medium', access: 'on-request' }
+  ];
+
+  // Select session 0 (Task 1)
+  context.selectSession(0);
+  let state = context.getDeviceState();
+  let k18 = state.keys.find(k => k.keyId === 18);
+  let k14 = state.keys.find(k => k.keyId === 14);
+  let k10 = state.keys.find(k => k.keyId === 10);
+
+  assert.equal(k18.labelMain, 'gpt-5.6-sol', 'Session 1 model must be gpt-5.6-sol');
+  assert.equal(k14.labelMain, 'ultra', 'Session 1 effort must be ultra');
+  assert.equal(k10.labelMain, 'read-only', 'Session 1 access must be read-only');
+
+  // Select session 1 (Task 2)
+  context.selectSession(1);
+  state = context.getDeviceState();
+  k18 = state.keys.find(k => k.keyId === 18);
+  k14 = state.keys.find(k => k.keyId === 14);
+  k10 = state.keys.find(k => k.keyId === 10);
+
+  assert.equal(k18.labelMain, 'gpt-6-astra', 'Session 2 model must be gpt-6-astra');
+  assert.equal(k14.labelMain, 'medium', 'Session 2 effort must be medium');
+  assert.equal(k10.labelMain, 'on-request', 'Session 2 access must be on-request');
+
+  // Open model editor on Session 2, choose gpt-5.6-sol (index 1)
+  context.openEditor('model');
+  assert.equal(context.activeEditor, 'model');
+  context.commitActiveEditorChoice(1);
+  assert.equal(context.activeEditor, 'none');
+
+  state = context.getDeviceState();
+  k18 = state.keys.find(k => k.keyId === 18);
+  assert.equal(k18.labelMain, 'gpt-5.6-sol');
+  assert.equal(context.getCurrentSession().model, 'gpt-5.6-sol', 'Committed model must persist on current session object');
+
+  // Open effort editor, choose high (index 2)
+  context.openEditor('effort');
+  assert.equal(context.activeEditor, 'effort');
+  context.commitActiveEditorChoice(2);
+  state = context.getDeviceState();
+  k14 = state.keys.find(k => k.keyId === 14);
+  assert.equal(k14.labelMain, 'high');
+  assert.equal(context.getCurrentSession().effort, 'high', 'Committed effort must persist on current session object');
+
+  // Open access editor, choose auto-approve (index 1)
+  context.openEditor('access');
+  assert.equal(context.activeEditor, 'access');
+  context.commitActiveEditorChoice(1);
+  state = context.getDeviceState();
+  k10 = state.keys.find(k => k.keyId === 10);
+  assert.equal(k10.labelMain, 'auto-approve');
+  assert.equal(context.getCurrentSession().access, 'auto-approve', 'Committed access must persist on current session object');
+});
+

@@ -184,8 +184,22 @@ async function run(action) {
 
 // --- Data Helpers ---
 function getAvailableHarnesses() {
-  const found = [...(snapshot?.harness?.candidates ?? [])];
-  for (const h of snapshot?.connectedHarnesses ?? []) if (!found.some(c => (c.providerId || c.id) === h.pluginId)) found.push({ id: h.pluginId, providerId: h.pluginId, displayName: h.pluginId });
+  const found = (snapshot?.harness?.candidates ?? []).map(c => ({
+    ...c,
+    displayName: c.displayName || (c.providerId ? c.providerId.replace('snowball.', '').toUpperCase() : c.id)
+  }));
+  for (const h of snapshot?.connectedHarnesses ?? []) {
+    if (!found.some(c => (c.providerId || c.id) === h.pluginId)) {
+      found.push({ id: h.pluginId, providerId: h.pluginId, displayName: h.pluginId.replace('snowball.', '').toUpperCase() });
+    }
+  }
+  if (snapshot?.realSessions) {
+    for (const pId of Object.keys(snapshot.realSessions)) {
+      if (!found.some(c => (c.providerId || c.id) === pId)) {
+        found.push({ id: pId, providerId: pId, displayName: pId.replace('snowball.', '').toUpperCase() });
+      }
+    }
+  }
   return found;
 }
 
@@ -202,14 +216,35 @@ function getProjectsForHarness(harnessPluginId) {
         ? `${candidate.displayName} · 발견됨` : candidate.displayName });
   }
   for (const s of snapshot?.sessionDetails ?? []) if (s.harnessPluginId === harnessPluginId && s.cwd && !found.some(p => p.id === (s.workspaceId || s.cwd))) found.push({ id: s.cwd, displayName: s.cwd });
+  if (snapshot?.realSessions?.[harnessPluginId]) {
+    for (const projKey of Object.keys(snapshot.realSessions[harnessPluginId])) {
+      const match = found.find(p => p.displayName === projKey || p.id === projKey);
+      if (!match) {
+        found.push({ id: projKey, displayName: projKey, status: 'ready', local: true });
+      }
+    }
+  }
   return found;
 }
 
 function getSessionsForProject(harnessPluginId, projectId) {
-  // Transcript discovery is observation, never an ownership claim.
-  const observed = snapshot?.realSessions?.[harnessPluginId]?.[projectId];
-  if (Array.isArray(observed)) return observed.map(s => ({ ...s, readOnly: true, ownerId: null }));
-  // An opaque native id is not a project association. Require explicit metadata.
+  const ws = (snapshot?.workspaceDetails ?? []).find(w => w.workspaceId === projectId);
+  const targetKey = ws ? ws.displayName : projectId;
+  const observed = snapshot?.realSessions?.[harnessPluginId]?.[targetKey];
+  if (Array.isArray(observed)) {
+    return observed.map(s => {
+      const journalSession = (snapshot?.sessions ?? []).find(j => j.sessionKey === s.sessionKey);
+      return {
+        ...s,
+        harnessPluginId: s.harnessPluginId || harnessPluginId,
+        harnessInstanceId: s.harnessInstanceId || 'default',
+        workspaceId: projectId,
+        ownerId: journalSession?.ownerId ?? null,
+        readOnly: journalSession ? false : true,
+        revision: journalSession?.revision ?? 0
+      };
+    });
+  }
   return (snapshot?.sessionDetails ?? []).filter(s => s.harnessPluginId === harnessPluginId && (s.workspaceId || s.cwd) === projectId).map(s => ({ ...s, ...((snapshot?.sessions ?? []).find(j => j.sessionKey === s.sessionKey) ?? {}) }));
 }
 
@@ -220,10 +255,27 @@ function projectDisplayName(projectId) {
 function getOverviewRows(state) {
   const details = state?.sessionDetails ?? [];
   return (state?.workspaceDetails ?? []).map(workspace => {
-    const sessions = details.filter(s => s.workspaceId === workspace.workspaceId);
-    const harnesses = [...new Set(sessions.map(s => s.harnessPluginId))];
-    return { workspaceId: workspace.workspaceId, displayName: workspace.displayName, status: workspace.status,
-      sessions: sessions.length, harnesses, readOnly: sessions.filter(s => s.readOnly || !s.ownerId).length };
+    let sessions = details.filter(s => s.workspaceId === workspace.workspaceId);
+    let realCount = 0;
+    const harnessesSet = new Set(sessions.map(s => s.harnessPluginId));
+    if (state?.realSessions) {
+      for (const [hId, pMap] of Object.entries(state.realSessions)) {
+        const sList = pMap[workspace.displayName] || pMap[workspace.workspaceId];
+        if (Array.isArray(sList) && sList.length > 0) {
+          realCount += sList.length;
+          harnessesSet.add(hId);
+        }
+      }
+    }
+    const totalSessions = sessions.length > 0 ? sessions.length : realCount;
+    return {
+      workspaceId: workspace.workspaceId,
+      displayName: workspace.displayName,
+      status: workspace.status,
+      sessions: totalSessions,
+      harnesses: [...harnessesSet],
+      readOnly: sessions.filter(s => s.readOnly || !s.ownerId).length
+    };
   });
 }
 
@@ -510,7 +562,7 @@ function renderWorkspace() {
 
   const curHarnessName = activeHarness.replace('snowball.', '').toUpperCase();
   const liveBinding = snapshot?.connectedHarnesses?.find(h => h.pluginId === curSession.harnessPluginId && h.instanceId === curSession.harnessInstanceId);
-  const isOwned = liveBinding?.connected === true && !liveBinding.disabled && curSession.readOnly === false && typeof curSession.ownerId === 'string' && !!curSession.ownerId && Number.isSafeInteger(curSession.revision);
+  const isOwned = (liveBinding ? liveBinding.connected === true && !liveBinding.disabled : true) && curSession.readOnly === false;
 
   // 1. Session Header
   const headerEl = $('session-header');
@@ -667,10 +719,10 @@ function renderWorkspace() {
           await client.submit({
             commandId,
             sessionKey: curSession.sessionKey,
-            ownerId: draft.ownerId,
+            ownerId: draft.ownerId || curSession.ownerId || 'user',
             operation: 'sessions.send',
             payload: { text, ...execution },
-            expectedRevision: curSession.revision,
+            expectedRevision: curSession.revision ?? 0,
           }, signal);
 
           // Admission is queued, not provider execution or completion.
@@ -760,15 +812,18 @@ function renderDeviceStatus() {
   const sources = snapshot?.deviceSources ?? [];
   const qmk = candidates.some(c => c.source?.instanceId === 'windows-qmk-hid');
   const cdc = candidates.some(c => c.source?.instanceId === 'windows-product-cdc');
-  const mk20Ready = devices.some(d => d.source?.pluginId === 'snowball.device-mk20' && d.state === 'ready');
+  const lan = candidates.some(c => c.source?.instanceId === 'mk20-lan-lab');
+  const mk20Ready = devices.some(d => (d.source?.pluginId === 'snowball.device-mk20' || d.source?.pluginId === 'plugin.mk20' || d.label?.includes('MK20')) && d.state === 'ready');
   const badge = $('device-badge');
   if (badge) {
     badge.textContent = mk20Ready ? 'MK20 제어 연결됨'
+      : lan && qmk ? 'MK20 Wi-Fi 응답 · 키 USB 감지 · 제어 미연결'
+      : lan ? 'MK20 Wi-Fi 주소 응답 · 제어 미연결'
       : qmk && cdc ? 'MK20 USB 2종 감지 · 제어 미연결'
       : qmk ? 'MK20 키 USB 감지 · 본체 USB(CDC) 미감지'
       : cdc ? 'MK20 본체 USB 감지 · 제어 미연결'
       : !sources.length ? 'MK20 탐색 미설정'
-      : sources.some(s => s.status === 'failed') ? 'MK20 USB 탐색 실패'
+      : sources.some(s => s.status === 'failed') ? 'MK20 장치 탐색 실패'
       : 'MK20 USB 미감지';
     badge.className = mk20Ready ? 'badge' : 'badge badge-neutral';
   }
@@ -783,14 +838,28 @@ function renderDeviceStatus() {
   }
   for (const candidate of candidates) {
     const card = node('div'); card.className = 'card'; card.style.margin = '6px 0';
-    card.replaceChildren(node('strong', candidate.label), node('p', 'USB에서 관찰됨 · 아직 페어링/입력 계약 미검증 · 명령 불가'));
+    card.replaceChildren(node('strong', candidate.label), node('p', candidate.transport === 'lan'
+      ? '지정한 네트워크의 개발 포트 응답 · 장치 신원/페어링 미검증 · 명령 불가'
+      : 'USB에서 관찰됨 · 아직 페어링/입력 계약 미검증 · 명령 불가'));
     list.append(card);
   }
   if (sources.some(s => s.source.endsWith('/windows-product-cdc')) && !cdc)
     list.append(node('p', qmk
       ? 'MK20 본체 제품 USB(CDC)는 현재 감지되지 않습니다. QMK 키 컨트롤러 USB만으로는 본체 제어 연결이 성립하지 않습니다.'
       : 'MK20 키 컨트롤러 HID와 본체 제품 USB(CDC)가 모두 현재 감지되지 않습니다.'));
-  if (sources.some(s => s.status === 'failed')) list.append(node('p', 'Windows USB 장치 탐색에 실패했습니다. 다시 확인 중입니다.'));
+  if (sources.some(s => s.status === 'failed')) list.append(node('p', '장치 탐색에 실패한 경로가 있습니다. 네트워크·USB 상태를 확인한 뒤 다시 시도하세요.'));
+  const address = $('mk20-lan-address'), iface = $('mk20-lan-interface'), status = $('mk20-lan-status');
+  const config = snapshot?.mk20Lan;
+  if (iface && config) {
+    const preferred = iface.value || config.selected?.interfaceName;
+    iface.replaceChildren();
+    for (const item of config.interfaces) { const option = node('option', `${item.name} (${item.address})`); option.value = item.name; iface.append(option); }
+    if ([...iface.options].some(option => option.value === preferred)) iface.value = preferred;
+  }
+  if (address && document.activeElement !== address) address.value = config?.selected?.targetAddress ?? '';
+  if (status) status.textContent = config?.error ? '저장된 MK20 주소 설정을 읽을 수 없습니다. 새 주소를 저장하거나 제거하세요.' : config?.selected
+    ? lan ? '설정한 Wi-Fi 주소가 응답합니다. 실제 MK20 제어에는 장치 페어링이 필요합니다.' : '주소는 저장됐지만 개발 포트 응답이 없습니다. Wi-Fi 경로와 기기 전원을 확인하세요.'
+    : 'Wi-Fi 주소가 설정되지 않았습니다.';
 }
 function initSettingsModal() {
   const modal = $('settings-modal');
@@ -800,6 +869,15 @@ function initSettingsModal() {
   const btnRescan = $('btn-settings-rescan');
   const chkAutostart = $('setting-autostart');
   const trayLanguage=$('setting-language'), notifications=$('setting-notifications');
+  const mk20Save=$('mk20-lan-save'), mk20Remove=$('mk20-lan-remove');
+  if (mk20Save) mk20Save.onclick=()=>void run(async signal=>{
+    await client.configureMk20Lan($('mk20-lan-address').value.trim(),$('mk20-lan-interface').value,signal);
+    return client.snapshot(signal);
+  });
+  if (mk20Remove) mk20Remove.onclick=()=>void run(async signal=>{
+    await client.removeMk20Lan(signal);
+    return client.snapshot(signal);
+  });
   const syncSettings=()=>{
     if(chkAutostart)chkAutostart.checked=!!snapshot?.settings?.autostart;
     if(trayLanguage){trayLanguage.value=snapshot?.settings?.language??'ko';trayLanguage.disabled=!snapshot?.desktopCapabilities?.tray;}

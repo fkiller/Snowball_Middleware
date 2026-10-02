@@ -44,6 +44,8 @@ export function wrapText(text, maxLen = 50) {
 
 export function wrapWithPrefix(text, firstPrefix, contPrefix, maxLen = 50) {
   if (!text) return [];
+  const trimmed = String(text).trim().replace(/\n{3,}/g, '\n\n');
+  if (!trimmed) return [];
   const lines = [];
   const firstPWidth = stringDisplayWidth(firstPrefix);
   const contPWidth = stringDisplayWidth(contPrefix);
@@ -51,7 +53,13 @@ export function wrapWithPrefix(text, firstPrefix, contPrefix, maxLen = 50) {
   const contMax = Math.max(1, maxLen - contPWidth);
 
   let isFirst = true;
-  for (const raw of String(text).split('\n')) {
+  for (const raw of trimmed.split('\n')) {
+    if (raw.trim() === '') {
+      if (lines.length > 0 && lines[lines.length - 1] !== '') {
+        lines.push('');
+      }
+      continue;
+    }
     let line = '', width = 0;
     for (const char of raw.replace(/\t/g, '    ').replace(/\r/g, '')) {
       const advance = char.codePointAt(0) < 128 ? 1 : 2;
@@ -65,13 +73,15 @@ export function wrapWithPrefix(text, firstPrefix, contPrefix, maxLen = 50) {
       line += char;
       width += advance;
     }
-    lines.push((isFirst ? firstPrefix : contPrefix) + line);
-    isFirst = false;
+    if (line) {
+      lines.push((isFirst ? firstPrefix : contPrefix) + line);
+      isFirst = false;
+    }
   }
   return lines;
 }
 
-export function sliceLineIntoChunks(line, chunkCount = 4, chunkWidth = 13) {
+export function sliceLineIntoChunks(line, chunkCount = 4, chunkWidth = 15) {
   const chunks = [];
   let currentChunk = '';
   let currentWidth = 0;
@@ -162,12 +172,13 @@ export class ContextManager {
     this.sessionsByScope = {};
     this.modelCatalogs = new Map();
     this.modelSelectionScope = '';
-    this.accessLevels = []; // No policy control is advertised until a provider applies it.
+    this.accessLevels = [];
 
     this.selectedMachineIdx = 0;
     this.selectedHarnessIdx = 0;
     this.selectedProjectIdx = 0;
     this.selectedSessionIdx = 0;
+    this.sttEngineLabel = 'Whisper AI Engine';
     this.selectedModelIdx = 0;
     this.selectedEffortIdx = -1;
     this.selectedAccessIdx = 0;
@@ -208,6 +219,7 @@ export class ContextManager {
     this.voiceDraftText = '';
     this.voiceDestinationLabel = '';
     this.voiceSubmission = 'idle';
+    this.lastDispatchError = null;
 
     // Reader Top Screen
     this.readerTitle = 'Snowball Middleware';
@@ -224,15 +236,66 @@ export class ContextManager {
     this.updateReaderForCurrentSession();
   }
 
+  syncSessionSettings() {
+    const curSess = this.getCurrentSession();
+    const catalog = this.currentModelCatalog();
+    if (!catalog || catalog.length === 0) return;
+
+    // 1. Model: match session's model or default model in catalog
+    if (curSess && curSess.model) {
+      const mIdx = catalog.findIndex(m =>
+        m.model === curSess.model ||
+        m.id === curSess.model ||
+        m.displayName === curSess.model ||
+        (typeof curSess.model === 'string' && curSess.model.includes('/') && m.model.endsWith(curSess.model.split('/')[1])) ||
+        (typeof m.model === 'string' && m.model.includes('/') && typeof curSess.model === 'string' && curSess.model.endsWith(m.model.split('/')[1]))
+      );
+      this.selectedModelIdx = mIdx >= 0 ? mIdx : Math.max(0, catalog.findIndex(m => m.isDefault));
+    } else {
+      const defIdx = catalog.findIndex(m => m.isDefault);
+      this.selectedModelIdx = defIdx >= 0 ? defIdx : 0;
+      if (curSess && this.models[this.selectedModelIdx]) {
+        curSess.model = this.models[this.selectedModelIdx];
+      }
+    }
+
+    // 2. Effort: match session's effort or model's default effort
+    const curModel = catalog[this.selectedModelIdx];
+    const supportedEfforts = curModel?.efforts || [];
+    if (curSess && curSess.effort && supportedEfforts.includes(curSess.effort)) {
+      this.selectedEffortIdx = supportedEfforts.indexOf(curSess.effort);
+    } else if (curModel?.defaultEffort && supportedEfforts.includes(curModel.defaultEffort)) {
+      this.selectedEffortIdx = supportedEfforts.indexOf(curModel.defaultEffort);
+      if (curSess) curSess.effort = curModel.defaultEffort;
+    } else {
+      this.selectedEffortIdx = supportedEfforts.length > 0 ? 0 : -1;
+      if (curSess && this.selectedEffortIdx >= 0) curSess.effort = supportedEfforts[0];
+    }
+
+    // 3. Access: match session's access or default 'on-request'
+    if (curSess && curSess.access && this.accessLevels.includes(curSess.access)) {
+      this.selectedAccessIdx = this.accessLevels.indexOf(curSess.access);
+    } else {
+      const reqIdx = this.accessLevels.indexOf('on-request');
+      this.selectedAccessIdx = reqIdx >= 0 ? reqIdx : 0;
+      if (curSess && this.accessLevels.length > 0) curSess.access = this.accessLevels[this.selectedAccessIdx];
+    }
+  }
+
   setModelCatalog(models, scope = this.getScopeKey()) {
     if (!Array.isArray(models) || models.some(m => !m || typeof m.model !== 'string' || !m.model || !Array.isArray(m.efforts) || m.efforts.some(e => typeof e !== 'string'))) throw new Error('Invalid provider model catalog');
     this.modelCatalogs.set(scope, structuredClone(models));
-    if (scope === this.getScopeKey()) { this.selectedModelIdx = -1; this.selectedEffortIdx = -1; }
+    if (scope === this.getScopeKey()) {
+      this.syncSessionSettings();
+    }
   }
 
   currentModelCatalog() {
     const scope = this.getScopeKey();
-    if (this.modelSelectionScope !== scope) { this.modelSelectionScope = scope; this.selectedModelIdx = -1; this.selectedEffortIdx = -1; }
+    if (this.modelSelectionScope !== scope) {
+      this.modelSelectionScope = scope;
+      this.syncSessionSettings();
+    }
     return this.modelCatalogs.get(scope) ?? [];
   }
   get models() { return this.currentModelCatalog().map(m => m.model); }
@@ -294,6 +357,11 @@ export class ContextManager {
   setSessionTurns(turns) {
     this.currentTurns = Array.isArray(turns) ? turns : [];
     this.updateReaderForCurrentSession();
+    if (this.userPromptLineIndices.length > 0) {
+      this.readerScrollLine = this.userPromptLineIndices[this.userPromptLineIndices.length - 1];
+    } else {
+      this.readerScrollLine = Math.max(0, this.readerLines.length - 4);
+    }
   }
 
   toggleDetails() {
@@ -321,28 +389,84 @@ export class ContextManager {
     }
   }
 
+  saveActiveSessionState() {
+    const curSess = this.getCurrentSession();
+    if (!curSess) return;
+    curSess.voiceDraftText = this.voiceDraftText;
+    curSess.voiceSubmission = this.voiceSubmission;
+    curSess.lastDispatchError = this.lastDispatchError;
+    curSess.isRecordingVoice = this.isRecordingVoice;
+    curSess.isTranscribingVoice = this.isTranscribingVoice;
+    curSess.transcribingSeconds = this.transcribingSeconds;
+    curSess.voiceDestinationLabel = this.voiceDestinationLabel;
+    curSess.readerScrollLine = this.readerScrollLine;
+    curSess.showDetails = this.showDetails;
+    if (this.currentTurns && Array.isArray(this.currentTurns)) {
+      curSess.turns = [...this.currentTurns];
+      curSess.turnCount = this.currentTurns.length;
+    }
+  }
+
+  restoreActiveSessionState() {
+    const curSess = this.getCurrentSession();
+    if (curSess) {
+      this.voiceDraftText = curSess.voiceDraftText || '';
+      this.voiceSubmission = curSess.voiceSubmission || 'idle';
+      this.lastDispatchError = curSess.lastDispatchError || null;
+      this.isRecordingVoice = curSess.isRecordingVoice || false;
+      this.isTranscribingVoice = curSess.isTranscribingVoice || false;
+      this.transcribingSeconds = curSess.transcribingSeconds || 0;
+      this.voiceDestinationLabel = curSess.title || '';
+      this.readerScrollLine = curSess.readerScrollLine || 0;
+      this.showDetails = curSess.showDetails || false;
+      if (curSess.turns && Array.isArray(curSess.turns)) {
+        this.currentTurns = [...curSess.turns];
+      } else {
+        this.currentTurns = [];
+      }
+    } else {
+      this.voiceDraftText = '';
+      this.voiceSubmission = 'idle';
+      this.lastDispatchError = null;
+      this.isRecordingVoice = false;
+      this.isTranscribingVoice = false;
+      this.transcribingSeconds = 0;
+      this.voiceDestinationLabel = '';
+      this.readerScrollLine = 0;
+      this.showDetails = false;
+      this.currentTurns = [];
+    }
+    this.syncSessionSettings();
+  }
+
   cycleMachine() {
+    this.saveActiveSessionState();
     this.selectedMachineIdx = (this.selectedMachineIdx + 1) % this.machines.length;
     this.resolveProjectAndSession();
     this.activeEditor = 'none';
+    this.restoreActiveSessionState();
     this.updateReaderForCurrentSession();
   }
 
   cycleHarness() {
+    this.saveActiveSessionState();
     this.selectedHarnessIdx = (this.selectedHarnessIdx + 1) % this.harnesses.length;
     this.memoryHarnessPerMachine.set(this.getCurrentMachine().id, this.getCurrentHarness().id);
     this.resolveProjectAndSession();
     this.activeEditor = 'none';
+    this.restoreActiveSessionState();
     this.updateReaderForCurrentSession();
   }
 
   selectProject(idx) {
     const projs = this.getProjectsForCurrentScope();
     if (idx >= 0 && idx < projs.length) {
+      this.saveActiveSessionState();
       this.selectedProjectIdx = idx;
       this.memoryProjectPerHarness.set(this.getScopeKey(), projs[idx].id);
       this.resolveSession();
       this.activeEditor = 'none';
+      this.restoreActiveSessionState();
       this.updateReaderForCurrentSession();
     }
   }
@@ -350,9 +474,11 @@ export class ContextManager {
   selectSession(idx) {
     const sess = this.getSessionsForCurrentScope();
     if (idx >= 0 && idx < sess.length) {
+      this.saveActiveSessionState();
       this.selectedSessionIdx = idx;
       this.memorySessionPerProject.set(this.getFullScopeKey(), sess[idx].id);
       this.activeEditor = 'none';
+      this.restoreActiveSessionState();
       this.updateReaderForCurrentSession();
     }
   }
@@ -380,6 +506,7 @@ export class ContextManager {
     } else {
       this.selectedSessionIdx = 0;
     }
+    this.restoreActiveSessionState();
   }
 
   openEditor(field) {
@@ -392,9 +519,9 @@ export class ContextManager {
         case 'machine': this.editorFocusIdx = this.selectedMachineIdx; break;
         case 'project': this.editorFocusIdx = this.selectedProjectIdx; break;
         case 'session': this.editorFocusIdx = this.selectedSessionIdx; break;
-        case 'model': this.editorFocusIdx = this.selectedModelIdx; break;
-        case 'effort': this.editorFocusIdx = this.selectedEffortIdx; break;
-        case 'access': this.editorFocusIdx = this.selectedAccessIdx; break;
+        case 'model': this.editorFocusIdx = Math.max(0, this.selectedModelIdx); break;
+        case 'effort': this.editorFocusIdx = Math.max(0, this.selectedEffortIdx); break;
+        case 'access': this.editorFocusIdx = Math.max(0, this.selectedAccessIdx); break;
         default: this.editorFocusIdx = 0; break;
       }
       this.editorChoiceWindowStart = Math.max(0, this.editorFocusIdx - 2);
@@ -416,18 +543,23 @@ export class ContextManager {
   }
 
   commitActiveEditorChoice(idx) {
+    const s = this.getCurrentSession();
     switch (this.activeEditor) {
       case 'harness':
         if (idx >= 0 && idx < this.harnesses.length) {
+          this.saveActiveSessionState();
           this.selectedHarnessIdx = idx;
           this.memoryHarnessPerMachine.set(this.getCurrentMachine().id, this.getCurrentHarness().id);
           this.resolveProjectAndSession();
+          this.restoreActiveSessionState();
         }
         break;
       case 'machine':
         if (idx >= 0 && idx < this.machines.length) {
+          this.saveActiveSessionState();
           this.selectedMachineIdx = idx;
           this.resolveProjectAndSession();
+          this.restoreActiveSessionState();
         }
         break;
       case 'project':
@@ -437,13 +569,27 @@ export class ContextManager {
         this.selectSession(idx);
         break;
       case 'model':
-        if (idx >= 0 && idx < this.models.length) { this.selectedModelIdx = idx; this.selectedEffortIdx = -1; }
+        if (idx >= 0 && idx < this.models.length) {
+          this.selectedModelIdx = idx;
+          if (s) s.model = this.models[idx];
+          const curModel = this.currentModelCatalog()[idx];
+          const defEffort = curModel?.defaultEffort || curModel?.efforts?.[0];
+          const eIdx = (curModel?.efforts || []).indexOf(defEffort);
+          this.selectedEffortIdx = eIdx >= 0 ? eIdx : 0;
+          if (s) s.effort = curModel?.efforts?.[this.selectedEffortIdx];
+        }
         break;
       case 'effort':
-        if (idx >= 0 && idx < this.efforts.length) this.selectedEffortIdx = idx;
+        if (idx >= 0 && idx < this.efforts.length) {
+          this.selectedEffortIdx = idx;
+          if (s) s.effort = this.efforts[idx];
+        }
         break;
       case 'access':
-        if (idx >= 0 && idx < this.accessLevels.length) this.selectedAccessIdx = idx;
+        if (idx >= 0 && idx < this.accessLevels.length) {
+          this.selectedAccessIdx = idx;
+          if (s) s.access = this.accessLevels[idx];
+        }
         break;
     }
     this.activeEditor = 'none';
@@ -456,7 +602,12 @@ export class ContextManager {
       const root = await fs.realpath(this.getCurrentProject().path || process.cwd());
       let target = directory;
       try { target = await fs.realpath(directory); } catch { target = root; }
-      if (target !== root && !target.startsWith(root + path.sep)) target = root;
+      
+      const normRoot = path.normalize(root).toLowerCase();
+      const normTarget = path.normalize(target).toLowerCase();
+      if (normTarget !== normRoot && !normTarget.startsWith(normRoot + path.sep.toLowerCase())) {
+        target = root;
+      }
 
       const entries = await fs.readdir(target, { withFileTypes: true });
       this.filePath = target;
@@ -468,7 +619,7 @@ export class ContextManager {
         .sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.localeCompare(b.name))
         .map(e => ({ name: e.name, isDir: e.isDirectory() }));
 
-      if (target !== root) {
+      if (normTarget !== normRoot) {
         this.workspaceFiles = [{ name: '..', isDir: true }, ...mapped];
       } else {
         this.workspaceFiles = mapped;
@@ -503,7 +654,7 @@ export class ContextManager {
       if (stat.size > 256000) throw new Error('File exceeds 256KB preview limit');
       const text = await fs.readFile(full, 'utf8');
       if (text.includes('\0')) throw new Error('Binary file has no text preview');
-      const lines = wrapText(text, 50);
+      const lines = wrapText(text, 60);
       this.isWorkspaceViewerActive = true;
       this.workspaceSelectedFileIdx = fileIdx;
       this.workspaceFileContentLines = lines;
@@ -572,11 +723,13 @@ export class ContextManager {
       } else {
         const maxScroll = Math.max(0, this.readerLines.length - 4);
         this.readerScrollLine = Math.max(0, Math.min(maxScroll, this.readerScrollLine + delta));
+        this.updateReaderForCurrentSession();
       }
     } else if (this.viewMode === 'workspace') {
       if (this.isWorkspaceViewerActive) {
         const total = this.workspaceFileContentLines.length;
         this.readerScrollLine = Math.max(0, Math.min(Math.max(0, total - 4), this.readerScrollLine + delta));
+        this.updateReaderForCurrentSession();
       } else {
         this.moveWorkspaceCursor(delta);
       }
@@ -593,6 +746,7 @@ export class ContextManager {
       } else {
         const maxScroll = Math.max(0, this.readerLines.length - 4);
         this.readerScrollLine = Math.max(0, Math.min(maxScroll, this.readerScrollLine + delta));
+        this.updateReaderForCurrentSession();
       }
     }
   }
@@ -608,7 +762,8 @@ export class ContextManager {
         if (item) {
           if (item.isDir) {
             if (item.name === '..') {
-              const parent = (this.filePath === this.fileRoot) ? this.fileRoot : path.dirname(this.filePath);
+              const isAtRoot = path.normalize(this.filePath).toLowerCase() === path.normalize(this.fileRoot).toLowerCase();
+              const parent = isAtRoot ? this.fileRoot : path.dirname(this.filePath);
               await this.readWorkspaceFiles(parent);
             } else {
               await this.readWorkspaceFiles(path.join(this.filePath, item.name));
@@ -674,9 +829,14 @@ export class ContextManager {
           break;
         }
         case 'model': {
-          title = `MODELS (${this.models.length})`;
+          const catalog = this.currentModelCatalog();
+          title = `MODELS (${catalog.length})`;
           subtitle = 'Knob: browse | Click: select';
-          items = this.models.map(md => ({ label: md }));
+          items = catalog.map(m => {
+            const label = (m.displayName && m.model.includes('/')) ? m.displayName : m.model;
+            const detail = label !== m.model ? m.model : '';
+            return { label, detail };
+          });
           break;
         }
         case 'effort': {
@@ -743,7 +903,7 @@ export class ContextManager {
           'Left Knob: Navigate | Click/Press: Open | K18: Up | K19: Root'
         ];
       } else {
-        currentModeKey = `workspace-viewer:${this.workspaceSelectedFileIdx}:${this.readerScrollLine}`;
+        currentModeKey = `workspace-viewer:${this.workspaceSelectedFileIdx}`;
         const totalLines = this.workspaceFileContentLines.length;
         this.readerTitle = `FILE | ${this.workspaceFiles[this.workspaceSelectedFileIdx]?.name || ''}`;
         this.readerSubtitle = `Line ${this.readerScrollLine + 1}/${totalLines} | /${relPath.replace(/\\/g, '/')}/${this.workspaceFiles[this.workspaceSelectedFileIdx]?.name || ''}`;
@@ -762,24 +922,32 @@ export class ContextManager {
         'Press [Cancel] (K4) to abort.',
       ];
     } else if (this.isTranscribingVoice) {
-      currentModeKey = `transcribing:${this.voiceDestinationLabel || s.id}`;
+      const sec = this.transcribingSeconds || 0;
+      currentModeKey = `transcribing:${this.voiceDestinationLabel || s.id}:${sec}`;
       this.readerTitle = 'Transcribing Voice';
       this.readerSubtitle = `Target: ${this.voiceDestinationLabel || s.title}`;
       this.readerLines = [
-        '[TRANSCRIBING AUDIO]',
-        'Processing recorded speech utterance...',
+        `[TRANSCRIBING AUDIO] (${sec}s)`,
         '',
-        'Please wait a moment...',
+        `${this.sttEngineLabel || 'Whisper AI Engine'} is processing...`,
+        `Elapsed: ${sec}s | K4: Cancel anytime`
       ];
     } else if (this.voiceSubmission !== 'idle') {
       currentModeKey = `submission:${this.voiceSubmission}`;
-      this.readerTitle = this.voiceSubmission === 'sending' ? 'Sending voice draft' : 'Submission unconfirmed';
+      this.readerTitle = this.voiceSubmission === 'sending' ? 'Dispatching Prompt' : 'Submission unconfirmed';
       this.readerSubtitle = `Target: ${this.voiceDestinationLabel || s.title}`;
-      this.readerLines = ['Draft preserved; do not send again.', 'Check the original task for delivery.', ...wrapText(this.voiceDraftText)];
+      this.readerLines = [
+        '[DISPATCHING TO HARNESS]',
+        `Target: ${p.name} -> ${s.title}`,
+        `Harness: ${h.name} (${m.name})`,
+        '',
+        'Awaiting agent response...',
+        'You can cycle harness (K13) to continue other tasks.'
+      ];
     } else if (this.voiceDraftText) {
-      currentModeKey = `draft:${this.voiceDestinationLabel || s.id}:${this.voiceDraftText}`;
-      this.readerTitle = 'Voice Prompt Draft';
-      this.readerSubtitle = `Target: ${this.voiceDestinationLabel || s.title}`;
+      currentModeKey = `draft:${this.voiceDestinationLabel || s.id}:${this.voiceDraftText}:${this.lastDispatchError || ''}`;
+      this.readerTitle = this.lastDispatchError ? 'Dispatch Error' : 'Voice Prompt Draft';
+      this.readerSubtitle = this.lastDispatchError ? `Error: ${this.lastDispatchError}` : `Target: ${this.voiceDestinationLabel || s.title}`;
       const raw = this.voiceDraftText.trim();
       const draftLines = [];
       const words = raw.split(/\s+/);
@@ -791,10 +959,10 @@ export class ContextManager {
       }
       if (cur) draftLines.push(cur);
       this.readerLines = [
-        '[DRAFT PROMPT VERIFICATION]',
+        this.lastDispatchError ? `[FAILED: ${this.lastDispatchError.slice(0, 42)}]` : '[DRAFT PROMPT VERIFICATION]',
         ...draftLines.map(l => `"${l}"`),
         '',
-        'Press [Send] (K16) to dispatch.',
+        'Press [Send] (K16) to retry.',
         'Press [Talk] (K20) to replace draft.',
         'Press [Cancel] (K4) to discard.',
       ];
@@ -816,6 +984,7 @@ export class ContextManager {
           const agentResponse = turn.agentResponse || (turn.role === 'agent' ? turn.text : '');
           const processDetails = turn.processDetails || [];
 
+          const beforeCount = lines.length;
           if (userPrompt) {
             const promptLines = wrapWithPrefix(userPrompt, '[USER] ', '> ', 50);
             if (promptLines.length > 0) {
@@ -833,7 +1002,12 @@ export class ContextManager {
             const respLines = wrapWithPrefix(agentResponse, '[AGENT] ', '  ', 50);
             lines.push(...respLines);
           }
-          lines.push('');
+          if (lines.length > beforeCount && lines[lines.length - 1] !== '') {
+            lines.push('');
+          }
+        }
+        while (lines.length > 0 && lines[lines.length - 1] === '') {
+          lines.pop();
         }
         this.userPromptLineIndices = promptIndices;
         this.readerTitle = `${m.name} | [${h.name.toUpperCase()}]`;
@@ -1027,7 +1201,7 @@ export class ContextManager {
               } else if (trimmed.startsWith('import ') || trimmed.startsWith('export ') || trimmed.startsWith('function ') || trimmed.startsWith('class ') || trimmed.startsWith('const ') || trimmed.startsWith('let ') || trimmed.startsWith('return ')) {
                 color = 1; // cyan
               }
-              const chunks = sliceLineIntoChunks(line, 4, 13);
+              const chunks = sliceLineIntoChunks(line, 4, 15);
               rowLines.push({ chunks, color });
             }
           }
@@ -1112,7 +1286,7 @@ export class ContextManager {
             if (line.startsWith('+')) color = 1; // cyan
             else if (line.startsWith('-')) color = 2; // rose
             else if (line.startsWith('@@')) color = 3; // amber
-            const chunks = sliceLineIntoChunks(line, 4, 13);
+            const chunks = sliceLineIntoChunks(line, 4, 15);
             rowLines.push({ chunks, color });
           }
         }
@@ -1191,24 +1365,28 @@ export class ContextManager {
       });
 
       // Row 1: Config / Modals
+      const curModelObj = this.currentModelCatalog()[this.selectedModelIdx];
+      const modelLabel = (this.models[this.selectedModelIdx] && !this.models[this.selectedModelIdx].includes('/'))
+        ? this.models[this.selectedModelIdx]
+        : (curModelObj?.displayName || this.models[this.selectedModelIdx] || 'Default');
       keys.push({
         keyId: 18,
         labelTop: 'MODEL',
-        labelMain: safeText(this.models[this.selectedModelIdx] ?? 'Default', 10),
+        labelMain: safeText(modelLabel, 15),
         isFilled: true,
         isEditing: this.activeEditor === 'model'
       });
       keys.push({
         keyId: 14,
         labelTop: 'EFFORT',
-        labelMain: safeText(this.efforts[this.selectedEffortIdx] ?? 'Default', 10),
+        labelMain: safeText(this.efforts[this.selectedEffortIdx] ?? 'Default', 15),
         isFilled: true,
         isEditing: this.activeEditor === 'effort'
       });
       keys.push({
         keyId: 10,
         labelTop: 'ACCESS',
-        labelMain: safeText(this.accessLevels[this.selectedAccessIdx], 10),
+        labelMain: safeText(this.accessLevels[this.selectedAccessIdx] || '', 15),
         isFilled: true,
         isEditing: this.activeEditor === 'access'
       });
@@ -1248,7 +1426,8 @@ export class ContextManager {
             label = curSess[choiceIdx].title;
             isChosen = choiceIdx === this.selectedSessionIdx;
           } else if (this.activeEditor === 'model' && choiceIdx < this.models.length) {
-            label = this.models[choiceIdx];
+            const mObj = this.currentModelCatalog()[choiceIdx];
+            label = (mObj?.displayName && this.models[choiceIdx]?.includes('/')) ? mObj.displayName : this.models[choiceIdx];
             isChosen = choiceIdx === this.selectedModelIdx;
           } else if (this.activeEditor === 'effort' && choiceIdx < this.efforts.length) {
             label = this.efforts[choiceIdx];
@@ -1262,7 +1441,7 @@ export class ContextManager {
             keys.push({
               keyId: kid,
               labelTop: `ITEM ${choiceIdx + 1}`,
-              labelMain: safeText(label, 10),
+              labelMain: safeText(label, 15),
               isFilled: isChosen,
               isFocused: choiceIdx === this.editorFocusIdx
             });
@@ -1317,10 +1496,11 @@ export class ContextManager {
           isFocused: false,
         });
       } else if (this.isTranscribingVoice) {
+        const sec = this.transcribingSeconds || 0;
         keys.push({
           keyId: 20,
           labelTop: 'STT',
-          labelMain: 'Wait...',
+          labelMain: `${sec}s...`,
           isFilled: false,
           isDisabled: true,
         });
@@ -1337,7 +1517,7 @@ export class ContextManager {
           keyId: 4,
           labelTop: 'ABORT',
           labelMain: 'Cancel',
-          isFilled: false,
+          isFilled: true,
         });
       } else if (this.voiceDraftText) {
         keys.push({

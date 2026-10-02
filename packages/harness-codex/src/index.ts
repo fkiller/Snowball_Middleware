@@ -98,9 +98,9 @@ export class CodexOwnedAdapter extends EventEmitter implements DispatchPort {
     this.#owned.add(value.thread.id);
     return { sessionKey: this.sessionKey(value.thread.id), ownerId: this.ownerId };
   }
-  async listSessions(): Promise<{ nativeId: string; sessionKey: string; ownerId: string | null; readOnly: boolean; cwd: string }[]> {
+  async listSessions(): Promise<{ nativeId: string; sessionKey: string; ownerId: string | null; readOnly: boolean; cwd: string; model?: string; effort?: string; access?: string }[]> {
     this.ready(); this.#sessionListTruncated = false;
-    const sessions: { nativeId: string; sessionKey: string; ownerId: string | null; readOnly: boolean; cwd: string }[] = [];
+    const sessions: { nativeId: string; sessionKey: string; ownerId: string | null; readOnly: boolean; cwd: string; model?: string; effort?: string; access?: string }[] = [];
     let cursor: string | undefined; let bytes = 2; const seen = new Set<string>();
     // Real histories can exceed the native frame bound at limit=100. Small native
     // pages and a separate normalized worker-response budget keep both pipes bounded.
@@ -109,7 +109,19 @@ export class CodexOwnedAdapter extends EventEmitter implements DispatchPort {
       if (!record(result) || !Array.isArray(result.data) || result.data.length > 10) throw new CodexFault('invalid_thread_list');
       for (const t of result.data) {
         if (!record(t) || !id(t.id) || sessions.some(s => s.nativeId === t.id)) continue;
-        const session = { nativeId: t.id, sessionKey: this.sessionKey(t.id), ownerId: this.#owned.has(t.id) ? this.ownerId : null, readOnly: !this.#owned.has(t.id), cwd: typeof t.cwd === 'string' ? t.cwd.slice(0, 4096) : '' };
+        const model = typeof t.model === 'string' ? t.model : (typeof (t as any).modelId === 'string' ? (t as any).modelId : undefined);
+        const effort = typeof (t as any).effort === 'string' ? (t as any).effort : undefined;
+        const access = typeof (t as any).approvalPolicy === 'string' ? (t as any).approvalPolicy : undefined;
+        const session = {
+          nativeId: t.id,
+          sessionKey: this.sessionKey(t.id),
+          ownerId: this.#owned.has(t.id) ? this.ownerId : null,
+          readOnly: !this.#owned.has(t.id),
+          cwd: typeof t.cwd === 'string' ? t.cwd.slice(0, 4096) : '',
+          ...(model ? { model } : {}),
+          ...(effort ? { effort } : {}),
+          ...(access ? { access } : {}),
+        };
         bytes += Buffer.byteLength(JSON.stringify(session)) + 1;
         if (bytes > 48 * 1024) { this.#sessionListTruncated = true; return sessions; }
         sessions.push(session);
@@ -120,11 +132,21 @@ export class CodexOwnedAdapter extends EventEmitter implements DispatchPort {
     }
     this.#sessionListTruncated = true; return sessions;
   }
-  async readSession(threadId: string): Promise<{ nativeId: string; readOnly: boolean }> {
+  async readSession(threadId: string): Promise<{ nativeId: string; readOnly: boolean; model?: string; effort?: string; access?: string }> {
     this.ready(); if (!id(threadId)) throw new CodexFault('invalid_thread');
     const value = await this.rpc.request('thread/read', { threadId, includeTurns: false });
     if (!record(value) || !record(value.thread) || value.thread.id !== threadId) throw new CodexFault('invalid_thread_response');
-    return { nativeId: threadId, readOnly: !this.#owned.has(threadId) };
+    const t = value.thread;
+    const model = typeof t.model === 'string' ? t.model : (typeof (t as any).modelId === 'string' ? (t as any).modelId : undefined);
+    const effort = typeof (t as any).effort === 'string' ? (t as any).effort : undefined;
+    const access = typeof (t as any).approvalPolicy === 'string' ? (t as any).approvalPolicy : undefined;
+    return {
+      nativeId: threadId,
+      readOnly: !this.#owned.has(threadId),
+      ...(model ? { model } : {}),
+      ...(effort ? { effort } : {}),
+      ...(access ? { access } : {}),
+    };
   }
   async execute(envelope: { command: CommandRecord; decision?: DecisionRecord }, signal: AbortSignal): Promise<DispatchReceipt> {
     const input = envelope.command.input;

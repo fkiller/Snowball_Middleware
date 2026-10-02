@@ -53,12 +53,30 @@ export interface LocalApiOptions {
   hostname?: string;
   realSessions?: unknown;
   turnsStore?: unknown;
+  connectedHarnesses?: Array<{
+    pluginId: string;
+    instanceId: string;
+    connected: boolean;
+    disabled?: boolean;
+    canCreate?: boolean;
+    canAttach?: boolean;
+    canListModels?: boolean;
+    sessionListTruncated?: boolean;
+  }>;
+  listModels?: (pluginId: string, instanceId: string) => Promise<Array<{ model: string; displayName: string; efforts: string[] }>>;
+  createSession?: (pluginId: string, workspaceCanonical: string, options: { title?: string; model?: string; workspaceId?: string }, instanceId: string) => Promise<{ sessionKey: string; ownerId: string; title: string }>;
   /** Trusted native picker. The HTTP request never supplies a path or display name. */
   chooseWorkspace?: (signal: AbortSignal) => Promise<{ root: string; displayName: string } | null>;
   /** Native tray selection and reviewed provider enrollment; HTTP only triggers the picker. */
   connectCodex?: (signal: AbortSignal) => Promise<string>;
   disconnectCodex?: (instanceId: string, signal: AbortSignal) => Promise<string>;
   resetCodex?: (signal: AbortSignal) => Promise<boolean>;
+  /** Explicit lab locator only. A reachable development port never grants device control. */
+  mk20Lan?: {
+    describe(): { selected: { version: number; targetAddress: string; interfaceName: string } | null; interfaces: { name: string; address: string }[]; error?: string };
+    configure(value: { targetAddress: string; interfaceName: string }): Promise<unknown>;
+    remove(): Promise<unknown>;
+  };
 }
 /**
  * Reviewed harness candidate survey supplied by the trusted runtime.
@@ -96,6 +114,7 @@ export class LocalApi {
   private settingsBusy = false;
   private readonly workspaceChecks = new Set<string>();
   private harnessScanning = false;
+  private mk20LanBusy = false;
   private selection?: { controllerId: string; abort: AbortController };
   private heartbeat?: ReturnType<typeof setInterval>;
   private attempts = 0;
@@ -274,7 +293,7 @@ export class LocalApi {
       sessions: this.options.journal.listSessions(),
       sessionDetails,
       sessionMessages: this.options.sessionService?.snapshotMessages() ?? {},
-      connectedHarnesses: this.options.sessionService?.snapshotAdapters() ?? [],
+      connectedHarnesses: this.options.connectedHarnesses ?? this.options.sessionService?.snapshotAdapters() ?? [],
       commands: this.options.journal.listCommands().map(c => ({ commandId: c.input.commandId, actorId: c.input.actorId, sessionKey: c.input.sessionKey, ownerId: c.input.ownerId, operation: c.input.operation, status: c.status, revision: c.revision, order: c.order, updatedAt: c.updatedAt })),
       decisions: this.options.journal.listDecisions().map(d => ({ decisionId: d.decisionId, sessionKey: d.sessionKey, ownerId: d.ownerId, status: d.status, revision: d.revision, allowedAnswers: [...d.allowedAnswers], ...(d.expiresAt !== undefined ? { expiresAt: d.expiresAt } : {}) })),
       workspaces: this.options.workspaces?.list() ?? [],
@@ -287,6 +306,7 @@ export class LocalApi {
       devices: this.options.devices?.list() ?? [],
       deviceSources: this.options.devices?.sourceStates() ?? [],
       deviceCandidates: this.options.devices?.listCandidates() ?? [],
+      mk20Lan: this.options.mk20Lan?.describe() ?? null,
       harness: this.options.harness?.describe() ?? null,
       hostname: this.options.hostname || os.hostname(),
       realSessions: this.options.realSessions ?? null,
@@ -449,6 +469,28 @@ export class LocalApi {
         this.stillAuthorized(req, session); this.send(res, 200, { snapshot: this.snapshot() }); return;
       } finally { res.off('close', disconnected); }
     }
+    if (url.pathname === '/v1/devices/mk20-lan/configure' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (!this.options.mk20Lan) fail(404, 'mk20_lan_unavailable');
+      if (Object.keys(body).sort().join(',') !== 'interfaceName,targetAddress' || typeof body.interfaceName !== 'string' || typeof body.targetAddress !== 'string') fail(400, 'invalid_mk20_endpoint');
+      if (this.mk20LanBusy) fail(429, 'device_scan_busy');
+      this.mk20LanBusy = true;
+      try { await this.options.mk20Lan.configure({ targetAddress: body.targetAddress, interfaceName: body.interfaceName }); }
+      catch (error) { fail((error as Error)?.message === 'invalid_mk20_endpoint' ? 400 : 503, (error as Error)?.message === 'invalid_mk20_endpoint' ? 'invalid_mk20_endpoint' : 'device_config_failed'); }
+      finally { this.mk20LanBusy = false; }
+      this.send(res, 200, { snapshot: this.snapshot() }); return;
+    }
+    if (url.pathname === '/v1/devices/mk20-lan/remove' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).length) fail(400, 'invalid_request');
+      if (!this.options.mk20Lan) fail(404, 'mk20_lan_unavailable');
+      if (this.mk20LanBusy) fail(429, 'device_scan_busy');
+      this.mk20LanBusy = true;
+      try { await this.options.mk20Lan.remove(); }
+      catch { fail(503, 'device_config_failed'); }
+      finally { this.mk20LanBusy = false; }
+      this.send(res, 200, { snapshot: this.snapshot() }); return;
+    }
     if (url.pathname === '/v1/snapshot' && req.method === 'GET') { this.send(res, 200, this.snapshot()); return; }
     if (url.pathname === '/v1/settings' && req.method === 'GET') {
       this.send(res, 200, { settings: structuredClone(this.settings) }); return;
@@ -483,33 +525,37 @@ export class LocalApi {
       const body = await this.body(req); this.stillAuthorized(req, session);
       if (this.settings.controlPaused) fail(409, 'control_paused');
       const service = this.options.sessionService; const store = this.options.workspaceStore;
-      if (!service || !store) fail(503, 'harness_runtime_unavailable');
+      if (!service && !this.options.createSession) fail(503, 'harness_runtime_unavailable');
+      if (!store) fail(503, 'create_storage_unavailable');
       if (Object.keys(body).some(k => !['requestId', 'pluginId', 'instanceId', 'workspaceId', 'title', 'model'].includes(k)) || typeof body.requestId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(body.requestId) || typeof body.pluginId !== 'string' || typeof body.instanceId !== 'string' || typeof body.workspaceId !== 'string' || body.title !== undefined && (typeof body.title !== 'string' || body.title.length > 128) || body.model !== undefined && typeof body.model !== 'string') fail(400, 'invalid_request');
-      const binding = service.snapshotAdapters().find(a => a.pluginId === body.pluginId && a.instanceId === body.instanceId);
+      const adapters = this.options.connectedHarnesses ?? service?.snapshotAdapters() ?? [];
+      const binding = adapters.find(a => a.pluginId === body.pluginId && a.instanceId === body.instanceId);
       if (!binding || !binding.connected || !binding.canCreate || binding.disabled) fail(409, 'create_unavailable');
-      const creates = this.options.createStore; if (!creates) fail(503, 'create_storage_unavailable');
-      if (this.creatingSessions.has(session.controllerId)) fail(409, 'create_in_progress');
-      this.creatingSessions.add(session.controllerId);
+      const creates = this.options.createStore;
+      if (creates && this.creatingSessions.has(session.controllerId)) fail(409, 'create_in_progress');
+      if (creates) this.creatingSessions.add(session.controllerId);
       let beganNativeAttempt = false;
       try {
         const workspace = await store.assertReadable(body.workspaceId);
         this.stillAuthorized(req, session);
         if (this.settings.controlPaused) fail(409, 'control_paused');
         const fingerprint = digest(JSON.stringify([body.pluginId, body.instanceId, workspace.canonical, body.workspaceId, body.title ?? '', body.model ?? '']));
-        const prior = creates.get(body.requestId);
+        const prior = creates?.get(body.requestId);
         if (prior && prior.fingerprint !== fingerprint) fail(409, 'create_request_mismatch');
         if (prior?.status === 'confirmed') {
-          const current = service.getSession(prior.sessionKey!);
+          const current = service?.getSession(prior.sessionKey!);
           this.send(res, 200, { requestId: body.requestId, sessionKey: prior.sessionKey, ownerId: current?.ownerId ?? null, restoredReadOnly: current?.readOnly ?? true, snapshot: this.snapshot() }); return;
         }
         if (prior) fail(409, 'session_creation_unconfirmed');
-        creates.begin(body.requestId, fingerprint);
+        creates?.begin(body.requestId, fingerprint);
         beganNativeAttempt = true;
-        const created = await service.createSession(body.pluginId, workspace.canonical, { ...(typeof body.title === 'string' ? { title: body.title } : {}), ...(typeof body.model === 'string' ? { model: body.model } : {}), workspaceId: body.workspaceId }, body.instanceId);
-        creates.confirm(body.requestId, fingerprint, created.sessionKey);
+        const created = this.options.createSession
+          ? await this.options.createSession(body.pluginId, workspace.canonical, { ...(typeof body.title === 'string' ? { title: body.title } : {}), ...(typeof body.model === 'string' ? { model: body.model } : {}), workspaceId: body.workspaceId }, body.instanceId)
+          : await service!.createSession(body.pluginId, workspace.canonical, { ...(typeof body.title === 'string' ? { title: body.title } : {}), ...(typeof body.model === 'string' ? { model: body.model } : {}), workspaceId: body.workspaceId }, body.instanceId);
+        creates?.confirm(body.requestId, fingerprint, created.sessionKey);
         this.changed(); this.send(res, 200, { ...created, requestId: body.requestId, restoredReadOnly: false, snapshot: this.snapshot() });
       } catch (error) { if (error instanceof ApiFault) throw error; if (beganNativeAttempt) fail(503, 'session_creation_unconfirmed'); if (error instanceof SessionFault) fail(409, error.code); fail(503, 'create_preflight_failed'); }
-      finally { this.creatingSessions.delete(session.controllerId); }
+      finally { if (creates) this.creatingSessions.delete(session.controllerId); }
       return;
     }
     if (url.pathname === '/v1/sessions/create-status' && req.method === 'POST') {
@@ -521,7 +567,19 @@ export class LocalApi {
     }
     if (['/v1/harness/sessions', '/v1/harness/models', '/v1/sessions/attach'].includes(url.pathname) && req.method === 'POST') {
       const body = await this.body(req); this.stillAuthorized(req, session);
-      const service = this.options.sessionService; if (!service) fail(503, 'harness_runtime_unavailable');
+      const service = this.options.sessionService;
+      if (url.pathname === '/v1/harness/models' && this.options.listModels) {
+        if (Object.keys(body).some(k => !['pluginId', 'instanceId'].includes(k)) || typeof body.pluginId !== 'string' || typeof body.instanceId !== 'string') fail(400, 'invalid_request');
+        try {
+          const models = await this.options.listModels(body.pluginId, body.instanceId);
+          this.send(res, 200, { models });
+          return;
+        } catch (error) {
+          if (error instanceof ApiFault) throw error;
+          fail(503, 'harness_operation_failed');
+        }
+      }
+      if (!service) fail(503, 'harness_runtime_unavailable');
       try {
         if (url.pathname === '/v1/harness/sessions') {
           if (Object.keys(body).some(k => k !== 'pluginId') || typeof body.pluginId !== 'string') fail(400, 'invalid_request');

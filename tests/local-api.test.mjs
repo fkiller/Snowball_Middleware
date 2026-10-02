@@ -193,7 +193,7 @@ test('malformed, compressed and oversized bodies cannot admit work', async t => 
 test('published OpenAPI routes and SDK operations describe the implemented v1 surface', () => {
   const spec = JSON.parse(fs.readFileSync(new URL('../packages/api/openapi.v1.json', import.meta.url)));
   assert.equal(spec.openapi, '3.1.0');
-  assert.equal(Object.keys(spec.paths).length, 20);
+  assert.equal(Object.keys(spec.paths).length, 22);
   assert.equal(spec.paths['/v1/sessions/create-status'].post.operationId, 'readHarnessSessionCreateReceipt');
   assert.ok(spec.paths['/v1/sessions/create'].post.requestBody.content['application/json'].schema.required.includes('requestId'));
   assert.equal(spec.components.schemas.SessionSummary.properties.workspaceId.pattern, '^ws_[0-9a-f]{16}$');
@@ -201,6 +201,8 @@ test('published OpenAPI routes and SDK operations describe the implemented v1 su
   assert.equal(spec.paths['/v1/harness/connect-codex'].post.operationId, 'connectCodex');
   assert.equal(spec.paths['/v1/harness/disconnect-codex'].post.operationId, 'disconnectCodex');
   assert.equal(spec.paths['/v1/harness/reset-codex'].post.operationId, 'resetCodex');
+  assert.equal(spec.paths['/v1/devices/mk20-lan/configure'].post.operationId, 'configureMk20Lan');
+  assert.equal(spec.paths['/v1/devices/mk20-lan/remove'].post.operationId, 'removeMk20Lan');
   assert.equal(spec.paths['/v1/workspaces/{workspaceId}/recheck'].post.operationId, 'recheckWorkspace');
   assert.deepEqual(spec.paths['/v1/bootstrap'].post.security, []);
   assert.ok(spec.paths['/v1/commands'].post.responses['202']);

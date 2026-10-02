@@ -101,6 +101,14 @@
           <section class="settings-section">
             <h3>하드웨어 장치 (MK20)</h3>
             <div id="settings-devices-list"></div>
+            <p>Wi-Fi 개발 연결은 장치 주소와 이 PC의 네트워크 인터페이스를 직접 지정합니다. 주소 응답은 페어링이나 명령 권한을 뜻하지 않습니다.</p>
+            <div class="setting-row"><label for="mk20-lan-address">MK20 주소</label><input id="mk20-lan-address" type="text" inputmode="decimal" placeholder="192.168.1.248" maxlength="15"></div>
+            <div class="setting-row"><label for="mk20-lan-interface">PC 인터페이스</label><select id="mk20-lan-interface"></select></div>
+            <div class="settings-actions">
+              <button id="mk20-lan-save" type="button">Wi-Fi 주소 확인</button>
+              <button id="mk20-lan-remove" class="secondary" type="button">Wi-Fi 주소 제거</button>
+            </div>
+            <p id="mk20-lan-status"></p>
           </section>
 
           <section class="settings-section">

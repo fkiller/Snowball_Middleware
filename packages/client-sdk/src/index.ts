@@ -31,6 +31,7 @@ export interface Snapshot {
   devices: ReturnType<DeviceRegistry['list']>;
   deviceSources: ReturnType<DeviceRegistry['sourceStates']>;
   deviceCandidates: DeviceCandidate[];
+  mk20Lan?: { selected: { version: number; targetAddress: string; interfaceName: string } | null; interfaces: { name: string; address: string }[]; error?: string } | null;
   /** Reviewed candidate survey, or null when the runtime supplies no surveyor. Never control evidence. */
   harness: DiscoverySnapshot | null;
   settings?: LocalSettings;
@@ -70,6 +71,8 @@ export class LocalClient {
   disconnectCodex(instanceId: string, signal?: AbortSignal): Promise<{ snapshot: Snapshot }> { return this.request('/v1/harness/disconnect-codex', { instanceId }, signal); }
   /** Native-confirmed repair of saved connection references; task history remains. */
   resetCodex(signal?: AbortSignal): Promise<{ snapshot: Snapshot }> { return this.request('/v1/harness/reset-codex', {}, signal); }
+  configureMk20Lan(targetAddress: string, interfaceName: string, signal?: AbortSignal): Promise<{ snapshot: Snapshot }> { return this.request('/v1/devices/mk20-lan/configure', { targetAddress, interfaceName }, signal); }
+  removeMk20Lan(signal?: AbortSignal): Promise<{ snapshot: Snapshot }> { return this.request('/v1/devices/mk20-lan/remove', {}, signal); }
   recheckWorkspace(workspaceId: string, signal?: AbortSignal): Promise<WorkspaceSummary> { return this.request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/recheck`, {}, signal); }
   selectWorkspace(signal?: AbortSignal): Promise<{ selected: false } | { selected: true; workspaceId: string }> { return this.request('/v1/workspaces/select', {}, signal); }
   settings(signal?: AbortSignal): Promise<{ settings: LocalSettings }> { return this.request('/v1/settings', undefined, signal); }

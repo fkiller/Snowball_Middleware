@@ -93,9 +93,10 @@ export class DesktopUpdater {
  * Uninstall manager with selective user data / secret preservation or complete purge (MW.08.02.01.01.A2).
  */
 export class DesktopUninstaller {
-  constructor(installDir, userDataDir) {
+  constructor(installDir, userDataDir, modelsDir) {
     this.installDir = installDir;
     this.userDataDir = userDataDir;
+    this.modelsDir = modelsDir || (userDataDir ? path.join(userDataDir, 'models') : undefined);
   }
 
   /**
@@ -106,6 +107,7 @@ export class DesktopUninstaller {
     const result = {
       binariesRemoved: false,
       userDataPurged: false,
+      modelsPurged: false,
       mode,
     };
 
@@ -115,8 +117,14 @@ export class DesktopUninstaller {
       result.binariesRemoved = true;
     }
 
-    // 2. Handle user data & secrets according to mode
+    // 2. Handle user data, downloaded models & secrets according to mode
     if (mode === 'remove_all') {
+      // Purge downloaded models if stored in explicit location
+      if (this.modelsDir && fs.existsSync(this.modelsDir)) {
+        fs.rmSync(this.modelsDir, { recursive: true, force: true });
+        result.modelsPurged = true;
+      }
+
       if (fs.existsSync(this.userDataDir)) {
         // Securely wipe known sensitive files first before directory removal
         const sensitiveFiles = [
@@ -134,10 +142,12 @@ export class DesktopUninstaller {
 
         fs.rmSync(this.userDataDir, { recursive: true, force: true });
         result.userDataPurged = true;
+        result.modelsPurged = true;
       }
     } else {
-      // keep_data: user data directory is left intact
+      // keep_data: user data directory and downloaded models are left intact
       result.userDataPurged = false;
+      result.modelsPurged = false;
     }
 
     return result;

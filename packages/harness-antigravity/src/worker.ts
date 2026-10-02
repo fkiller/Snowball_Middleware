@@ -59,6 +59,8 @@ async function handle(request: unknown) {
       const p = request.params;
       if (request.method === 'harness.status') {
         result = adapter.status();
+      } else if (request.method === 'harness.models') {
+        result = await adapter.listModels();
       } else if (request.method === 'harness.list') {
         result = await adapter.listSessions(p?.limit);
       } else if (request.method === 'harness.read') {

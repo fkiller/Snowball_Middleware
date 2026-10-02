@@ -7,6 +7,7 @@ import { connectOwnedOpenCode } from '../supervisor/opencode-owned.mjs';
 import { appendCodexConnection, loadCodexConnections, removeCodexConnection, resetCodexConnections } from './codex-connections.mjs';
 import { defaultDiscoveryProviders } from '../../packages/core/dist/index.js';
 import { observeMk20UsbPresence } from './windows-device-presence.mjs';
+import { Mk20LanPresence } from '../supervisor/mk20-lan.mjs';
 const pending = new Map(); let nextId=0, runtime, started=false, stopping=false, enrolling=false, externallyConfigured=false, dataDir, savedConnectionWarning=false;
 const send = value => process.parentPort.postMessage(value);
 function nativeRequest(action, value) {
@@ -81,7 +82,7 @@ process.parentPort.on('message', async ({data}) => {
   if(data?.kind!=='start'||started)return;started=true;
   try {
     dataDir=data.dataDir;externallyConfigured=!!data.codexConfig;
-    const options={dataDir,providers:defaultDiscoveryProviders(),...(process.platform==='win32'?{devicePresence:observeMk20UsbPresence}:{}),desktop:{getAutostart:()=>nativeRequest('get-autostart'),setAutostart:enabled=>nativeRequest('set-autostart',enabled)},chooseWorkspace:()=>nativeRequest('choose-workspace'),...(externallyConfigured?{}:{connectCodex:signal=>enrollCodex(signal),disconnectCodex:(id,signal)=>disconnectCodex(id,signal),resetCodex:signal=>resetCodex(signal)})};
+    const options={dataDir,providers:defaultDiscoveryProviders(),mk20Lan:new Mk20LanPresence(dataDir),...(process.platform==='win32'?{devicePresence:observeMk20UsbPresence}:{}),desktop:{getAutostart:()=>nativeRequest('get-autostart'),setAutostart:enabled=>nativeRequest('set-autostart',enabled)},chooseWorkspace:()=>nativeRequest('choose-workspace'),...(externallyConfigured?{}:{connectCodex:signal=>enrollCodex(signal),disconnectCodex:(id,signal)=>disconnectCodex(id,signal),resetCodex:signal=>resetCodex(signal)})};
     let codexFactory;
     if(data.codexConfig) {
       if(!path.isAbsolute(data.codexConfig)||fs.statSync(data.codexConfig).size>16384)throw new Error('Invalid Codex configuration');

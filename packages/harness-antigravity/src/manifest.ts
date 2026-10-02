@@ -14,7 +14,7 @@ export async function antigravityManifest() {
     platforms: ['win32', 'darwin', 'linux'],
     architectures: ['x64', 'arm64'],
     capabilities: [
-      ...['status', 'list', 'read', 'watch'].map(name => ({ operation: `harness.${name}`, access: 'observe' as const })),
+      ...['status', 'list', 'read', 'watch', 'models'].map(name => ({ operation: `harness.${name}`, access: 'observe' as const })),
     ],
     permissions: ['antigravity-brain'],
     configSchema: { type: 'object', properties: { appDataDir: { type: 'string' } }, additionalProperties: false },

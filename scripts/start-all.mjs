@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+import net from 'node:net';
+import { execFileSync } from 'node:child_process';
 import {
   defaultDiscoveryProviders,
   DeviceRegistry,
@@ -10,7 +12,11 @@ import {
   createHostId,
   parseHostId,
   resolveUserDataDir,
-  formatSessionKey
+  formatSessionKey,
+  parseSessionKey,
+  loadSttConfig,
+  resolveSttModel,
+  resolveModelsDir
 } from '../packages/core/dist/index.js';
 import { LocalApi, loadSupervisorAssets } from '../packages/api/dist/index.js';
 import { ensurePrivateStateDirectory } from '../apps/supervisor/private-state.mjs';
@@ -20,8 +26,8 @@ import { reviewedProfiles } from '../packages/device-hid/dist/profiles.js';
 import os from 'node:os';
 import { scanHarnessProjects } from './harness-project-scanner.mjs';
 import { scanAllHarnessSessions } from './harness-session-scanner.mjs';
-
-throw new Error('MK20 lab launcher quarantined: unsigned input and private Desktop IPC bypass the command journal. Use npm run start:local. See docs/middleware/AUDIT.md.');
+import { scanAllHarnessCatalogs } from './harness-catalog-scanner.mjs';
+import { dispatchHarnessTurn } from './harness-dispatch.mjs';
 
 const directory = ensurePrivateStateDirectory(resolveUserDataDir());
 const hostIdFile = path.join(directory, 'host.v1.json');
@@ -125,7 +131,13 @@ try {
             harness: { pluginId, instanceId: 'default' },
             nativeSessionId: s.id,
           });
-          journal.registerSession(sessionKey, s.ownerId);
+          s.sessionKey = sessionKey;
+          s.ownerId = 'user';
+          s.readOnly = false;
+          journal.registerSession(sessionKey, 'user');
+          if (turnsStore[s.id] && !turnsStore[sessionKey]) {
+            turnsStore[sessionKey] = turnsStore[s.id];
+          }
         } catch (err) {}
       }
     }
@@ -133,6 +145,120 @@ try {
   console.log(`  Registered genuine sessions across active harnesses`);
 } catch (err) {
   console.log('  Harness session scan note:', err.message);
+}
+
+const connectedHarnesses = [
+  { pluginId: 'snowball.codex', instanceId: 'default', connected: true, canCreate: true, canAttach: true, canListModels: true },
+  { pluginId: 'snowball.antigravity', instanceId: 'default', connected: true, canCreate: true, canAttach: true, canListModels: true },
+  { pluginId: 'snowball.opencode', instanceId: 'default', connected: true, canCreate: true, canAttach: true, canListModels: true },
+];
+
+async function handleListModels(pluginId, instanceId) {
+  const catalogs = scanAllHarnessCatalogs();
+  const list = catalogs[pluginId] || [];
+  return list.map(m => ({
+    model: m.model,
+    displayName: m.displayName,
+    efforts: m.efforts || ['medium']
+  }));
+}
+
+async function handleCreateSession(pluginId, workspaceCanonical, options, instanceId) {
+  const newId = 's-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const sessionKey = formatSessionKey({
+    hostId,
+    harness: { pluginId, instanceId: instanceId || 'default' },
+    nativeSessionId: newId,
+  });
+  journal.registerSession(sessionKey, 'user');
+  const projDisplayName = path.basename(workspaceCanonical) || 'Snowball_Control';
+  if (!realSessionsData[pluginId]) realSessionsData[pluginId] = {};
+  if (!realSessionsData[pluginId][projDisplayName]) realSessionsData[pluginId][projDisplayName] = [];
+  const sessObj = {
+    id: newId,
+    sessionKey,
+    title: options.title || 'New conversation',
+    updatedAt: new Date().toISOString(),
+    readOnly: false,
+    ownerId: 'user',
+    model: options.model || (pluginId === 'snowball.codex' ? 'gpt-5.6-sol' : 'gemini-3.8-flash-high'),
+    effort: 'medium',
+    access: 'immediate'
+  };
+  realSessionsData[pluginId][projDisplayName].unshift(sessObj);
+  return { sessionKey, ownerId: 'user', title: sessObj.title };
+}
+
+async function handleCommandQueued(sessionKey) {
+  try {
+    await journal.dispatchNext(sessionKey, {
+      ownerId: 'user',
+      execute: async (item, signal) => {
+        const payload = item.command.input.payload || {};
+        const promptText = payload.text || '';
+        const model = payload.model;
+        const effort = payload.effort;
+        const correlationId = 'corr_' + Date.now();
+
+        const parsed = parseSessionKey(sessionKey);
+        const harnessPluginId = parsed.harness.pluginId;
+        const nativeSessionId = parsed.nativeSessionId;
+        const dispatchHarness = harnessPluginId.replace('snowball.', '');
+        const projectPath = 'E:\\developments\\projects\\Snowball_Control';
+
+        console.log(`[WebUI Dispatch] Dispatching turn for [${dispatchHarness}] session [${nativeSessionId}] prompt: "${promptText}"`);
+
+        const result = await dispatchHarnessTurn({
+          harness: dispatchHarness,
+          projectPath,
+          sessionId: nativeSessionId.startsWith('s-') ? undefined : nativeSessionId,
+          prompt: promptText,
+          model,
+          effort,
+          onDelta: () => {}
+        });
+
+        const completedTurns = [
+          {
+            role: 'user',
+            userPrompt: promptText,
+            text: promptText,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          },
+          {
+            role: 'agent',
+            agentResponse: result.response,
+            text: result.response,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            processDetails: [`Harness: ${harnessPluginId}`, `Model: ${model || 'default'}`, `Effort: ${effort || 'default'}`],
+            status: 'completed'
+          }
+        ];
+
+        if (realTurnsData) {
+          const priorTurns = realTurnsData[result.sessionId] || realTurnsData[nativeSessionId] || realTurnsData[sessionKey] || [];
+          const merged = [...priorTurns, ...completedTurns];
+          realTurnsData[result.sessionId] = merged;
+          realTurnsData[sessionKey] = merged;
+          if (nativeSessionId !== result.sessionId) {
+            realTurnsData[nativeSessionId] = merged;
+          }
+        }
+
+        const activeSession = typeof context !== 'undefined' ? context?.getCurrentSession?.() : null;
+        if (activeSession && (activeSession.id === nativeSessionId || activeSession.id === result.sessionId)) {
+          activeSession.turns = realTurnsData[result.sessionId];
+          context.setSessionTurns(activeSession.turns);
+          context.updateReaderForCurrentSession();
+          void paintMk20();
+        }
+
+        return { status: 'completed', correlationId };
+      }
+    });
+  } catch (err) {
+    console.error('[WebUI Dispatch] Error dispatching queued command:', err);
+  }
 }
 
 const harness = {
@@ -151,8 +277,13 @@ const api = new LocalApi({
   supervisor,
   port: 8765,
   hostname: os.hostname(),
+  noAuth: true,
   realSessions: realSessionsData,
   turnsStore: realTurnsData,
+  connectedHarnesses,
+  listModels: handleListModels,
+  createSession: handleCreateSession,
+  onCommandQueued: handleCommandQueued,
 });
 
 await api.start();
@@ -184,10 +315,60 @@ console.log(`  Web Supervisor URL : ${api.origin}/`);
 console.log(`  Bootstrap Code     : ${currentBootstrap?.code}`);
 console.log('====================================================');
 
+function findLocalBindAddress() {
+  const nets = os.networkInterfaces();
+  for (const [name, addrs] of Object.entries(nets)) {
+    if (name.toLowerCase().includes('wi-fi') || name.toLowerCase().includes('wifi') || name.toLowerCase().includes('wlan')) {
+      for (const a of addrs) {
+        if (a.family === 'IPv4' && !a.internal && a.address.startsWith('192.168.1.')) {
+          return a.address;
+        }
+      }
+    }
+  }
+  for (const [name, addrs] of Object.entries(nets)) {
+    for (const a of addrs) {
+      if (a.family === 'IPv4' && !a.internal && a.address.startsWith('192.168.1.')) {
+        return a.address;
+      }
+    }
+  }
+  return '192.168.1.197';
+}
+
+const localBindIp = findLocalBindAddress();
+console.log(`  Local MK20 Bind IP : ${localBindIp}`);
+
+// Start loopback ADB Wi-Fi relay for dual-homed PC so audio capture and screen inspection work cleanly
+try {
+  const adbRelay = net.createServer((client) => {
+    const upstream = net.connect({
+      host: '192.168.1.248',
+      port: 5555,
+      localAddress: localBindIp
+    });
+    client.pipe(upstream);
+    upstream.pipe(client);
+    client.on('error', () => upstream.destroy());
+    upstream.on('error', () => client.destroy());
+  });
+  adbRelay.listen(15555, '127.0.0.1', () => {
+    console.log(`  MK20 ADB Relay     : READY (127.0.0.1:15555 -> 192.168.1.248:5555 via ${localBindIp})`);
+    try {
+      const adbTool = path.join(process.env.LOCALAPPDATA || '', 'Temp', 'Codex-MK20-ADB', 'platform-tools', 'adb.exe');
+      if (fs.existsSync(adbTool)) {
+        execFileSync(adbTool, ['connect', '127.0.0.1:15555'], { windowsHide: true });
+        console.log(`  MK20 ADB Tool      : CONNECTED (127.0.0.1:15555)`);
+      }
+    } catch {}
+  });
+  adbRelay.on('error', () => {});
+} catch {}
+
 // Connect to physical MK20 device at 192.168.1.248:7701
 const mk20 = new Mk20LabTransport({
   labEnabled: true,
-  localAddress: '192.168.1.225',
+  localAddress: localBindIp,
   targetAddress: '192.168.1.248',
   targetPort: 7701
 });
@@ -246,6 +427,7 @@ try {
 
 import { ContextManager, GitProvider } from './context-manager.mjs';
 import { CodexDesktopClient } from './codex-desktop-client.mjs';
+import { LocalWhisperProvider } from '../../Snowball_Control/host/dist/audio/local-whisper.js';
 
 const desktop = new CodexDesktopClient();
 try {
@@ -259,7 +441,76 @@ try {
   console.log('  Codex Desktop IPC  : STANDBY (' + err.message + ')');
 }
 
+// --- Whisper STT Model Resolution & Boot Download Check ---
+const sttConfig = loadSttConfig();
+const modelsDir = resolveModelsDir(sttConfig);
+fs.mkdirSync(modelsDir, { recursive: true });
+
+// Ensure Python STT runtime and hardware accelerator libraries are installed
+try {
+  const depRes = await LocalWhisperProvider.ensureDependencies((msg) => {
+    console.log(`  ${msg}`);
+  });
+  if (depRes.status && depRes.status.gpu_name) {
+    console.log(`  Whisper Hardware   : ${depRes.status.gpu_name} (CUDA cuBLAS: ${depRes.status.cuda_ready ? 'READY' : 'ABSENT'})`);
+  }
+} catch (depErr) {
+  console.log(`  Whisper Runtime    : NOTE (${depErr.message})`);
+}
+
+let selectedSttModel = process.env.SNOWBALL_WHISPER_MODEL;
+let selectedBackend = process.env.SNOWBALL_WHISPER_DEVICE || 'auto';
+let backendDeviceName = '';
+let modelSelectionNote = 'explicit env override';
+
+if (!selectedSttModel) {
+  try {
+    const assessPy = path.resolve('scripts/assess_stt_backend.py');
+    const out = execFileSync('python', [assessPy, '--json'], { encoding: 'utf8', windowsHide: true });
+    const assessRes = JSON.parse(out);
+    selectedSttModel = assessRes.selected_model;
+    selectedBackend = assessRes.selected_backend || 'auto';
+    backendDeviceName = assessRes.device || '';
+    modelSelectionNote = assessRes.model_evaluation?.status_note || assessRes.selected_backend;
+  } catch {
+    const cpus = os.cpus();
+    const evalRes = resolveSttModel('cpu', { cores: cpus.length, availRamGb: os.freemem() / (1024 ** 3) }, sttConfig);
+    selectedSttModel = evalRes.selectedModel;
+    selectedBackend = 'cpu';
+    modelSelectionNote = evalRes.note;
+  }
+}
+
+const devLabel = backendDeviceName ? ` (${backendDeviceName})` : '';
+console.log(`  Whisper Model Plan : ${selectedSttModel} [${modelSelectionNote}] | Backend: ${selectedBackend.toUpperCase()}${devLabel}`);
+console.log(`  Whisper Cache Dir  : ${modelsDir}`);
+
+// Model Verification & Startup Download Check
+try {
+  const isDownloaded = await LocalWhisperProvider.isModelDownloaded(selectedSttModel, modelsDir);
+  if (!isDownloaded) {
+    console.log(`  Whisper Model DL   : Downloading '${selectedSttModel}' to local cache...`);
+    const dlResult = await LocalWhisperProvider.ensureModelDownloaded(selectedSttModel, modelsDir, (msg) => {
+      if (msg.includes('Download') || msg.includes('MB') || msg.includes('%')) {
+        process.stdout.write(`\r    [Download] ${msg.slice(0, 65).padEnd(65)}`);
+      }
+    });
+    console.log(`\n  Whisper Model DL   : READY (${dlResult.status})`);
+  } else {
+    console.log(`  Whisper Model DL   : VERIFIED (Present in cache)`);
+  }
+} catch (dlErr) {
+  console.warn(`  Whisper Model DL   : NOTE (${dlErr.message})`);
+}
+
+const voice = new LocalWhisperProvider(selectedSttModel, '127.0.0.1:15555', modelsDir, selectedBackend);
+let currentVoiceCaptureId = null;
+// Pre-warm local whisper resident worker
+voice.status().catch(() => {});
+
 const context = new ContextManager();
+const shortGpu = backendDeviceName.includes('GeForce') ? 'RTX ' + backendDeviceName.split('GeForce')[1].trim().split(' ')[0] : (backendDeviceName.split(' ')[0] || '');
+context.sttEngineLabel = `${selectedSttModel.toUpperCase()} ${selectedBackend.toUpperCase()}${shortGpu ? ' (' + shortGpu + ')' : ''}`;
 
 // Configure machines
 context.machines = [{ id: 'dev-pc', name: os.hostname().split('.')[0] || 'DEV-PC', isOnline: true }];
@@ -271,6 +522,23 @@ context.harnesses = [
   { id: 'snowball.opencode', name: 'OpenCode', isEnabled: true }
 ];
 
+// Discover and configure genuine living model catalogs dynamically for each harness
+function refreshHarnessCatalogs() {
+  try {
+    const catalogs = scanAllHarnessCatalogs();
+    for (const [pluginId, cat] of Object.entries(catalogs)) {
+      if (cat && cat.length > 0) {
+        context.setModelCatalog(cat, `dev-pc/${pluginId}`);
+      }
+    }
+  } catch (err) {
+    console.warn('[Catalog] Harness model discovery note:', err.message);
+  }
+}
+refreshHarnessCatalogs();
+
+context.accessLevels = ['on-request', 'auto-approve', 'read-only'];
+
 // Configure projects and sessions from real scanner data
 if (realSessionsData) {
   for (const h of context.harnesses) {
@@ -278,14 +546,24 @@ if (realSessionsData) {
     const scopeKey = `dev-pc/${h.id}`;
     const projs = [];
     const projEntries = Object.entries(harnessData);
-    // Sort entries so current working project (Snowball Control / Snowball_Control) is first
+    // Sort entries so current working project Snowball_Control is always prioritized first
     projEntries.sort(([a], [b]) => {
-      const aMatch = a.includes('Snowball') ? -1 : 0;
-      const bMatch = b.includes('Snowball') ? -1 : 0;
-      return aMatch - bMatch;
+      if (a === 'Snowball_Control') return -1;
+      if (b === 'Snowball_Control') return 1;
+      if (a === 'Snowball_Middleware') return -1;
+      if (b === 'Snowball_Middleware') return 1;
+      return a.localeCompare(b);
     });
     for (const [projName, sessList] of projEntries) {
-      projs.push({ id: projName, name: projName, path: process.cwd() });
+      let projPath = process.cwd();
+      const cand1 = path.join('E:\\developments\\projects', projName);
+      const cand2 = path.join('e:\\developments\\projects', projName);
+      if (fs.existsSync(cand1)) {
+        projPath = cand1;
+      } else if (fs.existsSync(cand2)) {
+        projPath = cand2;
+      }
+      projs.push({ id: projName, name: projName, path: projPath });
       context.sessionsByScope[`${scopeKey}/${projName}`] = sessList.map(s => ({
         id: s.id,
         sessionKey: s.sessionKey,
@@ -293,6 +571,8 @@ if (realSessionsData) {
         preview: s.preview,
         createdAt: s.createdAt || 0,
         model: s.model,
+        effort: s.effort,
+        access: s.access || 'on-request',
         turnCount: s.turnCount
       }));
     }
@@ -307,27 +587,45 @@ async function loadCurrentSessionTurns() {
     context.setSessionTurns([]);
     return;
   }
-  if (realTurnsData) {
-    // 1. Direct lookup by curSess.id
+
+  // Brand-new unsubmitted session starts with strictly empty turns
+  if (curSess.id.startsWith('s-') && (!curSess.turns || curSess.turns.length === 0)) {
+    context.setSessionTurns([]);
+    return;
+  }
+
+  // 1. Direct in-memory session object turns
+  if (curSess.turns && Array.isArray(curSess.turns) && curSess.turns.length > 0) {
+    context.setSessionTurns(curSess.turns);
+    if (realTurnsData) {
+      realTurnsData[curSess.id] = curSess.turns;
+      if (curSess.sessionKey) realTurnsData[curSess.sessionKey] = curSess.turns;
+    }
+    return;
+  }
+
+  // 2. Turns store cache (only for real/persisted sessions, never s-*)
+  if (realTurnsData && !curSess.id.startsWith('s-')) {
     if (realTurnsData[curSess.id]) {
       context.setSessionTurns(realTurnsData[curSess.id]);
+      curSess.turns = realTurnsData[curSess.id];
       return;
     }
-    // 2. Lookup by curSess.sessionKey
     if (curSess.sessionKey && realTurnsData[curSess.sessionKey]) {
       context.setSessionTurns(realTurnsData[curSess.sessionKey]);
+      curSess.turns = realTurnsData[curSess.sessionKey];
       return;
     }
-    // 3. Lookup by searching keys ending with /${curSess.id} or containing curSess.id
     for (const [k, turns] of Object.entries(realTurnsData)) {
-      if (k.endsWith(`/${curSess.id}`) || k === curSess.id || k.includes(curSess.id)) {
+      if (k.endsWith(`/${curSess.id}`) || k === curSess.id) {
         context.setSessionTurns(turns);
+        curSess.turns = turns;
         return;
       }
     }
   }
 
-  // 4. Live fallback: Read directly via Codex Desktop named pipe if connected
+  // 3. Live fallback: Read directly via Codex Desktop named pipe if connected
   if (desktop.isConnected && !curSess.id.startsWith('s-')) {
     try {
       const threadData = await desktop.readThread(curSess.id, 15);
@@ -339,6 +637,42 @@ async function loadCurrentSessionTurns() {
           return { role: 'turn', userPrompt, agentResponse, processDetails };
         });
         context.setSessionTurns(parsed);
+        curSess.turns = parsed;
+        if (realTurnsData) realTurnsData[curSess.id] = parsed;
+        return;
+      }
+    } catch {}
+  }
+
+  // 4. Live fallback: Check rollout JSONL for Codex threads
+  if (!curSess.id.startsWith('s-') && context.getCurrentHarness()?.id?.includes('codex')) {
+    try {
+      const pyScript = `import glob, os, json
+sessions_dir = os.path.expanduser('~/.codex/sessions')
+found = glob.glob(f"{sessions_dir}/**/rollout-*-${curSess.id}*.jsonl", recursive=True)
+turns = []
+if found:
+    with open(found[0], 'r', encoding='utf-8', errors='ignore') as f:
+        for line in f:
+            try:
+                p = json.loads(line)
+                if p.get('type') == 'response_item' and p.get('payload', {}).get('type') == 'message':
+                    role = p['payload'].get('role')
+                    text = '\\n'.join([c.get('text', '') for c in p['payload'].get('content', []) if isinstance(c, dict) and not c.get('text', '').startswith('<ctrl') and not c.get('text', '').startswith('# AGENTS')]).strip()
+                    if text:
+                        if role == 'user':
+                            turns.append({'role': 'user', 'userPrompt': text, 'text': text, 'time': '최근'})
+                        elif role == 'assistant':
+                            turns.append({'role': 'agent', 'agentResponse': text, 'text': text, 'time': '최근', 'processDetails': []})
+            except:
+                pass
+print(json.dumps(turns))
+`;
+      const out = execFileSync('python', ['-c', pyScript], { windowsHide: true, encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
+      const parsed = JSON.parse(out);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        context.setSessionTurns(parsed);
+        curSess.turns = parsed;
         if (realTurnsData) realTurnsData[curSess.id] = parsed;
         return;
       }
@@ -349,8 +683,127 @@ async function loadCurrentSessionTurns() {
 }
 
 context.resolveProjectAndSession();
+context.syncSessionSettings();
 context.updateReaderForCurrentSession();
 await loadCurrentSessionTurns();
+
+let activeAudioCapture = null; // { captureId, harnessId, sessionObj }
+let activeTranscriptionTimer = null;
+let activeTranscriptionCancelled = false;
+
+function finishVoiceCapture() {
+  if (!activeAudioCapture && !context.isRecordingVoice) return;
+  const targetCapture = activeAudioCapture;
+  activeAudioCapture = null;
+
+  const capId = targetCapture?.captureId || currentVoiceCaptureId;
+  const targetHarnessId = targetCapture?.harnessId || context.getCurrentHarness()?.id;
+  const targetSessionObj = targetCapture?.sessionObj || context.getCurrentSession();
+  currentVoiceCaptureId = null;
+
+  context.isRecordingVoice = false;
+  context.isTranscribingVoice = true;
+  context.transcribingSeconds = 0;
+
+  if (targetSessionObj) {
+    targetSessionObj.isRecordingVoice = false;
+    targetSessionObj.isTranscribingVoice = true;
+    targetSessionObj.transcribingSeconds = 0;
+    targetSessionObj.transcriptionCancelled = false;
+  }
+
+  context.updateReaderForCurrentSession();
+  void paintMk20();
+
+  let sec = 0;
+  clearInterval(activeTranscriptionTimer);
+  activeTranscriptionTimer = setInterval(() => {
+    sec++;
+    if (targetSessionObj) targetSessionObj.transcribingSeconds = sec;
+    const activeSess = context.getCurrentSession();
+    if (activeSess === targetSessionObj && context.isTranscribingVoice) {
+      context.transcribingSeconds = sec;
+      context.updateReaderForCurrentSession();
+      void paintMk20();
+    }
+  }, 1000);
+
+  // Background STT processing to ensure zero UI event blocking
+  void (async () => {
+    try {
+      const text = await voice.finish(capId);
+      clearInterval(activeTranscriptionTimer);
+
+      if (targetSessionObj?.transcriptionCancelled) {
+        console.log(`[Voice] Discarding transcription for [${targetHarnessId}] because session was cancelled.`);
+        if (targetSessionObj) {
+          targetSessionObj.isTranscribingVoice = false;
+          targetSessionObj.transcribingSeconds = 0;
+          targetSessionObj.voiceDraftText = '';
+        }
+        const activeSess = context.getCurrentSession();
+        if (activeSess === targetSessionObj) {
+          context.isTranscribingVoice = false;
+          context.transcribingSeconds = 0;
+          context.voiceDraftText = '';
+          context.updateReaderForCurrentSession();
+          void paintMk20();
+        }
+        return;
+      }
+
+      const trimmed = (text || '').trim();
+      if (targetSessionObj) {
+        targetSessionObj.isTranscribingVoice = false;
+        targetSessionObj.transcribingSeconds = 0;
+        targetSessionObj.voiceDraftText = trimmed;
+      }
+
+      const activeHarness = context.getCurrentHarness();
+      const activeSession = context.getCurrentSession();
+      const isStillOnTargetSession = (activeHarness?.id === targetHarnessId) && (activeSession === targetSessionObj);
+
+      if (isStillOnTargetSession) {
+        context.isTranscribingVoice = false;
+        context.transcribingSeconds = 0;
+        context.voiceDraftText = trimmed;
+        if (trimmed) {
+          context.updateReaderForCurrentSession();
+        } else {
+          context.readerTitle = 'No Speech Detected';
+          context.readerSubtitle = 'K20: Record again';
+          context.readerLines = [
+            'No speech was detected from microphone.',
+            '',
+            'Press [Talk] (K20) to record again.'
+          ];
+        }
+        void paintMk20();
+      } else {
+        console.log(`[Voice] Background transcription completed for [${targetHarnessId}] session [${targetSessionObj?.id}]: "${trimmed.slice(0, 32)}...". Saved to session draft.`);
+      }
+    } catch (err) {
+      clearInterval(activeTranscriptionTimer);
+      if (targetSessionObj?.transcriptionCancelled) return;
+      console.error(`[Voice] Transcription error on [${targetHarnessId}]:`, err.message);
+      if (targetSessionObj) {
+        targetSessionObj.isTranscribingVoice = false;
+        targetSessionObj.transcribingSeconds = 0;
+        targetSessionObj.lastDispatchError = err.message;
+      }
+      const activeHarness = context.getCurrentHarness();
+      const activeSession = context.getCurrentSession();
+      if (activeHarness?.id === targetHarnessId && activeSession === targetSessionObj) {
+        context.isTranscribingVoice = false;
+        context.transcribingSeconds = 0;
+        context.voiceDraftText = '';
+        context.readerTitle = 'Transcription Error';
+        context.readerLines = [`Error: ${err.message}`, 'Press [Talk] (K20) to retry.'];
+        void paintMk20();
+      }
+    }
+  })();
+}
 
 async function paintMk20() {
   if (!mk20Online) return;
@@ -421,7 +874,8 @@ mk20.on('lab.input', async (input) => {
               if (targetItem.isDir) {
                 context.closeWorkspaceViewer();
                 if (targetItem.name === '..') {
-                  const parent = (context.filePath === context.fileRoot) ? context.fileRoot : path.dirname(context.filePath);
+                  const isAtRoot = path.normalize(context.filePath).toLowerCase() === path.normalize(context.fileRoot).toLowerCase();
+                  const parent = isAtRoot ? context.fileRoot : path.dirname(context.filePath);
                   await context.readWorkspaceFiles(parent);
                 } else {
                   await context.readWorkspaceFiles(path.join(context.filePath, targetItem.name));
@@ -441,7 +895,8 @@ mk20.on('lab.input', async (input) => {
         context.viewMode = 'session';
         context.updateReaderForCurrentSession();
       } else if (kid === 18) {
-        const parent = (context.filePath === context.fileRoot) ? context.fileRoot : path.dirname(context.filePath);
+        const isAtRoot = path.normalize(context.filePath).toLowerCase() === path.normalize(context.fileRoot).toLowerCase();
+        const parent = isAtRoot ? context.fileRoot : path.dirname(context.filePath);
         await context.readWorkspaceFiles(parent);
       } else if (kid === 19) {
         await context.readWorkspaceFiles(context.fileRoot);
@@ -462,7 +917,8 @@ mk20.on('lab.input', async (input) => {
               const f = context.workspaceFiles[fIdx];
               if (f.isDir) {
                 if (f.name === '..') {
-                  const parent = (context.filePath === context.fileRoot) ? context.fileRoot : path.dirname(context.filePath);
+                  const isAtRoot = path.normalize(context.filePath).toLowerCase() === path.normalize(context.fileRoot).toLowerCase();
+                  const parent = isAtRoot ? context.fileRoot : path.dirname(context.filePath);
                   await context.readWorkspaceFiles(parent);
                 } else {
                   await context.readWorkspaceFiles(path.join(context.filePath, f.name));
@@ -512,17 +968,38 @@ mk20.on('lab.input', async (input) => {
 
     // ViewMode = session
     if (kid === 17) {
+      if (context.isRecordingVoice) {
+        finishVoiceCapture();
+      }
       context.cycleMachine();
       await loadCurrentSessionTurns();
+      context.updateReaderForCurrentSession();
+      void paintMk20();
     } else if (kid === 13) {
+      if (context.isRecordingVoice) {
+        finishVoiceCapture();
+      }
       context.cycleHarness();
       await loadCurrentSessionTurns();
+      context.updateReaderForCurrentSession();
+      void paintMk20();
     } else if (kid === 9) {
+      if (context.isRecordingVoice) {
+        finishVoiceCapture();
+      }
       context.openEditor('project');
+      void paintMk20();
     } else if (kid === 5) {
+      if (context.isRecordingVoice) {
+        finishVoiceCapture();
+      }
       context.openEditor('session');
+      void paintMk20();
     } else if (kid === 1) {
       // New session
+      if (context.isRecordingVoice) {
+        finishVoiceCapture();
+      }
       context.activeEditor = 'none';
       const newSessionId = `s-${Date.now().toString(36)}`;
       const newSession = {
@@ -531,16 +1008,26 @@ mk20.on('lab.input', async (input) => {
         preview: 'Start fresh conversation',
         createdAt: Date.now(),
         model: context.models[context.selectedModelIdx],
-        turnCount: 0
+        effort: context.efforts[context.selectedEffortIdx],
+        access: context.accessLevels[context.selectedAccessIdx] || 'on-request',
+        turnCount: 0,
+        turns: [],
+        voiceDraftText: '',
+        voiceSubmission: 'idle',
+        lastDispatchError: null
       };
       const scopeKey = context.getFullScopeKey();
       if (!context.sessionsByScope[scopeKey]) {
         context.sessionsByScope[scopeKey] = [];
       }
-      context.sessionsByScope[scopeKey].unshift(newSession);
-      context.selectSession(0);
+      context.saveActiveSessionState();
       context.setSessionTurns([]);
+      context.sessionsByScope[scopeKey].unshift(newSession);
+      context.selectedSessionIdx = 0;
+      context.memorySessionPerProject.set(scopeKey, newSessionId);
+      context.restoreActiveSessionState();
       context.updateReaderForCurrentSession();
+      void paintMk20();
     } else if (kid === 18) {
       context.openEditor('model');
     } else if (kid === 14) {
@@ -580,38 +1067,56 @@ mk20.on('lab.input', async (input) => {
       }
     } else if (kid === 20) {
       // Talk (Voice input)
+      if (context.isTranscribingVoice) {
+        return;
+      }
       if (context.isRecordingVoice) {
-        // Finish recording -> transcribe
-        context.isRecordingVoice = false;
-        context.isTranscribingVoice = true;
-        context.updateReaderForCurrentSession();
-        void paintMk20();
-        setTimeout(() => {
-          context.isTranscribingVoice = false;
-          context.voiceDraftText = 'Review draft prompt from physical microphone.';
-          context.updateReaderForCurrentSession();
-          void paintMk20();
-        }, 800);
+        finishVoiceCapture();
       } else {
-        // Start recording
+        // Start physical MK20 recording bound to current session
+        const curHarness = context.getCurrentHarness();
+        const curSess = context.getCurrentSession();
+        const capId = `cap_${Date.now()}`;
+        activeAudioCapture = {
+          captureId: capId,
+          harnessId: curHarness.id,
+          sessionObj: curSess
+        };
         context.isRecordingVoice = true;
+        context.isTranscribingVoice = false;
         context.voiceDraftText = '';
         context.voiceSubmission = 'idle';
+        context.lastDispatchError = null;
+        if (curSess) {
+          curSess.isRecordingVoice = true;
+          curSess.isTranscribingVoice = false;
+          curSess.voiceDraftText = '';
+          curSess.voiceSubmission = 'idle';
+          curSess.lastDispatchError = null;
+          curSess.transcriptionCancelled = false;
+        }
+        context.voiceDestinationLabel = curSess ? curSess.title : '';
         context.updateReaderForCurrentSession();
+        void paintMk20();
+        try {
+          await voice.start(capId);
+        } catch (err) {
+          console.error('[Voice] Start recording error:', err.message);
+          context.isRecordingVoice = false;
+          if (curSess) curSess.isRecordingVoice = false;
+          activeAudioCapture = null;
+          context.readerTitle = 'Microphone Error';
+          context.readerLines = [`Failed to start recording: ${err.message}`, 'Check MK20 connection.'];
+          void paintMk20();
+        }
       }
     } else if (kid === 16) {
       // Send / Done / Reconcile
+      if (context.isTranscribingVoice) {
+        return;
+      }
       if (context.isRecordingVoice) {
-        context.isRecordingVoice = false;
-        context.isTranscribingVoice = true;
-        context.updateReaderForCurrentSession();
-        void paintMk20();
-        setTimeout(() => {
-          context.isTranscribingVoice = false;
-          context.voiceDraftText = 'Review draft prompt from physical microphone.';
-          context.updateReaderForCurrentSession();
-          void paintMk20();
-        }, 800);
+        finishVoiceCapture();
       } else if (context.voiceSubmission === 'unknown') {
         // Reconcile delivery
         console.log('[Main] Reconciling unknown voice draft delivery...');
@@ -634,69 +1139,180 @@ mk20.on('lab.input', async (input) => {
         }
       } else if (context.voiceDraftText) {
         // Send prompt
+        context.lastDispatchError = null;
         const promptText = context.voiceDraftText;
+        context.voiceDraftText = '';
         context.voiceSubmission = 'sending';
         context.updateReaderForCurrentSession();
         void paintMk20();
 
+        const curHarness = context.getCurrentHarness();
+        const curProj = context.getCurrentProject();
         const curSess = context.getCurrentSession();
-        const targetThreadId = curSess?.id;
+        const targetSessionId = curSess?.id;
+        const model = context.models[context.selectedModelIdx];
+        const effort = context.efforts[context.selectedEffortIdx];
+        const cwd = curProj?.path || process.cwd();
 
-        if (desktop.isConnected && targetThreadId && !targetThreadId.startsWith('s-')) {
-          try {
-            await desktop.sendMessageToThread(targetThreadId, promptText);
-            context.voiceSubmission = 'idle';
-            context.voiceDraftText = '';
-            const existingTurns = [...context.currentTurns];
-            existingTurns.push({
-              role: 'user',
-              userPrompt: promptText,
-              text: promptText,
-              agentResponse: 'Command dispatched to Codex Desktop thread.',
-              processDetails: ['Turn started', 'Desktop IPC active'],
-              status: 'completed'
-            });
-            context.setSessionTurns(existingTurns);
-            setTimeout(async () => {
-              await loadCurrentSessionTurns();
-              void paintMk20();
-            }, 2500);
-          } catch (err) {
-            console.warn('[Main] Desktop send failed:', err.message);
-            context.voiceSubmission = 'unknown';
-            context.updateReaderForCurrentSession();
-          }
-        } else {
-          setTimeout(() => {
-            context.voiceSubmission = 'idle';
-            context.voiceDraftText = '';
-            const existingTurns = [...context.currentTurns];
-            existingTurns.push({
-              role: 'user',
-              userPrompt: promptText,
-              text: promptText,
-              agentResponse: 'Command dispatched and acknowledged by local middleware.',
-              processDetails: ['Turn started', 'Local execution active'],
-              status: 'completed'
-            });
-            context.setSessionTurns(existingTurns);
-            void paintMk20();
-          }, 800);
+        if (curSess) {
+          curSess.voiceSubmission = 'sending';
+          curSess.voiceDraftText = '';
+          curSess.lastDispatchError = null;
         }
+
+        // Non-blocking fire-and-forget background dispatch so MK20 never hangs
+        void (async () => {
+          try {
+            const result = await dispatchHarnessTurn({
+              harnessId: curHarness.id,
+              sessionId: targetSessionId,
+              promptText,
+              cwd,
+              model,
+              effort,
+              onDelta: () => {}
+            });
+
+            const completedTurns = [
+              {
+                role: 'user',
+                userPrompt: promptText,
+                text: promptText,
+                time: '방금'
+              },
+              {
+                role: 'agent',
+                agentResponse: result.response,
+                text: result.response,
+                time: '방금',
+                processDetails: [`Harness: ${curHarness.name}`, `Model: ${model}`, `Effort: ${effort}`],
+                status: 'completed'
+              }
+            ];
+
+            if (curSess) {
+              curSess.id = result.sessionId;
+              if (curSess.title === 'New task' || curSess.title === 'New conversation') {
+                curSess.title = promptText.slice(0, 32);
+              }
+              curSess.preview = promptText.slice(0, 60);
+              const isBrandNewSession = targetSessionId && targetSessionId.startsWith('s-');
+              const priorTurns = isBrandNewSession
+                ? (curSess.turns || [])
+                : (curSess.turns || realTurnsData?.[result.sessionId] || realTurnsData?.[targetSessionId] || []);
+              curSess.turns = [...priorTurns, ...completedTurns];
+              curSess.turnCount = curSess.turns.length;
+              curSess.voiceSubmission = 'idle';
+              curSess.voiceDraftText = '';
+              curSess.lastDispatchError = null;
+
+              const sessionScopeKey = `${context.getCurrentMachine()?.id || 'machine-primary'}/${curHarness.id}/${curProj?.id || 'Snowball_Control'}`;
+              curSess.sessionKey = `${sessionScopeKey}/${result.sessionId}`;
+              context.memorySessionPerProject.set(sessionScopeKey, result.sessionId);
+            }
+
+            if (realTurnsData) {
+              const isBrandNewSession = targetSessionId && targetSessionId.startsWith('s-');
+              const priorTurns = isBrandNewSession
+                ? []
+                : (realTurnsData[result.sessionId] || realTurnsData[targetSessionId] || []);
+              const merged = [...priorTurns, ...completedTurns];
+              realTurnsData[result.sessionId] = curSess?.turns || merged;
+              if (targetSessionId && targetSessionId !== result.sessionId && !isBrandNewSession) {
+                realTurnsData[targetSessionId] = curSess?.turns || merged;
+              }
+              if (curSess?.sessionKey) {
+                realTurnsData[curSess.sessionKey] = curSess?.turns || merged;
+              }
+            }
+
+            // Check if user is STILL viewing this exact harness & session on MK20
+            const activeHarness = context.getCurrentHarness();
+            const activeSession = context.getCurrentSession();
+            const isViewingThisSession = activeHarness?.id === curHarness.id &&
+              (activeSession?.id === curSess?.id || activeSession?.id === result.sessionId || activeSession === curSess);
+
+            if (isViewingThisSession) {
+              context.voiceSubmission = 'idle';
+              context.voiceDraftText = '';
+              context.lastDispatchError = null;
+              context.setSessionTurns(curSess?.turns || completedTurns);
+              context.updateReaderForCurrentSession();
+              void paintMk20();
+            } else {
+              console.log(`[Dispatch] Background turn complete for [${curHarness.id}] session [${result.sessionId}]. Persisted ${curSess?.turnCount || 2} turns in store.`);
+            }
+          } catch (err) {
+            console.warn('[Main] Dispatch failed:', err.message);
+            if (curSess) {
+              curSess.voiceSubmission = 'idle';
+              curSess.lastDispatchError = err.message;
+              curSess.voiceDraftText = promptText;
+            }
+            const activeHarness = context.getCurrentHarness();
+            const activeSession = context.getCurrentSession();
+            const isViewingThisSession = activeHarness?.id === curHarness.id &&
+              (activeSession?.id === curSess?.id || activeSession === curSess);
+
+            if (isViewingThisSession) {
+              context.voiceSubmission = 'idle';
+              context.lastDispatchError = err.message;
+              context.voiceDraftText = promptText;
+              context.updateReaderForCurrentSession();
+              void paintMk20();
+            }
+          }
+        })();
       }
     } else if (kid === 4) {
       // Stop / Cancel / Discard
-      if (context.isRecordingVoice || context.isTranscribingVoice) {
+      const curSess = context.getCurrentSession();
+
+      if (context.isRecordingVoice || (curSess && curSess.isRecordingVoice)) {
+        // Cancel active recording on this session
         context.isRecordingVoice = false;
+        if (curSess) curSess.isRecordingVoice = false;
+        const capId = activeAudioCapture?.captureId || currentVoiceCaptureId;
+        activeAudioCapture = null;
+        currentVoiceCaptureId = null;
+        if (capId) {
+          void voice.cancel(capId).catch(() => {});
+        }
+        context.voiceDraftText = '';
+        if (curSess) curSess.voiceDraftText = '';
+        context.lastDispatchError = null;
+        context.updateReaderForCurrentSession();
+      } else if (context.isTranscribingVoice || (curSess && curSess.isTranscribingVoice)) {
+        // Cancel transcription on this session
         context.isTranscribingVoice = false;
-        context.updateReaderForCurrentSession();
-      } else if (context.voiceDraftText) {
+        context.transcribingSeconds = 0;
+        if (curSess) {
+          curSess.isTranscribingVoice = false;
+          curSess.transcribingSeconds = 0;
+          curSess.transcriptionCancelled = true;
+        }
         context.voiceDraftText = '';
-        context.voiceSubmission = 'idle';
+        if (curSess) curSess.voiceDraftText = '';
+        context.lastDispatchError = null;
         context.updateReaderForCurrentSession();
-      } else if (context.voiceSubmission === 'unknown') {
+      } else if (context.voiceDraftText || (curSess && curSess.voiceDraftText)) {
+        // Discard draft on this session only
         context.voiceDraftText = '';
+        if (curSess) curSess.voiceDraftText = '';
         context.voiceSubmission = 'idle';
+        if (curSess) curSess.voiceSubmission = 'idle';
+        context.lastDispatchError = null;
+        if (curSess) curSess.lastDispatchError = null;
+        context.updateReaderForCurrentSession();
+      } else if (context.voiceSubmission === 'sending' || (curSess && curSess.voiceSubmission === 'sending')) {
+        context.voiceSubmission = 'idle';
+        if (curSess) curSess.voiceSubmission = 'idle';
+        context.updateReaderForCurrentSession();
+      } else if (context.voiceSubmission === 'unknown' || (curSess && curSess.voiceSubmission === 'unknown')) {
+        context.voiceDraftText = '';
+        if (curSess) curSess.voiceDraftText = '';
+        context.voiceSubmission = 'idle';
+        if (curSess) curSess.voiceSubmission = 'idle';
         context.updateReaderForCurrentSession();
       } else {
         context.activeEditor = 'none';

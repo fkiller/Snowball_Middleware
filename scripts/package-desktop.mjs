@@ -20,10 +20,10 @@ function copy(relative,destination=relative){
  inventory.push({path:destination.replaceAll('\\','/'),sha256:createHash('sha256').update(fs.readFileSync(target)).digest('hex')});
 }
 for(const name of ['main.mjs','core-worker.mjs','presentation.mjs','codex-connections.mjs','windows-device-presence.mjs'])copy('apps/desktop/'+name);
-for(const name of ['runtime.mjs','codex-plugin.mjs','opencode-owned.mjs','settings-store.mjs','private-state.mjs','native-picker.mjs','index.html','app.js','style.css'])copy('apps/supervisor/'+name);
+for(const name of ['runtime.mjs','codex-plugin.mjs','opencode-owned.mjs','settings-store.mjs','private-state.mjs','native-picker.mjs','mk20-lan.mjs','index.html','app.js','style.css'])copy('apps/supervisor/'+name);
 // Reviewed Codex control and explicitly configured OpenCode observation are
 // bundled. No optional native drivers, account homes or runtime state.
-const packages=['plugin-sdk','plugin-host','core','api','client-sdk','harness-codex','harness-opencode'];
+const packages=['plugin-sdk','plugin-host','core','api','client-sdk','harness-codex','harness-opencode','device-lan'];
 for(const name of packages){
  for(const prefix of ['packages/'+name,'node_modules/@snowball/'+name]){
   copy('packages/'+name+'/package.json',prefix+'/package.json');
@@ -33,6 +33,12 @@ for(const name of packages){
   }
  }
 }
+// The scoped LAN helper uses dns-packet for optional mDNS; bundle its exact
+// pinned runtime dependency graph even when only manual MK20 probing is active.
+for(const [name,files] of [
+ ['dns-packet',['package.json','index.js','types.js','classes.js','opcodes.js','optioncodes.js','rcodes.js','LICENSE']],
+ ['@leichtgewicht/ip-codec',['package.json','index.cjs','index.mjs','LICENSE']],
+]) for(const file of files)copy(`node_modules/${name}/${file}`);
 const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
 fs.writeFileSync(path.join(staging,'package.json'),JSON.stringify({name:pkg.name,version:pkg.version,author:'Snowball Middleware contributors',private:true,license:pkg.license,type:'module',main:'apps/desktop/main.mjs'},null,2));
 fs.writeFileSync(path.join(staging,'BUILD-INVENTORY.json'),JSON.stringify({version:1,platform:process.platform,arch:process.arch,license:'UNLICENSED',signed:false,files:inventory},null,2));

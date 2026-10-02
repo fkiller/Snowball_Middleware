@@ -34,39 +34,57 @@ function privateJournalDirectory(directory) {
 }
 
 /** Local composition root for the CLI and native tray; no cloud control plane. */
-export async function startLocalRuntime({ dataDir = resolveUserDataDir(), repositoryRoot = fileURLToPath(new URL('../..', import.meta.url)), providers = [], enableNativePicker = false, chooseWorkspace, connectCodex, disconnectCodex, resetCodex, devicePresence, noAuth = true, createHarnessAdapters = async () => [], desktop } = {}) {
+export async function startLocalRuntime({ dataDir = resolveUserDataDir(), repositoryRoot = fileURLToPath(new URL('../..', import.meta.url)), providers = [], enableNativePicker = false, chooseWorkspace, connectCodex, disconnectCodex, resetCodex, devicePresence, mk20Lan, noAuth = true, createHarnessAdapters = async () => [], desktop } = {}) {
   // This boundary validates native privacy before any user registration is loaded.
   const directory = ensurePrivateStateDirectory(dataDir);
   const hostId = loadHostId(directory);
   const commandDir = privateJournalDirectory(path.join(directory, 'commands'));
   const workspaceDir = privateJournalDirectory(path.join(directory, 'workspaces'));
-  let journal; let store; let metadata; let creates; let api; let sessions; let bindings = []; let deviceScanTimer; let deviceScanActive = false;
+  let journal; let store; let metadata; let creates; let api; let sessions; let bindings = []; let deviceScanTimer; let deviceScanPromise;
   const dispatches = new Map(); let stopping = false;
   const discovery = new HarnessDiscovery();
-  const devices = devicePresence ? new DeviceRegistry() : undefined;
+  const devices = devicePresence || mk20Lan ? new DeviceRegistry() : undefined;
   const qmkSource = { pluginId: 'snowball.device-presence', instanceId: 'windows-qmk-hid' };
   const cdcSource = { pluginId: 'snowball.device-presence', instanceId: 'windows-product-cdc' };
-  const scanDevicePresence = async () => {
-    if (!devices || stopping || deviceScanActive) return;
-    deviceScanActive = true;
+  const lanSource = { pluginId: 'snowball.device-presence', instanceId: 'mk20-lan-lab' };
+  const scanDevicePresence = () => {
+    if (!devices || stopping) return Promise.resolve();
+    if (deviceScanPromise) return deviceScanPromise;
+    deviceScanPromise = (async () => {
     try {
-      // Keep the last truthful candidate visible while the OS probe is running.
-      const observation = await devicePresence();
+      // The USB and LAN probes are independent; one failure cannot hide the other.
+      const [usb, lan] = await Promise.allSettled([devicePresence?.(), mk20Lan?.probe()]);
       if (stopping) return;
-      const qmkGeneration = devices.beginScan(qmkSource);
-      if (observation === true || observation?.qmkHidObserved) devices.observe(qmkSource, qmkGeneration, {
-        nativeDeviceId: 'usb-4250-426f', label: 'MK20 키 컨트롤러 USB (QMK HID)', transport: 'hid', capabilities: [], supported: false,
-      });
-      devices.finishScan(qmkSource, qmkGeneration, 'ready');
-      const cdcGeneration = devices.beginScan(cdcSource);
-      if (observation?.productCdcObserved) devices.observe(cdcSource, cdcGeneration, {
-        nativeDeviceId: 'usb-1d6b-0104', label: 'MK20 본체 USB (제품 CDC)', transport: 'serial', capabilities: [], supported: false,
-      });
-      devices.finishScan(cdcSource, cdcGeneration, 'ready');
-    } catch {
-      for (const source of [qmkSource, cdcSource]) { const generation = devices.beginScan(source); devices.finishScan(source, generation, 'failed'); }
+      if (devicePresence) {
+        const observation = usb.status === 'fulfilled' ? usb.value : null;
+        const qmkGeneration = devices.beginScan(qmkSource);
+        if (observation === true || observation?.qmkHidObserved) devices.observe(qmkSource, qmkGeneration, {
+          nativeDeviceId: 'usb-4250-426f', label: 'MK20 키 컨트롤러 USB (QMK HID)', transport: 'hid', capabilities: [], supported: false,
+        });
+        devices.finishScan(qmkSource, qmkGeneration, usb.status === 'fulfilled' ? 'ready' : 'failed');
+        const cdcGeneration = devices.beginScan(cdcSource);
+        if (observation?.productCdcObserved) devices.observe(cdcSource, cdcGeneration, {
+          nativeDeviceId: 'usb-1d6b-0104', label: 'MK20 본체 USB (제품 CDC)', transport: 'serial', capabilities: [], supported: false,
+        });
+        devices.finishScan(cdcSource, cdcGeneration, usb.status === 'fulfilled' ? 'ready' : 'failed');
+      }
+      if (mk20Lan) {
+        const generation = devices.beginScan(lanSource);
+        if (lan.status === 'fulfilled' && lan.value) devices.observe(lanSource, generation, {
+          nativeDeviceId: lan.value.targetAddress,
+          label: `MK20로 설정한 Wi-Fi 주소 ${lan.value.targetAddress} (개발 포트 응답)`,
+          transport: 'lan', capabilities: [], supported: false,
+        });
+        devices.finishScan(lanSource, generation, lan.status === 'fulfilled' ? 'ready' : 'failed');
+      }
     }
-    finally { deviceScanActive = false; }
+    finally { deviceScanPromise = undefined; }
+    })();
+    return deviceScanPromise;
+  };
+  const rescanAfterConfiguration = async () => {
+    if (deviceScanPromise) await deviceScanPromise;
+    await scanDevicePresence();
   };
   try {
     journal = new CommandJournal({ hostId, directory: commandDir });
@@ -108,6 +126,7 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
         catch (error) { if (changedAutostart) await desktop.setAutostart(previous.autostart); throw error; }
       },
       chooseWorkspace: chooseWorkspace ?? (enableNativePicker && ['win32', 'darwin'].includes(process.platform) ? chooseNativeWorkspace : undefined), connectCodex, disconnectCodex, resetCodex,
+      mk20Lan: mk20Lan ? { describe: () => mk20Lan.describe(), configure: async value => { mk20Lan.configure(value); await rescanAfterConfiguration(); return mk20Lan.describe(); }, remove: async () => { mk20Lan.remove(); await rescanAfterConfiguration(); return mk20Lan.describe(); } } : undefined,
       supervisor: await loadSupervisorAssets(repositoryRoot) });
     await api.start();
     if (devices) { deviceScanTimer = setInterval(() => void scanDevicePresence(), 15000); deviceScanTimer.unref(); }

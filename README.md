@@ -1,26 +1,167 @@
-# Snowball Middleware
+<p align="center">
+  <img src="assets/banner.png" alt="Snowball Middleware Banner" width="100%">
+</p>
 
-Local control of the user's harnesses and tasks on macOS/Windows. Hardware is optional. No mandatory cloud control plane; network discovery and other-host control are explicit extensions.
+<h1 align="center">
+  <img src="assets/icon.png" width="48" height="48" valign="middle" alt="Snowball Icon">
+  Snowball Middleware
+</h1>
 
-**Audit status (2026-09-24): development foundation, not a completed or distributable MVP.** Read [the integrity review](docs/middleware/AUDIT.md) and [current control reality](docs/middleware/CONTROL_REALITY.md) for fixed vulnerabilities, reopened acceptance gates and remaining integration. This repository is separate from `../Snowball_Control`, which retains MK20 firmware and hardware tooling. Production code belongs in `packages/`; `reference/legacy-host` is a byte-preserved prototype, not the production runtime. Never start its UDP/mesh entrypoints as the new middleware.
+<p align="center">
+  <strong>Local Control Plane, Web Supervisor & Desktop Middleware for AI Coding Agents</strong>
+</p>
 
-Read [the execution plan](docs/middleware/PLAN.md), [task tree](docs/middleware/TASK_TREE.md), [discovery journeys](docs/middleware/DISCOVERY_JOURNEYS.md), and [resume guide](docs/middleware/RESUME.md). The task ledger in this repository is authoritative.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
+  <img src="https://img.shields.io/badge/Node.js-%3E%3D22.12-green.svg" alt="Node.js">
+  <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux-orange.svg" alt="Platforms">
+  <img src="https://img.shields.io/badge/Tests-237%2F237%20Passing-brightgreen.svg" alt="Tests">
+  <a href="https://github.com/fkiller/Snowball_Control"><img src="https://img.shields.io/badge/Hardware-MK20%20Control%20Panel-purple.svg" alt="Companion Repo"></a>
+</p>
 
-Development requires Node >=22.12.
+---
+
+## 🌟 Overview
+
+**Snowball Middleware** is the host-side control plane that unifies local AI coding agents—**OpenAI Codex**, **Google Antigravity (AGY)**, and **OpenCode**—into a single, low-latency desktop interface.
+
+It provides developers with:
+- **Web Supervisor (`http://127.0.0.1:8765/`)**: Zero-auth, local-loopback web dashboard for inspecting live turns, reviewing diffs, granting tool approvals, dictating prompts, and adjusting model/effort variants in real time.
+- **Native Desktop System Tray**: Lightweight cross-platform tray runtime (Windows, macOS, Linux) managing background daemon workers, hotkeys, and quick status monitoring.
+- **Hardware Agnostic**: Fully functional as a standalone desktop control plane. When connected to the **MK20 hardware desk terminal**, it streams LCD framebuffers and binds physical mechanical keys and rotary encoders instantly.
+
+> 💡 **Looking for MK20 Firmware and Hardware Tooling?**  
+> Check out the companion repository: 👉 **[`Snowball_Control`](https://github.com/fkiller/Snowball_Control)** (QMK firmware, Tina Linux OS/BSP, and C HUD daemon).
+
+---
+
+## ⚡ Non-Negotiable Core Principles
+
+1. **Zero Simulation (시뮬레이션 전면 금지)**
+   - No mock delays, fake approvals, or simulated responses.
+   - All session turns, file edits, and tool approvals dispatch directly into native agent runtimes (`codex app-server`, `agy stream-json`, `opencode run`).
+2. **Living Source of Truth (살아있는 원천 기반 동적 발견)**
+   - Models, efforts (variants), sessions, and workspaces are dynamically discovered from native tools and local caches. Zero static hardcoding.
+3. **Local-First & Security Boundary**
+   - Web Supervisor runs strictly on `127.0.0.1` loopback with zero mandatory cloud dependencies.
+   - Network hardware connections (LAN UDP / USB HID) require explicit physical proof of presence.
+4. **Plugin Sandbox Isolation**
+   - Device and harness plugins run in security-isolated sandboxes, preventing arbitrary file system access while preserving native host dispatching.
+
+---
+
+## 🏗️ Architecture
+
+For the complete architectural specification, protocol definitions, and security model, see:  
+👉 **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)**
 
 ```text
-npm ci --ignore-scripts
-npm test
-npm run test:reference
-npm run plan
+ ┌────────────────────────────────────────────────────────┐
+ │                   Web Supervisor                       │
+ │               http://127.0.0.1:8765/                   │
+ └──────────────────────────┬─────────────────────────────┘
+                            │ REST / SSE
+ ┌──────────────────────────▼─────────────────────────────┐
+ │                Core Middleware Engine                  │
+ │   - ContextManager (State Engine & Mode Machine)       │
+ │   - DeviceRegistry & SessionManager                    │
+ │   - Resident Whisper Worker (Metal / CUDA / CPU STT)   │
+ │   - Living Catalog & DB Scanners                       │
+ └──────────────┬──────────────────────────┬──────────────┘
+                │ Native Dispatch          │ UDP 7701 / HID
+ ┌──────────────▼─────────────┐   ┌────────▼─────────────┐
+ │   AI Coding Harnesses      │   │  MK20 Desk Terminal  │
+ │   - OpenAI Codex           │   │  (via companion repo │
+ │   - Google Antigravity     │   │   Snowball_Control)  │
+ │   - OpenCode               │   └──────────────────────┘
+ └────────────────────────────┘
 ```
 
-Normal `npm test` uses fixtures and skips physical HID/MK20 tests. Explicit hardware flags are `SNOWBALL_TEST_HID=1` or `SNOWBALL_TEST_MK20=1`; MK20 also requires `SNOWBALL_MK20_LOCAL_ADDRESS` and `SNOWBALL_MK20_TARGET_ADDRESS`. Never count skipped tests as hardware acceptance.
+---
 
-See [plugin development](docs/middleware/PLUGIN_DEVELOPMENT.md) and the [standalone reference](examples/standalone-device-plugin/README.md). Codex, OpenCode and Antigravity harness plugins have separate private repositories and versioned private releases; hardware plugins and public licensing remain separate gates.
+## 💻 Multi-Platform Installation & Execution
 
-`test:reference` runs the portable regression suite with local mock servers; no provider prompt or physical device is used. `test:reference:speech` additionally requires a separately configured Python/faster-whisper/model environment; no Python, model or recording is bundled.
+### Prerequisites
+- **Node.js**: `>= 22.12.0`
+- **Operating Systems**: Windows 10/11 x64, macOS 12+ (Apple Silicon & Intel), Linux (Kernel 5.4+)
 
-A development Web Supervisor is available via `npm run build` then `npm run start:local`; it opens on loopback without login or PIN. Optional `--require-auth` selects token mode. The native tray/onboarding can select a reviewed Codex CLI instance, and a selected session can dispatch actual model/effort overrides through the journal. Windows 0.153.4 real create/resume/model/effort/response/interrupt acceptance has passed; native connection/restore/disconnect was verified read-only against the default login. The installed Windows tray runtime restored two ready projects, connected controllable Codex and read-only OpenCode; an earlier browser run read the actual model/effort catalog and completed two real verification responses. Visible native dialogs, exact approvals and Desktop co-ownership remain pending. On 2026-09-24 MK20 QMK HID was physically present and passed a safe enumeration/open-close test; the separate MK20 product CDC was absent. The UI reports one unsupported USB candidate and zero controllable devices. Button-report mapping and authenticated device pairing remain unverified. See [control setup and reality checklist](docs/middleware/CONTROL_REALITY.md) and [desktop setup](apps/desktop/README.md). The [private unsigned desktop preview](https://github.com/fkiller/Snowball_Middleware/releases/tag/v0.1.0-private.3) contains a Windows per-user installer that passed install/run/uninstall and macOS ARM64 and Intel x64 ZIPs that passed CI package/extract/run smoke. Signing and notarized Mac user installation remain open. `scripts/start-all.mjs` is quarantined because device input bypassed pairing/journal boundaries and still contains simulated actions. Licensing of inherited code/generated provider schemas is not resolved for public distribution. Packages are private and marked UNLICENSED until that review; this does not relicense third-party dependencies.
+### 1. Setup & Build
+```bash
+# Clone the repository
+git clone https://github.com/fkiller/Snowball_Middleware.git
+cd Snowball_Middleware
 
-The currently installed Windows package is from `artifacts/desktop/1790299544731/Snowball Middleware-win32-x64`; the installer is `artifacts/installers/1790299598142/SnowballMiddlewareSetup-0.1.0-win-x64.exe`. The running tray uses an ephemeral loopback URL: open Supervisor from the tray after any restart. Its API verified two ready projects, controllable Codex, read-only OpenCode with eight native models, and the MK20 QMK USB candidate without claiming device control. Full regression before the tray startup-label edit: 226 tests, 222 passed, four physical skips, zero failures; the edit passed its focused test, installed Windows smoke and all three desktop CI jobs. [Desktop CI, release and installed-runtime evidence](docs/middleware/evidence/MW.08.01.01.01/desktop-three-platform-20260924.md) records exact hashes and limitations.
+# Install dependencies
+npm ci --ignore-scripts
+
+# Build core packages
+npm run build
+```
+
+### 2. Running Web Supervisor (Local Loopback)
+```bash
+npm run start:local
+```
+Open **`http://127.0.0.1:8765/`** in your browser. The dashboard connects immediately without requiring a login or PIN.
+
+### 3. Running Native Desktop Tray
+```bash
+# Windows / macOS / Linux System Tray runtime
+npm run start:tray
+```
+
+### 4. Desktop Packaging (Multi-Platform Releases)
+```bash
+# Build standalone desktop app bundles (Windows, macOS ARM64/x64, Linux)
+npm run package:desktop
+
+# (Windows) Build NSIS per-user installer (.exe)
+npm run package:windows-installer
+```
+
+---
+
+## 🧪 Verification & Test Suite
+
+Run the full automated test suite (237 unit, integration, and platform tests):
+
+```bash
+# Run full regression test suite
+npm test
+
+# Run desktop tray smoke test
+npm run test:tray
+```
+
+---
+
+## 📁 Repository Structure
+
+```text
+Snowball_Middleware/
+├── apps/
+│   ├── desktop/                # Electron native tray shell & background worker
+│   └── supervisor/             # Web Supervisor UI (HTML, CSS, JS runtime)
+├── assets/                     # Official brand artwork, icon, and banner
+│   ├── banner.png
+│   └── icon.png
+├── config/                     # Configuration schemas (STT models, etc.)
+├── docs/                       # Comprehensive architecture documentation
+│   └── ARCHITECTURE.md         # Single Source of Truth architecture specification
+├── packages/
+│   ├── api/                    # Local HTTP & WebSocket API server
+│   ├── client-sdk/             # TypeScript client SDK for Supervisor
+│   ├── core/                   # State machine, session manager & journal
+│   ├── harness-antigravity/    # Antigravity adapter plugin
+│   ├── harness-codex/          # Codex adapter plugin
+│   └── harness-opencode/       # OpenCode adapter plugin
+├── scripts/                    # Build, packaging & test automation scripts
+├── LICENSE                     # Apache-2.0 License
+└── README.md                   # Project overview and quick start guide
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.

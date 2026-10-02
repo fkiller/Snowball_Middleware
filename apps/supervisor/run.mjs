@@ -5,6 +5,7 @@ import { connectOwnedOpenCode } from './opencode-owned.mjs';
 import path from 'node:path';
 import { defaultDiscoveryProviders, resolveUserDataDir } from '../../packages/core/dist/index.js';
 import { startLocalRuntime } from './runtime.mjs';
+import { Mk20LanPresence } from './mk20-lan.mjs';
 
 // Bootstrap codes are deliberately displayed only to an interactive local terminal,
 // never to redirected stdout, a URL, a log file or a browser-storage entry.
@@ -42,6 +43,7 @@ if (codexConfig || opencodeConfig) options.createHarnessAdapters = async ({hostI
     return bindings;
   } catch (error) { await Promise.allSettled(bindings.map(({adapter}) => adapter.stop())); throw error; }
 };
+options.mk20Lan = new Mk20LanPresence(options.dataDir ?? resolveUserDataDir());
 let runtime;
 try { runtime = await startLocalRuntime(options); }
 catch { console.error('Local startup failed. Inspect state ownership, storage and existing runtime locks; nothing was reset.'); process.exitCode = 1; }

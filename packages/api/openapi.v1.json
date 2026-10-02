@@ -451,6 +451,24 @@
         "responses": { "200": { "description": "Saved Codex references cleared after native confirmation.", "content": { "application/json": { "schema": { "type": "object", "required": ["snapshot"], "additionalProperties": false, "properties": { "snapshot": { "$ref": "#/components/schemas/Snapshot" } } } } } }, "default": { "$ref": "#/components/responses/Error" } }
       }
     },
+    "/v1/devices/mk20-lan/configure": {
+      "post": {
+        "operationId": "configureMk20Lan",
+        "description": "Save a manually selected on-link MK20 development locator and probe TCP 5555 from the chosen local interface. This never pairs or grants control.",
+        "parameters": [{ "name": "Origin", "in": "header", "required": true, "schema": { "type": "string" } }, { "name": "X-Snowball-CSRF", "in": "header", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["targetAddress", "interfaceName"], "additionalProperties": false, "properties": { "targetAddress": { "type": "string", "format": "ipv4" }, "interfaceName": { "type": "string" } } } } } },
+        "responses": { "200": { "description": "Locator saved; current unpaired observation returned.", "content": { "application/json": { "schema": { "type": "object", "required": ["snapshot"], "additionalProperties": false, "properties": { "snapshot": { "$ref": "#/components/schemas/Snapshot" } } } } } }, "default": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/v1/devices/mk20-lan/remove": {
+      "post": {
+        "operationId": "removeMk20Lan",
+        "description": "Remove only the saved lab locator. No device firmware or harness session changes.",
+        "parameters": [{ "name": "Origin", "in": "header", "required": true, "schema": { "type": "string" } }, { "name": "X-Snowball-CSRF", "in": "header", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false } } } },
+        "responses": { "200": { "description": "Locator removed; current snapshot returned.", "content": { "application/json": { "schema": { "type": "object", "required": ["snapshot"], "additionalProperties": false, "properties": { "snapshot": { "$ref": "#/components/schemas/Snapshot" } } } } } }, "default": { "$ref": "#/components/responses/Error" } }
+      }
+    },
     "/v1/workspaces/{workspaceId}/recheck": {
       "post": {
         "operationId": "recheckWorkspace",
@@ -1540,6 +1558,10 @@
               "additionalProperties": false
             }
           },
+          "mk20Lan": {
+            "description": "Manually selected unpaired development locator and available local interfaces, or null when unavailable.",
+            "oneOf": [{ "type": "null" }, { "type": "object", "properties": { "selected": { "oneOf": [{ "type": "null" }, { "type": "object", "required": ["version", "targetAddress", "interfaceName"], "properties": { "version": { "type": "integer" }, "targetAddress": { "type": "string" }, "interfaceName": { "type": "string" } }, "additionalProperties": false }] }, "interfaces": { "type": "array", "items": { "type": "object", "required": ["name", "address"], "properties": { "name": { "type": "string" }, "address": { "type": "string" } }, "additionalProperties": false } }, "error": { "type": "string" } }, "required": ["selected", "interfaces"], "additionalProperties": false }]
+          },
           "deviceSources": {
             "type": "array",
             "items": {
@@ -1716,6 +1738,7 @@
           "workspaces",
           "devices",
           "deviceCandidates",
+          "mk20Lan",
           "deviceSources",
           "workspaceDetails",
           "harness",

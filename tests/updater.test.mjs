@@ -122,3 +122,23 @@ test('MW.08.02.01.01.A2: uninstall with remove_all securely zeroes secrets and d
   await assert.rejects(readFile(path.join(installDir, 'app.bundle')));
   await assert.rejects(readFile(path.join(userDataDir, 'host.v1.json')));
 });
+
+test('MW.08.02.01.01.A2: uninstall cleans up downloaded STT models on remove_all and preserves on keep_data', async t => {
+  const { installDir, userDataDir } = await fixture(t);
+  const modelsDir = path.join(userDataDir, 'models');
+  await mkdir(modelsDir, { recursive: true });
+  await writeFile(path.join(modelsDir, 'model.bin'), Buffer.from('fake-whisper-weights-1.5gb'));
+
+  // 1. keep_data retains models
+  const uninstallerKeep = new DesktopUninstaller(installDir, userDataDir, modelsDir);
+  const resultKeep = await uninstallerKeep.uninstall('keep_data');
+  assert.equal(resultKeep.modelsPurged, false);
+  const weightsKeep = await readFile(path.join(modelsDir, 'model.bin'));
+  assert.equal(weightsKeep.toString(), 'fake-whisper-weights-1.5gb');
+
+  // 2. remove_all purges models completely
+  const resultRemove = await uninstallerKeep.uninstall('remove_all');
+  assert.equal(resultRemove.modelsPurged, true);
+  await assert.rejects(readFile(path.join(modelsDir, 'model.bin')));
+});
+

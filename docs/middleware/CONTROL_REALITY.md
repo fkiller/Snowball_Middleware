@@ -1,5 +1,9 @@
 # Local control correction and MVP reality — 2026-09-24
 
+## MK20 Wi-Fi correction — 2026-09-24
+
+The physical MK20 was online at `192.168.1.248`. The PC's dual Ethernet/Wi-Fi LAN made a normal ADB connection time out; binding the source to `Wi-Fi` (`192.168.1.197`) recovered the device shell. Live UDP 7701 preview returned device pings and visibly changed the MK20 top framebuffer; [the captured screen and procedure](evidence/MW.04.02.01.02/wifi-recovery-20260924.md) document this. The updated installed Windows app lets the user save/remove an on-link MK20 address and interface and shows a responsive **unsupported LAN candidate** alongside the USB HID candidate. This is not paired device control: firmware authentication, physical input mapping and a real hardware-to-journal command path remain open. Do not confuse the loopback Web noAuth choice with device pairing.
+
 ## Live correction after the 0-project report
 
 The old browser URL `127.0.0.1:62147` was an obsolete portable process. The current user browser was moved to a newly built portable on loopback. It restores the explicitly selected current-PC Codex CLI from private state, rechecks two registered workspaces as ready, and groups six read-only native sessions under `Snowball_Control` by exact server-side cwd/workspace identity. `Snowball_Middleware` was initially empty; the latest packaged browser created one separate owned verification task there and completed a real GPT-6-Astra/low response. The browser's real `model/list` call showed five Codex models and GPT-6-Astra efforts low, medium, high, xhigh, max, ultra. No existing task was attached or commanded during these checks. Session transcript history remains bounded, and historical tasks are read-only until explicit attachment.

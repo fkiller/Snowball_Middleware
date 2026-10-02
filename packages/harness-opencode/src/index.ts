@@ -78,9 +78,10 @@ export class OpenCodeOwnedAdapter extends EventEmitter implements DispatchPort {
       ownerId: this.ownerId,
       instanceId: this.#binding.instanceId,
       surface: 'http-sse' as const,
-      credentialSource: 'opencode-server' as const,
+      credentialSource: 'opencode-local' as const,
       existingDesktopControl: false,
       readOnly: true,
+      capabilities: ['observe'] as const,
       controlReason: 'owner_protocol_unverified',
       ownedSessionCount: this.#owned.size,
       providerVersion: this.#version ?? null,
@@ -141,24 +142,28 @@ export class OpenCodeOwnedAdapter extends EventEmitter implements DispatchPort {
     return list as Array<{ id: string; directory?: string }>;
   }
 
-  async createSession(root: string, options: { title?: string } = {}): Promise<{ sessionKey: string; ownerId: string }> {
-    throw new OpenCodeFault('owner_protocol_unverified');
-  }
-
-  async listSessions(): Promise<{ nativeId: string; sessionKey: string; ownerId: string | null; readOnly: boolean; cwd: string }[]> {
+  async listSessions(): Promise<{ nativeId: string; sessionKey: string; ownerId: string | null; readOnly: boolean; cwd: string; model?: string; effort?: string; access?: string }[]> {
     this.checkReady();
     const list = await this.fetchSessions();
 
-    return list.map(s => ({
-      nativeId: s.id,
-      sessionKey: this.sessionKey(s.id),
-      ownerId: this.#owned.has(s.id) ? this.ownerId : null,
-      readOnly: !this.#owned.has(s.id),
-      cwd: s.directory || '',
-    }));
+    return list.map(s => {
+      const model = typeof (s as any).model === 'string' ? (s as any).model : undefined;
+      const effort = typeof (s as any).effort === 'string' ? (s as any).effort : undefined;
+      const access = typeof (s as any).access === 'string' ? (s as any).access : (typeof (s as any).permission === 'string' ? (s as any).permission : undefined);
+      return {
+        nativeId: s.id,
+        sessionKey: this.sessionKey(s.id),
+        ownerId: this.#owned.has(s.id) ? this.ownerId : null,
+        readOnly: !this.#owned.has(s.id),
+        cwd: s.directory || '',
+        ...(model ? { model } : {}),
+        ...(effort ? { effort } : {}),
+        ...(access ? { access } : {}),
+      };
+    });
   }
 
-  async readSession(nativeId: string): Promise<{ nativeId: string; readOnly: boolean }> {
+  async readSession(nativeId: string): Promise<{ nativeId: string; readOnly: boolean; model?: string; effort?: string; access?: string }> {
     this.checkReady();
     if (typeof nativeId !== 'string' || nativeId.length < 1 || nativeId.length > 128 || /[\x00-\x1f\x7f/\\]/.test(nativeId)) throw new OpenCodeFault('invalid_session_id');
     const res = await fetch(`${this.#baseUrl}/session/${encodeURIComponent(nativeId)}`, {
@@ -169,7 +174,16 @@ export class OpenCodeOwnedAdapter extends EventEmitter implements DispatchPort {
     if (!res.ok) throw new OpenCodeFault('read_session_failed');
     const item = await boundedJson(res, 128 * 1024) as { id?: string };
     if (item?.id !== nativeId) throw new OpenCodeFault('invalid_session');
-    return { nativeId, readOnly: !this.#owned.has(nativeId) };
+    const model = typeof (item as any).model === 'string' ? (item as any).model : undefined;
+    const effort = typeof (item as any).effort === 'string' ? (item as any).effort : undefined;
+    const access = typeof (item as any).access === 'string' ? (item as any).access : (typeof (item as any).permission === 'string' ? (item as any).permission : undefined);
+    return {
+      nativeId,
+      readOnly: !this.#owned.has(nativeId),
+      ...(model ? { model } : {}),
+      ...(effort ? { effort } : {}),
+      ...(access ? { access } : {}),
+    };
   }
 
   /** Live provider catalog. OpenCode variants are not claimed to be Codex efforts. */
@@ -199,6 +213,10 @@ export class OpenCodeOwnedAdapter extends EventEmitter implements DispatchPort {
       }
     }
     return models;
+  }
+
+  async createSession(root: string, options: { title?: string } = {}): Promise<{ sessionKey: string; ownerId: string }> {
+    throw new OpenCodeFault('owner_protocol_unverified');
   }
 
   async execute(

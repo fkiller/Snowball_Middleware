@@ -108,3 +108,14 @@ export {
   type HostAggregation,
   type LanHostFederatorOptions,
 } from './lan-host.js';
+export {
+  DEFAULT_STT_CONFIG,
+  STT_MODEL_LADDER,
+  loadSttConfig,
+  normalizeSttModelName,
+  resolveModelsDir,
+  resolveSttModel,
+  type SttConfig,
+  type SttModelName,
+  type SttModelSelectionResult,
+} from './stt-config.js';

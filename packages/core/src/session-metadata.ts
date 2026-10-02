@@ -9,6 +9,9 @@ export interface StoredSessionMetadata {
   cwd: string;
   workspaceId?: string;
   createdAt: number;
+  model?: string;
+  effort?: string;
+  access?: string;
 }
 
 /** Private, append-only display metadata. It never grants an owner or command authority. */
@@ -46,7 +49,18 @@ export class SessionMetadataStore implements SessionMetadataPort {
     if (parseSessionKey(key).hostId !== this.hostId || !raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Invalid session metadata identity');
     const m = raw as Record<string, unknown>;
     if (typeof m.title !== 'string' || !m.title.trim() || m.title.length > 128 || typeof m.cwd !== 'string' || m.cwd.length > 4096 || !Number.isSafeInteger(m.createdAt) || Number(m.createdAt) < 0 || m.workspaceId !== undefined && (typeof m.workspaceId !== 'string' || !/^ws_[0-9a-f]{16}$/.test(m.workspaceId))) throw new Error('Invalid session metadata fields');
-    return { title: m.title, cwd: m.cwd, ...(m.workspaceId === undefined ? {} : { workspaceId: m.workspaceId as string }), createdAt: m.createdAt as number };
+    const model = typeof m.model === 'string' && m.model.length <= 128 ? m.model : undefined;
+    const effort = typeof m.effort === 'string' && m.effort.length <= 64 ? m.effort : undefined;
+    const access = typeof m.access === 'string' && m.access.length <= 64 ? m.access : undefined;
+    return {
+      title: m.title,
+      cwd: m.cwd,
+      ...(m.workspaceId === undefined ? {} : { workspaceId: m.workspaceId as string }),
+      createdAt: m.createdAt as number,
+      ...(model !== undefined ? { model } : {}),
+      ...(effort !== undefined ? { effort } : {}),
+      ...(access !== undefined ? { access } : {}),
+    };
   }
 
   get(key: string): StoredSessionMetadata | undefined { const value = this.entries.get(key); return value && { ...value }; }
