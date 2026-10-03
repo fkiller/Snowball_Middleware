@@ -1,6 +1,19 @@
 import { LocalClient } from '/supervisor/client.js';
 
-const client = new LocalClient(location.origin);
+let client = new LocalClient(location.origin);
+let webControllerId,controllerState,controllerReady=false,controllerTimer,controllerWrites=Promise.resolve(),lastControllerPatch='';
+// sessionStorage is tab-local; Web Locks also distinguish duplicated/opener tabs
+// whose initial sessionStorage was copied by the browser.
+async function claimWebController() {
+  const fresh=()=>`ctl_${Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>b.toString(16).padStart(2,'0')).join('')}`;
+  let id;try{id=sessionStorage.getItem('snowball_controller');}catch{}
+  if(!/^ctl_[a-f0-9]{16}$/.test(id))id=fresh();
+  if(typeof navigator!=='undefined'&&navigator.locks){
+    const acquired=await new Promise((resolve,reject)=>{navigator.locks.request('snowball:'+id,{ifAvailable:true},lock=>{resolve(!!lock);if(lock)return new Promise(release=>window.addEventListener('pagehide',release,{once:true}));}).catch(reject);});
+    if(!acquired){id=fresh();void navigator.locks.request('snowball:'+id,()=>new Promise(release=>window.addEventListener('pagehide',release,{once:true})));}
+  }else id=fresh();
+  try{sessionStorage.setItem('snowball_controller',id);}catch{}return id;
+}
 const $ = id => typeof document !== 'undefined' ? document.getElementById(id) : null;
 
 // --- Internationalization (i18n) State & Dictionary ---
@@ -10,7 +23,7 @@ try {
     if (location.hash === '#ko' || location.hash.startsWith('#ko') || location.hash.includes('lang=ko')) currentLanguage = 'ko';
     else if (location.hash === '#en' || location.hash.startsWith('#en') || location.hash.includes('lang=en')) currentLanguage = 'en';
     else {
-      const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('snowball_lang') : null;
+      const stored = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('snowball_lang') : null;
       if (stored === 'en' || stored === 'ko') currentLanguage = stored;
     }
   }
@@ -37,7 +50,7 @@ const I18N = {
     setting_autostart: 'Start automatically on OS login',
     setting_tray: 'System tray running state',
     tray_and_notifications: 'Tray Display & Notifications',
-    setting_language_label: 'Language',
+    setting_language_label: 'Tray Language',
     setting_notifications: 'OS notifications for approval requests and command errors',
     setting_tray_notice: 'Applied during tray execution. UI language can also be toggled directly from the header.',
     voice_engine_title: 'Voice Engine',
@@ -70,7 +83,7 @@ const I18N = {
     tray_and_notifications: '트레이 표시 및 알림',
     setting_language_label: '트레이 언어',
     setting_notifications: '새 승인 요청·명령 오류의 OS 알림',
-    setting_tray_notice: '트레이 실행 중에 적용됩니다. Web 화면 언어는 헤더나 설정에서 전환할 수 있습니다.',
+    setting_tray_notice: '트레이 실행 중에 적용됩니다. Web 화면 언어는 헤더에서 전환할 수 있습니다.',
     voice_engine_title: '음성 엔진 (Voice Engine)',
     voice_engine_label: '음성 인식 엔진:',
     voice_engine_webspeech: '브라우저 음성 인식 (지원 시)',
@@ -90,14 +103,12 @@ const I18N = {
 function setLanguage(lang, doRender = true) {
   if (lang !== 'en' && lang !== 'ko') return;
   currentLanguage = lang;
-  try { localStorage.setItem('snowball_lang', lang); } catch {}
+  try { sessionStorage.setItem('snowball_lang', lang); } catch {}
   if (typeof document !== 'undefined') {
     document.documentElement.lang = lang;
     document.title = lang === 'ko' ? 'Snowball · 로컬 제어' : 'Snowball · Local Control';
     $('lang-btn-en')?.classList.toggle('active', lang === 'en');
     $('lang-btn-ko')?.classList.toggle('active', lang === 'ko');
-    const trayLang = $('setting-language');
-    if (trayLang) trayLang.value = lang;
 
     document.querySelectorAll('[data-i18n]').forEach(el => {
       const k = el.getAttribute('data-i18n');
@@ -133,6 +144,25 @@ const historyByScope = {}; // { [harnessId]: lastProjectId, [projectId]: lastSes
 let harnessFilter = 'all';
 let workspaceFilter = 'all';
 let activeDraft = null; // { destinationKey: string, ownerId: string | null, text: string, readOnly: boolean }
+const promptDrafts = new Map();
+let promptDestination=null;
+function checkpointController() {
+  if(!controllerReady)return;
+  // Tab memory is synchronous so a quick reload cannot outrun a debounce.
+  try{sessionStorage.setItem('snowball_ui:'+webControllerId,JSON.stringify({activeHarness,activeProject,activeSessionKey,viewMode,language:currentLanguage,drafts:[...promptDrafts],execution:[...executionBySession],activeDraft}));}catch{}
+  clearTimeout(controllerTimer);
+  controllerTimer=setTimeout(()=>{
+    const selection={...(activeHarness?{harnessPluginId:activeHarness}:{}),...(activeSessionKey?{sessionKey:activeSessionKey}:{})};
+    const preferences={language:currentLanguage,view:viewMode,projectName:activeProject,model:'',effort:'',...(executionBySession.get(activeSessionKey)??{})};
+    const draft=activeDraft?.commandId?{destinationKey:activeDraft.destinationKey,text:activeDraft.text}:promptDrafts.get(activeSessionKey)?{destinationKey:activeSessionKey,text:promptDrafts.get(activeSessionKey)}:null;
+    const patch={selection,preferences,draft},encoded=JSON.stringify(patch);if(encoded===lastControllerPatch)return;lastControllerPatch=encoded;
+    controllerWrites=controllerWrites.then(async()=>{
+      // Clearing a previous destination is explicit and only affects this tab.
+      if(controllerState.draft&&draft&&controllerState.draft.destinationKey!==draft.destinationKey)controllerState=await client.updateController(controllerState.revision,{draft:null});
+      controllerState=await client.updateController(controllerState.revision,patch);
+    }).catch(async()=>{lastControllerPatch='';try{controllerState=await client.controller();}catch{};});
+  },250);
+}
 let selectedDevices = new Set();
 let devicesInitialized = false;
 
@@ -783,7 +813,7 @@ function renderWorkspace() {
       const chosen = executionBySession.get(curSession.sessionKey) ?? {};
       const selected = models.find(m => m.model === chosen.model);
       if (selected && chosen.effort && !selected.efforts.includes(chosen.effort)) { delete chosen.effort; executionBySession.set(curSession.sessionKey, chosen); }
-      if (chosen.model && !selected) executionBySession.delete(curSession.sessionKey);
+      if (modelCatalogs.has(catalogKey) && chosen.model && !selected) executionBySession.delete(curSession.sessionKey);
       const modelSelect = node('select'); modelSelect.setAttribute('aria-label', isEn ? 'Model' : '모델');
       const defaultOption = node('option', isEn ? 'Harness Default Model' : 'Harness 기본 모델'); defaultOption.value = ''; modelSelect.append(defaultOption);
       for (const m of models) { const option = node('option', m.displayName); option.value = m.model; modelSelect.append(option); }
@@ -889,6 +919,11 @@ function renderWorkspace() {
   const voiceBanner = $('voice-draft-banner');
 
   if (sendBtn && promptInput) {
+    if(promptDestination!==curSession.sessionKey){
+      if(promptDestination)promptDrafts.set(promptDestination,promptInput.value);
+      promptDestination=curSession.sessionKey;promptInput.value=promptDrafts.get(promptDestination)??'';
+    }
+    promptInput.oninput=()=>{promptDrafts.set(curSession.sessionKey,promptInput.value);checkpointController();};
     sendBtn.disabled = !isOwned;
     sendBtn.title = isOwned
       ? (isEn ? 'Send Command' : '명령 전송')
@@ -900,7 +935,7 @@ function renderWorkspace() {
 
     const handleSend = () => {
       const text = promptInput.value.trim();
-      if (!text || !isOwned) return;
+      if (!text || !isOwned || activeDraft?.commandId) return;
 
       // R-TARGET: 명령 작성 중 · 고정 대상 (Target invariance preserved)
       activeDraft = {
@@ -918,6 +953,7 @@ function renderWorkspace() {
       sessionTurns[curSession.sessionKey].push({ role: 'user', text, time: nowTime });
 
       promptInput.value = '';
+      promptDrafts.delete(curSession.sessionKey);checkpointController();
       renderWorkspace();
 
       void run(async signal => {
@@ -931,8 +967,10 @@ function renderWorkspace() {
             expectedRevision: curSession.revision ?? 0,
           }, signal);
 
-          activeDraft = null;
+          if(activeDraft===draft)activeDraft = null;
+          checkpointController();
           renderWorkspace();
+          checkpointController();
         } catch (err) {
           const failMsg = isEn
             ? `Could not verify delivery: ${err.message}. Will not retry automatically. Command ID: ${commandId}`
@@ -1022,6 +1060,7 @@ function renderWorkspace() {
       }
     };
   }
+  checkpointController();
 }
 
 // --- Settings Modal ---
@@ -1130,7 +1169,7 @@ function initSettingsModal() {
   const syncSettings=()=>{
     if(chkAutostart)chkAutostart.checked=!!snapshot?.settings?.autostart;
     if(trayLanguage){
-      trayLanguage.value=currentLanguage;
+      trayLanguage.value=snapshot?.settings?.language??'en';
       trayLanguage.disabled=false;
     }
     if(notifications){notifications.checked=!!snapshot?.settings?.notifications;notifications.disabled=!snapshot?.desktopCapabilities?.tray;}
@@ -1140,7 +1179,6 @@ function initSettingsModal() {
     await run(async signal=>{await client.updateSettings(snapshot.settings.revision,patch,signal);return client.snapshot(signal);});syncSettings();
   };
   if(trayLanguage)trayLanguage.onchange=()=>{
-    setLanguage(trayLanguage.value);
     void updateSetting({language:trayLanguage.value});
   };
   if(notifications)notifications.onchange=()=>void updateSetting({notifications:notifications.checked});
@@ -1361,6 +1399,7 @@ function renderWizard() {
 
 // --- Main Render Dispatcher ---
 function render() {
+  if(activeDraft?.commandId&&(snapshot?.commands??[]).some(command=>command.commandId===activeDraft.commandId&&command.sessionKey===activeDraft.destinationKey&&['queued','dispatched','acknowledged','completed'].includes(command.status)))activeDraft=null;
   const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
   const hostBadge = $('host-badge');
   if (hostBadge) {
@@ -1389,6 +1428,7 @@ function render() {
     if (breadcrumbs) breadcrumbs.style.display = 'none';
     renderWizard();
   }
+  checkpointController();
 }
 
 // Initial Boot: fetch snapshot and default to Workspace if connected
@@ -1416,9 +1456,17 @@ async function followChanges() {
 }
 window.addEventListener('pagehide', () => { liveAbort.abort(); clearTimeout(refreshTimer); });
 void (async () => {
+  webControllerId=await claimWebController();client=new LocalClient(location.origin,undefined,webControllerId);
   setLanguage(currentLanguage, false);
   initSettingsModal();
   try {
+    controllerState=await client.controller();
+    let saved;try{saved=JSON.parse(sessionStorage.getItem('snowball_ui:'+webControllerId));}catch{}
+    if(saved){activeHarness=saved.activeHarness;activeProject=saved.activeProject;activeSessionKey=saved.activeSessionKey;activeDraft=saved.activeDraft??null;for(const [key,text] of saved.drafts??[])if(typeof key==='string'&&typeof text==='string')promptDrafts.set(key,text);for(const [key,value] of saved.execution??[])executionBySession.set(key,value);}
+    else {activeHarness=controllerState.selection.harnessPluginId??activeHarness;activeSessionKey=controllerState.selection.sessionKey??null;activeProject=controllerState.preferences.projectName??'';if(activeSessionKey)executionBySession.set(activeSessionKey,{...(controllerState.preferences.model?{model:controllerState.preferences.model}:{}),...(controllerState.preferences.effort?{effort:controllerState.preferences.effort}:{})});}
+    if(!saved&&controllerState.draft)promptDrafts.set(controllerState.draft.destinationKey,controllerState.draft.text);
+    if(!location.hash)setLanguage(saved?.language??controllerState.preferences.language??currentLanguage,false);
+    controllerReady=true;
     let result = await client.snapshot();
     if (!result.harness || result.harness.status === 'idle' || !result.harness.candidates.length) {
       await client.scanHarness().catch(() => {});

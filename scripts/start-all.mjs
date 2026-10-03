@@ -1,8 +1,10 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import fs from 'node:fs';
 import net from 'node:net';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const execFileAsync=promisify(execFile);
 import {
   defaultDiscoveryProviders,
   DeviceRegistry,
@@ -10,27 +12,32 @@ import {
   WorkspaceStore,
   HarnessDiscovery,
   createHostId,
+  createControllerId,
   parseHostId,
   resolveUserDataDir,
   formatSessionKey,
   parseSessionKey,
   loadSttConfig,
   resolveSttModel,
-  resolveModelsDir
+  resolveModelsDir,
+  deviceControllerId
 } from '../packages/core/dist/index.js';
 import { LocalApi, loadSupervisorAssets } from '../packages/api/dist/index.js';
 import { ensurePrivateStateDirectory } from '../apps/supervisor/private-state.mjs';
-import { Mk20LabTransport } from '../../Snowball_Control/plugins/device-mk20/src/index.mjs';
+const controlRoot=process.env.SNOWBALL_CONTROL_ROOT ? path.resolve(process.env.SNOWBALL_CONTROL_ROOT) : fileURLToPath(new URL('../../Snowball_Control',import.meta.url));
+const {Mk20LabTransport}=await import(pathToFileURL(path.join(controlRoot,'plugins/device-mk20/src/index.mjs')).href);
 import { HidDiscovery, loadNativeBackend } from '../packages/device-hid/dist/index.js';
 import { reviewedProfiles } from '../packages/device-hid/dist/profiles.js';
 import os from 'node:os';
-import { scanHarnessProjects } from './harness-project-scanner.mjs';
-import { scanAllHarnessSessions } from './harness-session-scanner.mjs';
-import { scanAllHarnessCatalogs } from './harness-catalog-scanner.mjs';
-import { installedHarnessVersions } from './harness-runtime.mjs';
+import { NativeSourceService } from './source-service.mjs';
+import { loadControllerStore } from '../apps/supervisor/controller-store.mjs';
+import { controllerUiStore } from './controller-ui-store.mjs';
 import { dispatchHarnessTurn } from './harness-dispatch.mjs';
 
 const directory = ensurePrivateStateDirectory(resolveUserDataDir());
+const sources = new NativeSourceService();
+const controllerPersistence = await loadControllerStore(directory);
+const controllerStates = controllerPersistence.store;
 const hostIdFile = path.join(directory, 'host.v1.json');
 let hostId;
 try {
@@ -66,7 +73,7 @@ for (const dir of [commandDir, workspaceDir]) {
 
 const journal = new CommandJournal({ hostId, directory: commandDir });
 const store = new WorkspaceStore({ hostId, directory: workspaceDir });
-const devices = new DeviceRegistry();
+const devices = new DeviceRegistry(Date.now, controllerStates.contexts);
 const discovery = new HarnessDiscovery();
 const providers = defaultDiscoveryProviders();
 
@@ -87,7 +94,7 @@ for (const ws of store.list()) {
 
 // Scan and report real project candidates for each harness
 try {
-  const harnessProjectsMap = scanHarnessProjects();
+  const harnessProjectsMap = await sources.read('projects');
   const allCandidates = [
     ...harnessProjectsMap['snowball.codex'],
     ...harnessProjectsMap['snowball.antigravity'],
@@ -103,7 +110,7 @@ try {
 let realSessionsData = {};
 let realTurnsData = {};
 try {
-  const { sessionsByHarness, turnsStore } = scanAllHarnessSessions();
+  const { sessionsByHarness, turnsStore } = await sources.read('sessions');
   realSessionsData = sessionsByHarness;
   realTurnsData = turnsStore;
   for (const [pluginId, projs] of Object.entries(sessionsByHarness)) {
@@ -131,7 +138,7 @@ try {
   console.log('  Harness session scan note:', err.message);
 }
 
-const installedVersions = installedHarnessVersions();
+const installedVersions = await sources.read('installations');
 console.log('Harness installations:', installedVersions);
 const connectedHarnesses = Object.entries(installedVersions).map(([kind, info]) => ({
   pluginId: `snowball.${kind}`, instanceId: 'default', connected: info.available,
@@ -139,8 +146,7 @@ const connectedHarnesses = Object.entries(installedVersions).map(([kind, info]) 
 }));
 
 async function handleListModels(pluginId, instanceId) {
-  const catalogs = scanAllHarnessCatalogs();
-  const list = catalogs[pluginId] || [];
+  const list = await sources.read('catalog', pluginId);
   return list.map(m => ({
     model: m.model,
     displayName: m.displayName,
@@ -240,6 +246,7 @@ const api = new LocalApi({
   journal,
   workspaceStore: store,
   devices,
+  controllerStates,
   harness,
   supervisor,
   port: 8765,
@@ -279,7 +286,6 @@ console.log('====================================================');
 console.log('  SNOWBALL MIDDLEWARE IS ONLINE');
 console.log('====================================================');
 console.log(`  Web Supervisor URL : ${api.origin}/`);
-console.log(`  Bootstrap Code     : ${currentBootstrap?.code}`);
 console.log('====================================================');
 
 function findLocalBindAddress() {
@@ -324,7 +330,7 @@ try {
     try {
       const adbTool = path.join(process.env.LOCALAPPDATA || '', 'Temp', 'Codex-MK20-ADB', 'platform-tools', 'adb.exe');
       if (fs.existsSync(adbTool)) {
-        execFileSync(adbTool, ['connect', '127.0.0.1:15555'], { windowsHide: true });
+        void execFileAsync(adbTool, ['connect', '127.0.0.1:15555'], { windowsHide: true,timeout:4000 }).catch(()=>{});
         console.log(`  MK20 ADB Tool      : CONNECTED (127.0.0.1:15555)`);
       }
     } catch {}
@@ -333,7 +339,21 @@ try {
 } catch {}
 
 // Connect to physical MK20 device at 192.168.1.248:7701
+// A private IP routes packets; it is not a durable physical identity or pairing
+// proof. Obtain the installed board's MAC through the owner's native ADB link.
+const mk20IdentityFile=path.join(directory,'mk20-lab.identity.json');
+let mk20Identity;
+try {
+  const adbTool=path.join(process.env.LOCALAPPDATA||'','Temp','Codex-MK20-ADB','platform-tools','adb.exe');
+  const {stdout}=await execFileAsync(adbTool,['-s','192.168.1.248:5555','shell','cat','/sys/class/net/wlan0/address'],{windowsHide:true,timeout:4000});
+  const mac=stdout.trim().toLowerCase();if(!/^([a-f0-9]{2}:){5}[a-f0-9]{2}$/.test(mac))throw Error('invalid_board_identity');
+  mk20Identity='mk20-mac-'+mac;fs.writeFileSync(mk20IdentityFile,JSON.stringify({identity:mk20Identity})+'\n',{mode:0o600});
+} catch {
+  try{const saved=JSON.parse(fs.readFileSync(mk20IdentityFile,'utf8'));if(/^mk20-mac-([a-f0-9]{2}:){5}[a-f0-9]{2}$/.test(saved.identity))mk20Identity=saved.identity;}catch{}
+}
+const mk20ControllerId=mk20Identity?deviceControllerId('plugin.mk20','desk-terminal',mk20Identity):createControllerId();
 const mk20 = new Mk20LabTransport({
+  controllerId: mk20ControllerId,
   labEnabled: true,
   localAddress: localBindIp,
   targetAddress: '192.168.1.248',
@@ -354,11 +374,11 @@ try {
     label: 'MK20 Smart Desk Terminal (192.168.1.248:7701)',
     transport: 'lan',
     capabilities: ['button', 'select-session', 'display'],
-    supported: true,
-    verifiedIdentity: 'mk20-hw-192.168.1.248',
+    supported: !!mk20Identity,
+    ...(mk20Identity?{verifiedIdentity:mk20Identity}:{}),
   });
   devices.finishScan(lanSource, lanGen, 'ready');
-  if (lanCand) {
+  if (lanCand && mk20Identity) {
     devices.register(lanCand.candidateId, lanGen);
   }
 } catch (err) {
@@ -380,7 +400,8 @@ try {
       transport: 'hid',
       capabilities: ['button', 'select-session'],
       supported: true,
-      verifiedIdentity: `mk20-qmk-${mk20Hid.vendorId}:${mk20Hid.productId}`,
+      // VID/PID identifies a profile, not an individual board. Keep this USB
+      // controller ephemeral until the adapter verifies a unique identity.
     });
     devices.finishScan(hidSource, hidGen, 'ready');
     if (hidCand) {
@@ -434,7 +455,7 @@ let modelSelectionNote = 'explicit env override';
 if (!selectedSttModel) {
   try {
     const assessPy = path.resolve('scripts/assess_stt_backend.py');
-    const out = execFileSync('python', [assessPy, '--json'], { encoding: 'utf8', windowsHide: true });
+    const {stdout:out} = await execFileAsync('python', [assessPy, '--json'], { encoding: 'utf8', windowsHide: true,timeout:30000 });
     const assessRes = JSON.parse(out);
     selectedSttModel = assessRes.selected_model;
     selectedBackend = assessRes.selected_backend || 'auto';
@@ -493,9 +514,9 @@ context.harnesses = [
 ];
 
 // Discover and configure genuine living model catalogs dynamically for each harness
-function refreshHarnessCatalogs() {
+async function refreshHarnessCatalogs() {
   try {
-    const catalogs = scanAllHarnessCatalogs();
+    const catalogs = await sources.read('catalogs');
     for (const [pluginId, cat] of Object.entries(catalogs)) {
       if (Array.isArray(cat)) {
         context.setModelCatalog(cat, `dev-pc/${pluginId}`);
@@ -505,7 +526,7 @@ function refreshHarnessCatalogs() {
     console.warn('[Catalog] Harness model discovery note:', err.message);
   }
 }
-refreshHarnessCatalogs();
+await refreshHarnessCatalogs();
 
 context.accessLevels = ['Native policy'];
 
@@ -600,7 +621,7 @@ async function loadCurrentSessionTurns() {
           const processDetails = (t.items || []).filter(i => i.type === 'commandExecution').map(i => i.command || '') || t.processDetails || [];
           return { role: 'turn', userPrompt, agentResponse, processDetails };
         });
-        context.setSessionTurns(parsed);
+        if (context.getCurrentSession() === curSess) context.setSessionTurns(parsed);
         curSess.turns = parsed;
         if (realTurnsData) realTurnsData[curSess.id] = parsed;
         return;
@@ -611,31 +632,10 @@ async function loadCurrentSessionTurns() {
   // 4. Live fallback: Check rollout JSONL for Codex threads
   if (!curSess.id.startsWith('s-') && context.getCurrentHarness()?.id?.includes('codex')) {
     try {
-      const pyScript = `import glob, os, json
-sessions_dir = os.path.expanduser('~/.codex/sessions')
-found = glob.glob(f"{sessions_dir}/**/rollout-*-${curSess.id}*.jsonl", recursive=True)
-turns = []
-if found:
-    with open(found[0], 'r', encoding='utf-8', errors='ignore') as f:
-        for line in f:
-            try:
-                p = json.loads(line)
-                if p.get('type') == 'response_item' and p.get('payload', {}).get('type') == 'message':
-                    role = p['payload'].get('role')
-                    text = '\\n'.join([c.get('text', '') for c in p['payload'].get('content', []) if isinstance(c, dict) and not c.get('text', '').startswith('<ctrl') and not c.get('text', '').startswith('# AGENTS')]).strip()
-                    if text:
-                        if role == 'user':
-                            turns.append({'role': 'user', 'userPrompt': text, 'text': text, 'time': '최근'})
-                        elif role == 'assistant':
-                            turns.append({'role': 'agent', 'agentResponse': text, 'text': text, 'time': '최근', 'processDetails': []})
-            except:
-                pass
-print(json.dumps(turns))
-`;
-      const out = execFileSync('python', ['-c', pyScript], { windowsHide: true, encoding: 'utf8', env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
-      const parsed = JSON.parse(out);
+      const observed = await sources.read('sessions');
+      const parsed = observed.turnsStore[curSess.sessionKey] ?? observed.turnsStore[curSess.id];
       if (Array.isArray(parsed) && parsed.length > 0) {
-        context.setSessionTurns(parsed);
+        if (context.getCurrentSession() === curSess) context.setSessionTurns(parsed);
         curSess.turns = parsed;
         if (realTurnsData) realTurnsData[curSess.id] = parsed;
         return;
@@ -643,13 +643,19 @@ print(json.dumps(turns))
     } catch {}
   }
 
-  context.setSessionTurns([]);
+  if (context.getCurrentSession() === curSess) context.setSessionTurns([]);
 }
 
 context.resolveProjectAndSession();
 context.syncSessionSettings();
+const mk20Ui = await controllerUiStore(directory, mk20ControllerId);
+if(mk20Ui.saved)context.restoreUi(mk20Ui.saved);
+const previousSkin=controllerStates.get(mk20ControllerId).preferences.skinId;
+if(previousSkin){try{mk20.setSkin(previousSkin);}catch{console.warn('MK20 saved skin is unavailable; use a currently installed skin.');}}
+const savedMk20Scroll = context.readerScrollLine;
 context.updateReaderForCurrentSession();
 await loadCurrentSessionTurns();
+if(mk20Ui.saved)context.readerScrollLine=savedMk20Scroll;
 
 let activeAudioCapture = null; // { captureId, harnessId, sessionObj }
 let activeTranscriptionTimer = null;
@@ -772,6 +778,11 @@ function finishVoiceCapture() {
 async function paintMk20() {
   if (!mk20Online) return;
   try {
+    void mk20Ui.save(context.snapshotUi()).catch(error=>console.error('MK20 state save failed:',error.code??error.message));
+    const session=context.getCurrentSession(), preferences={model:'',effort:'',...context.getExecutionSettings(),view:context.viewMode,scroll:context.readerScrollLine,skinId:mk20.getActiveSkin().id};
+    const selection={harnessPluginId:context.getCurrentHarness().id,harnessInstanceId:'default',...(session.sessionKey?{sessionKey:session.sessionKey}:{})};
+    const previous=controllerStates.get(mk20ControllerId);
+    if(JSON.stringify(previous.selection)!==JSON.stringify(selection)||JSON.stringify(previous.preferences)!==JSON.stringify(preferences))controllerStates.update(mk20ControllerId,previous.revision,{selection,preferences});
     const payload = context.toPreviewPayload();
     await mk20.preview(payload);
   } catch (err) {
@@ -784,7 +795,7 @@ await paintMk20();
 const timer = setInterval(() => { void paintMk20(); }, 1200);
 
 // MK20 Hardware Input Dispatcher
-mk20.on('lab.input', async (input) => {
+async function handleMk20Input(input) {
   if (input.kind !== 'presence') {
     console.log('[MK20 INPUT RECEIVED]:', input);
   }
@@ -1291,6 +1302,14 @@ mk20.on('lab.input', async (input) => {
   } catch (err) {
     console.error('[MK20 INPUT ERROR]:', err);
   }
+}
+// One physical controller processes actions in arrival order. Native dispatch
+// remains asynchronous; a slow file/session read cannot reorder later choices.
+let mk20InputQueue=Promise.resolve(),mk20Pending=0;
+mk20.on('lab.input',input=>{
+  if(input.kind==='presence'||mk20Pending>=100)return;
+  mk20Pending++;
+  mk20InputQueue=mk20InputQueue.then(()=>handleMk20Input(input)).catch(error=>console.error('MK20 input failed:',error.code??error.message)).finally(()=>{mk20Pending--;});
 });
 
 console.log('====================================================');
@@ -1309,6 +1328,9 @@ const cleanup = async () => {
   clearInterval(timer);
   await mk20.close();
   await api.close();
+  await sources.close();
+  await controllerPersistence.close();
+  await mk20Ui.flush();
   store.close();
   journal.close();
   process.exit(0);

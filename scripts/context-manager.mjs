@@ -400,6 +400,43 @@ export class ContextManager {
     }
   }
 
+  snapshotUi() {
+    this.saveActiveSessionState();
+    const fields=['model','effort','access','voiceDraftText','voiceSubmission','lastDispatchError','voiceDestinationLabel','readerScrollLine','showDetails'];
+    const sessions={};
+    for(const [scope,list] of Object.entries(this.sessionsByScope))sessions[scope]=list.map(session=>({id:session.id,...(session.id.startsWith('s-')?{localDraft:true,title:session.title,createdAt:session.createdAt}:{}),...Object.fromEntries(fields.filter(key=>session[key]!==undefined).map(key=>[key,session[key]]))}));
+    return {schema:1,machine:this.getCurrentMachine().id,harness:this.getCurrentHarness().id,project:this.getCurrentProject().id,session:this.getCurrentSession().id,view:this.viewMode,volume:this.volume,muted:this.isMuted,sessions,memory:{harness:[...this.memoryHarnessPerMachine],project:[...this.memoryProjectPerHarness],session:[...this.memorySessionPerProject]}};
+  }
+
+  restoreUi(saved) {
+    if(!saved||saved.schema!==1||typeof saved.sessions!=='object')throw Error('invalid_ui_state');
+    for(const [scope,records] of Object.entries(saved.sessions)){
+      const list=this.sessionsByScope[scope];if(!list||!Array.isArray(records))continue;
+      for(const record of records){
+        let session=list.find(item=>item.id===record.id);
+        if(!session&&record.localDraft===true&&/^s-\d+$/.test(record.id)&&typeof record.title==='string') {session={id:record.id,title:record.title.slice(0,128),createdAt:record.createdAt,preview:'',turnCount:0};list.push(session);}
+        if(!session)continue;
+        for(const key of ['model','effort','access','voiceDraftText','voiceDestinationLabel'])if(typeof record[key]==='string'&&Buffer.byteLength(record[key])<=8192)session[key]=record[key];
+        if(Number.isSafeInteger(record.readerScrollLine)&&record.readerScrollLine>=0)session.readerScrollLine=record.readerScrollLine;
+        session.showDetails=record.showDetails===true;
+        // A crashed send has no execution proof. Never repeat it on recovery.
+        session.voiceSubmission=record.voiceSubmission==='sending'?'unknown':(['idle','ready','sent','error','unknown'].includes(record.voiceSubmission)?record.voiceSubmission:'idle');
+        session.isRecordingVoice=false;session.isTranscribingVoice=false;
+      }
+    }
+    for(const [kind,map,valid] of [
+      ['harness',this.memoryHarnessPerMachine,(scope,id)=>this.machines.some(m=>m.id===scope)&&this.harnesses.some(h=>h.id===id)],
+      ['project',this.memoryProjectPerHarness,(scope,id)=>this.projectsByScope[scope]?.some(p=>p.id===id)],
+      ['session',this.memorySessionPerProject,(scope,id)=>this.sessionsByScope[scope]?.some(s=>s.id===id)]
+    ])for(const pair of saved.memory?.[kind]??[])if(Array.isArray(pair)&&pair.length===2&&pair.every(value=>typeof value==='string')&&valid(...pair))map.set(...pair);
+    const index=(list,id)=>Math.max(0,list.findIndex(item=>item.id===id));
+    this.selectedMachineIdx=index(this.machines,saved.machine);this.selectedHarnessIdx=index(this.harnesses,saved.harness);
+    this.selectedProjectIdx=index(this.getProjectsForCurrentScope(),saved.project);this.selectedSessionIdx=index(this.getSessionsForCurrentScope(),saved.session);
+    if(['session','workspace','changes','question','settings'].includes(saved.view))this.viewMode=saved.view;
+    if(Number.isInteger(saved.volume)&&saved.volume>=0&&saved.volume<=100)this.volume=saved.volume;
+    this.isMuted=saved.muted===true;this.restoreActiveSessionState();const scroll=this.readerScrollLine;this.updateReaderForCurrentSession();this.readerScrollLine=scroll;
+  }
+
   restoreActiveSessionState() {
     const curSess = this.getCurrentSession();
     if (curSess) {
