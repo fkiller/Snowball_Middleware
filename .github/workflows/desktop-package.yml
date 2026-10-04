@@ -1,15 +1,50 @@
 name: Desktop package checks
-on: [push, workflow_dispatch]
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      save_packages:
+        description: Store verified packages in a private draft release
+        type: boolean
+        default: false
 permissions:
   contents: read
+concurrency:
+  group: desktop-package-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
 jobs:
+  prepare-release:
+    if: github.event_name == 'workflow_dispatch' && inputs.save_packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - id: release
+        run: node scripts/ci-draft-release.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
   package:
+    needs: prepare-release
+    if: ${{ !cancelled() && (needs.prepare-release.result == 'success' || needs.prepare-release.result == 'skipped') }}
+    permissions:
+      contents: write
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, macos-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -19,9 +54,11 @@ jobs:
       - run: npm run install:desktop
       - id: package
         run: node scripts/ci-package-smoke.mjs
-      - uses: actions/upload-artifact@v4
-        if: always() && steps.package.outputs.artifact_path != ''
-        with:
-          name: middleware-${{ runner.os }}-${{ runner.arch }}
-          path: ${{ steps.package.outputs.artifact_path }}
-          retention-days: 7
+      - name: Upload verified archives to draft release
+        if: needs.prepare-release.outputs.tag != ''
+        shell: bash
+        run: gh release upload "$RELEASE_TAG" "$ARTIFACT_PATH" "$ARTIFACT_PATH.sha256" --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
+          ARTIFACT_PATH: ${{ steps.package.outputs.artifact_path }}
