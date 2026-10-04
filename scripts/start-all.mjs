@@ -23,6 +23,9 @@ import {
   deviceControllerId
 } from '../packages/core/dist/index.js';
 import { LocalApi, loadSupervisorAssets } from '../packages/api/dist/index.js';
+import {harnessPresentation as codexPresentation} from '../packages/harness-codex/dist/presentation.js';
+import {harnessPresentation as agyPresentation} from '../packages/harness-antigravity/dist/presentation.js';
+import {harnessPresentation as ocodePresentation} from '../packages/harness-opencode/dist/presentation.js';
 import { ensurePrivateStateDirectory } from '../apps/supervisor/private-state.mjs';
 const controlRoot=process.env.SNOWBALL_CONTROL_ROOT ? path.resolve(process.env.SNOWBALL_CONTROL_ROOT) : fileURLToPath(new URL('../../Snowball_Control',import.meta.url));
 const {Mk20LabTransport}=await import(pathToFileURL(path.join(controlRoot,'plugins/device-mk20/src/index.mjs')).href);
@@ -253,6 +256,7 @@ const api = new LocalApi({
   hostname: os.hostname(),
   noAuth: true,
   realSessions: realSessionsData,
+  harnessPresentations:{'snowball.codex':codexPresentation,'snowball.antigravity':agyPresentation,'snowball.opencode':ocodePresentation},
   turnsStore: realTurnsData,
   connectedHarnesses,
   listModels: handleListModels,

@@ -7,6 +7,8 @@ import { ensurePrivateStateDirectory } from './private-state.mjs';
 import { chooseNativeWorkspace } from './native-picker.mjs';
 import { loadSettings, saveSettings } from './settings-store.mjs';
 import { loadControllerStore } from './controller-store.mjs';
+import {harnessPresentation as codexPresentation} from '../../packages/harness-codex/dist/presentation.js';
+import {harnessPresentation as ocodePresentation} from '../../packages/harness-opencode/dist/presentation.js';
 
 function loadHostId(directory) {
   const file = path.join(directory, 'host.v1.json');
@@ -35,7 +37,7 @@ function privateJournalDirectory(directory) {
 }
 
 /** Local composition root for the CLI and native tray; no cloud control plane. */
-export async function startLocalRuntime({ dataDir = resolveUserDataDir(), repositoryRoot = fileURLToPath(new URL('../..', import.meta.url)), providers = [], enableNativePicker = false, chooseWorkspace, connectCodex, disconnectCodex, resetCodex, devicePresence, mk20Lan, noAuth = true, createHarnessAdapters = async () => [], desktop } = {}) {
+export async function startLocalRuntime({ dataDir = resolveUserDataDir(), repositoryRoot = fileURLToPath(new URL('../..', import.meta.url)), providers = [], enableNativePicker = false, chooseWorkspace, connectCodex, disconnectCodex, resetCodex, devicePresence, mk20Lan, noAuth = true, createHarnessAdapters = async () => [], desktop, harnessPresentations = {'snowball.codex':codexPresentation,'snowball.opencode':ocodePresentation} } = {}) {
   // This boundary validates native privacy before any user registration is loaded.
   const directory = ensurePrivateStateDirectory(dataDir);
   const controllerPersistence = await loadControllerStore(directory);
@@ -119,7 +121,7 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
       describe: () => discovery.snapshot(),
       rescan: () => discovery.scan(reviewed, { platform: process.platform, pathValue: process.env.PATH ?? '' }),
     } : undefined;
-    api = new LocalApi({ journal, workspaceStore: store, devices, harness, noAuth, controllerStates: controllerPersistence.store, sessionService: sessions, createStore: creates, onCommandQueued: queueDispatch,
+    api = new LocalApi({ journal, workspaceStore: store, devices, harness, noAuth, controllerStates: controllerPersistence.store, sessionService: sessions, createStore: creates, onCommandQueued: queueDispatch, harnessPresentations,
       initialSettings, desktopCapabilities: {tray: !!desktop, autostart: !!desktop, codexSelection: !!connectCodex},
       applySettings: async (next, previous) => {
         const changedAutostart = next.autostart !== previous.autostart;

@@ -2154,6 +2154,12 @@
               "null"
             ],
             "description": "Legacy transcript projection; production runtime uses bounded sessionMessages."
+          },
+          "harnessPresentations": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PluginPresentation"
+            }
           }
         },
         "required": [
@@ -2644,7 +2650,8 @@
           },
           "crumb": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "maximum": 4
           }
         },
         "additionalProperties": false
@@ -2664,6 +2671,45 @@
             "description": "Unsent UTF-8 text, at most 8192 bytes. Does not authorize execution."
           }
         },
+        "additionalProperties": false
+      },
+      "PluginPresentation": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "icon": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "integer",
+                "const": 16
+              },
+              "rows": {
+                "type": "array",
+                "minItems": 16,
+                "maxItems": 16,
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                }
+              }
+            },
+            "required": [
+              "size",
+              "rows"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "name",
+          "icon"
+        ],
         "additionalProperties": false
       }
     },

@@ -26,7 +26,7 @@ function preferences(raw:unknown):ControllerPreferences {
     if(['model','effort','view','workspaceId','projectName'].includes(key)){if(typeof value!=='string'||Buffer.byteLength(value)>256||/[\x00-\x1f]/.test(value))throw Error('invalid_controller_preferences');}
     else if(key==='language'){if(!['en','ko'].includes(String(value)))throw Error('invalid_controller_preferences');}
     else if(key==='skinId'){if(typeof value!=='string'||! /^[a-z0-9][a-z0-9_-]{1,31}$/.test(value))throw Error('invalid_controller_preferences');}
-    else if(['cursor','scroll','crumb'].includes(key)){if(!Number.isSafeInteger(value)||Number(value)<0||Number(value)>(key==='crumb'?3:1000000))throw Error('invalid_controller_preferences');}
+    else if(['cursor','scroll','crumb'].includes(key)){if(!Number.isSafeInteger(value)||Number(value)<0||Number(value)>(key==='crumb'?4:1000000))throw Error('invalid_controller_preferences');}
     else if(key==='focus'){if(!['top','content'].includes(String(value)))throw Error('invalid_controller_preferences');}
     else throw Error('invalid_controller_preferences');
     result[key]=value;

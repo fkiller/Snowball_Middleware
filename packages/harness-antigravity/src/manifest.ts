@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { parseManifest } from '@snowball/plugin-sdk';
+import {harnessPresentation} from './presentation.js';
 
 /** Artifact metadata only. Caller approval is separate; this does not start the worker. */
 export async function antigravityManifest() {
@@ -9,6 +10,7 @@ export async function antigravityManifest() {
     publisher: 'Snowball',
     version: '0.1.0',
     kind: 'harness',
+    presentation:harnessPresentation,
     sdkApiRange: '^1.0.0',
     entrypoint: 'dist/worker.js',
     platforms: ['win32', 'darwin', 'linux'],

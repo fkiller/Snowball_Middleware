@@ -3,6 +3,7 @@ import os from 'node:os';
 import { randomBytes, createHash } from 'node:crypto';
 import { CommandJournal, ControllerStateStore, SessionFault, type SessionService, type SessionCreateStore, createControllerId, JournalFault, type CommandInput, type DeviceRegistry, type DiscoverySnapshot, type WorkspaceStore } from '@snowball/core';
 import { WorkspaceFiles } from './workspaces.js';
+import type {PluginPresentation} from '@snowball/core';
 import type { SupervisorAssets } from './supervisor.js';
 export { loadSupervisorAssets, type SupervisorAssets } from './supervisor.js';
 export { WorkspaceFiles, type WorkspaceSummary } from './workspaces.js';
@@ -52,6 +53,7 @@ export interface LocalApiOptions {
   /** Local UI has no login/PIN; network boundaries still apply. */
   noAuth?: boolean;
   hostname?: string;
+  harnessPresentations?: Record<string,PluginPresentation>;
   realSessions?: unknown;
   turnsStore?: unknown;
   connectedHarnesses?: Array<{
@@ -313,6 +315,7 @@ export class LocalApi {
       harness: this.options.harness?.describe() ?? null,
       hostname: this.options.hostname || os.hostname(),
       realSessions: this.options.realSessions ?? null,
+      harnessPresentations: structuredClone(this.options.harnessPresentations??{}),
       turnsStore: this.options.turnsStore ?? null,
     };
   }
