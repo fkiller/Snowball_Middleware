@@ -2688,6 +2688,13 @@
                 "type": "integer",
                 "const": 16
               },
+              "rgb565": {
+                "type": "string",
+                "minLength": 684,
+                "maxLength": 684,
+                "pattern": "^[A-Za-z0-9+/]{682}[AEIMQUYcgkosw048]=$",
+                "description": "512 bytes of row-major big-endian RGB565 pixels, canonical base64; rows is the visibility mask."
+              },
               "rows": {
                 "type": "array",
                 "minItems": 16,

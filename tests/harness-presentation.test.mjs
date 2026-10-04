@@ -12,8 +12,10 @@ import {CommandJournal} from '../packages/core/dist/index.js';
 test('each harness defines its distinct bounded glyph in its actual manifest',async()=>{
   const manifests=await Promise.all([codexManifest(),antigravityManifest(),opencodeManifest()]);
   assert.equal(new Set(manifests.map(m=>JSON.stringify(m.presentation.icon.rows))).size,3);
-  for(const m of manifests){assert.equal(m.presentation.icon.rows.length,16);assert.ok(Object.isFrozen(m.presentation.icon.rows));}
+  for(const m of manifests){assert.equal(m.presentation.icon.rows.length,16);assert.ok(Object.isFrozen(m.presentation.icon.rows));assert.equal(Buffer.from(m.presentation.icon.rgb565,'base64').length,512);}
   for(const invalid of [{size:16,rows:Array(16).fill(-1)},{size:32,rows:Array(16).fill(0)},{size:16,rows:[1]}])assert.throws(()=>parseManifest({...manifests[0],presentation:{name:'Test',icon:invalid}}),/presentation/);
+  for(const rgb565 of ['https://example.invalid/icon.png','a'.repeat(684),Buffer.alloc(511).toString('base64')])assert.throws(()=>parseManifest({...manifests[0],presentation:{name:'Test',icon:{size:16,rows:Array(16).fill(0),rgb565}}}),/RGB565/);
+  assert.equal(parseManifest({...manifests[0],presentation:{name:'Legacy',icon:{size:16,rows:Array(16).fill(0)}}}).presentation.icon.rgb565,undefined);
 });
 test('the real API carries plugin presentation without granting a controller or native command',async()=>{
   const presentations={'snowball.codex':codex,'snowball.antigravity':agy,'snowball.opencode':ocode};
