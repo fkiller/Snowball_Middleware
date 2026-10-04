@@ -67,6 +67,7 @@ export interface LocalApiOptions {
     sessionListTruncated?: boolean;
   }>;
   listModels?: (pluginId: string, instanceId: string) => Promise<Array<{ model: string; displayName: string; efforts: string[] }>>;
+  listAccess?: (pluginId: string, instanceId: string) => Promise<string[]>;
   createSession?: (pluginId: string, workspaceCanonical: string, options: { title?: string; model?: string; workspaceId?: string }, instanceId: string) => Promise<{ sessionKey: string; ownerId: string; title: string }>;
   /** Trusted native picker. The HTTP request never supplies a path or display name. */
   chooseWorkspace?: (signal: AbortSignal) => Promise<{ root: string; displayName: string } | null>;
@@ -581,6 +582,14 @@ export class LocalApi {
       const intent = this.options.createStore?.get(body.requestId);
       if (!intent) fail(404, 'create_request_not_found');
       this.send(res, 200, { requestId: body.requestId, status: intent.status === 'pending' ? 'unconfirmed' : 'confirmed', ...(intent.sessionKey ? { sessionKey: intent.sessionKey } : {}) }); return;
+    }
+    if (url.pathname === '/v1/harness/access' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).some(k => !['pluginId', 'instanceId'].includes(k)) || typeof body.pluginId !== 'string' || typeof body.instanceId !== 'string') fail(400, 'invalid_request');
+      if (!this.options.listAccess) fail(503, 'native_access_unavailable');
+      try { this.send(res, 200, { access: await this.options.listAccess(body.pluginId, body.instanceId) }); }
+      catch { fail(503, 'native_access_unavailable'); }
+      return;
     }
     if (['/v1/harness/sessions', '/v1/harness/models', '/v1/sessions/attach'].includes(url.pathname) && req.method === 'POST') {
       const body = await this.body(req); this.stillAuthorized(req, session);

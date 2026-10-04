@@ -36,6 +36,7 @@ import { NativeSourceService } from './source-service.mjs';
 import { loadControllerStore } from '../apps/supervisor/controller-store.mjs';
 import { controllerUiStore } from './controller-ui-store.mjs';
 import { dispatchHarnessTurn } from './harness-dispatch.mjs';
+import { listNativeAccess } from './native-access.mjs';
 
 const directory = ensurePrivateStateDirectory(resolveUserDataDir());
 const sources = new NativeSourceService();
@@ -191,6 +192,7 @@ async function handleCommandQueued(sessionKey) {
           promptText,
           model,
           effort,
+          access: payload.access,
           onDelta: () => {}
         });
 
@@ -260,6 +262,7 @@ const api = new LocalApi({
   turnsStore: realTurnsData,
   connectedHarnesses,
   listModels: handleListModels,
+  listAccess: listNativeAccess,
   createSession: handleCreateSession,
   onCommandQueued: handleCommandQueued,
 });

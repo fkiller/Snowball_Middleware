@@ -33,6 +33,17 @@ async function login(api) { const grant = api.issueBootstrap(); const res = awai
 const input = (journal, commandId, extra = {}) => ({ commandId, sessionKey, ownerId, expectedRevision: journal.session(sessionKey).revision, operation: 'sessions.send', payload: { text: 'private-payload' }, ...extra });
 const matches = (status, code) => error => error.status === status && (!code || error.code === code);
 
+test('native access catalog keeps request validation and native failures closed',async t=>{
+  let calls=0;const {api}=await setup(t,{listAccess:async(plugin,instance)=>{calls++;assert.equal(instance,'default');if(plugin==='failed')throw Error('native failure');return ['observed-policy'];}});
+  const auth=await login(api);
+  let res=await request(api,'/v1/harness/access',{auth,method:'POST',body:{pluginId:'snowball.codex',instanceId:'default',path:'untrusted'}});
+  assert.equal(res.status,400);assert.equal(calls,0);
+  res=await request(api,'/v1/harness/access',{auth,method:'POST',body:{pluginId:'snowball.codex',instanceId:'default'}});
+  assert.equal(res.status,200);assert.deepEqual(res.body.access,['observed-policy']);
+  res=await request(api,'/v1/harness/access',{auth,method:'POST',body:{pluginId:'failed',instanceId:'default'}});
+  assert.equal(res.status,503);
+});
+
 test('workspace candidate association uses exact registered root, not a matching display name', async t => {
   const { api, root, workspaces } = await setup(t);
   workspaces.listCandidates = () => [

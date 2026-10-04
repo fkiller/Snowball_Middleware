@@ -3,7 +3,7 @@ import {ControllerStore,ControllerContext,type ControllerSelection} from './cont
 import {parseControllerId,parsePluginId,parseInstanceId,parseSessionKey,type PersistedController} from './identity.js';
 
 export interface ControllerPreferences {
-  model?: string; effort?: string; language?: 'en'|'ko'; skinId?: string;
+  model?: string; effort?: string; access?: string; language?: 'en'|'ko'; skinId?: string;
   view?: string; workspaceId?: string; projectName?: string;
   cursor?: number; scroll?: number; crumb?: number; focus?: 'top'|'content';
 }
@@ -23,7 +23,7 @@ function preferences(raw:unknown):ControllerPreferences {
   if(!object(raw))throw Error('invalid_controller_preferences');
   const result:Record<string,unknown>={};
   for(const [key,value] of Object.entries(raw)) {
-    if(['model','effort','view','workspaceId','projectName'].includes(key)){if(typeof value!=='string'||Buffer.byteLength(value)>256||/[\x00-\x1f]/.test(value))throw Error('invalid_controller_preferences');}
+    if(['model','effort','access','view','workspaceId','projectName'].includes(key)){if(typeof value!=='string'||Buffer.byteLength(value)>256||/[\x00-\x1f]/.test(value))throw Error('invalid_controller_preferences');}
     else if(key==='language'){if(!['en','ko'].includes(String(value)))throw Error('invalid_controller_preferences');}
     else if(key==='skinId'){if(typeof value!=='string'||! /^[a-z0-9][a-z0-9_-]{1,31}$/.test(value))throw Error('invalid_controller_preferences');}
     else if(['cursor','scroll','crumb'].includes(key)){if(!Number.isSafeInteger(value)||Number(value)<0||Number(value)>(key==='crumb'?4:1000000))throw Error('invalid_controller_preferences');}
