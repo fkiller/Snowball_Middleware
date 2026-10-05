@@ -37,6 +37,7 @@ import { loadControllerStore } from '../apps/supervisor/controller-store.mjs';
 import { controllerUiStore } from './controller-ui-store.mjs';
 import { dispatchHarnessTurn } from './harness-dispatch.mjs';
 import { listNativeAccess } from './native-access.mjs';
+import { languageManager } from './language-manager.mjs';
 
 const directory = ensurePrivateStateDirectory(resolveUserDataDir());
 const sources = new NativeSourceService();
@@ -229,6 +230,9 @@ async function handleCommandQueued(sessionKey) {
           context.setSessionTurns(activeSession.turns);
           context.updateReaderForCurrentSession();
           void paintMk20();
+          if (context.autoTts && result.response) {
+            void speakCurrentSession(result.response);
+          }
         }
 
         return { status: 'completed', correlationId };
@@ -257,6 +261,15 @@ const api = new LocalApi({
   port: 8765,
   hostname: os.hostname(),
   noAuth: true,
+  initialSettings: {
+    language: languageManager.getPrimaryLanguage().id,
+  },
+  applySettings: async (next, prev) => {
+    if (next.language && next.language !== prev.language) {
+      languageManager.setPrimaryLanguage(next.language);
+      console.log(`[LanguageManager] Primary language changed to: ${next.language}`);
+    }
+  },
   realSessions: realSessionsData,
   harnessPresentations:{'snowball.codex':codexPresentation,'snowball.antigravity':agyPresentation,'snowball.opencode':ocodePresentation},
   turnsStore: realTurnsData,
@@ -504,6 +517,128 @@ const voice = new LocalWhisperProvider(selectedSttModel, '127.0.0.1:15555', mode
 let currentVoiceCaptureId = null;
 // Pre-warm local whisper resident worker
 voice.status().catch(() => {});
+
+// --- Supertonic TTS Provider Setup with 3-tier Fallback ---
+let tts = null;
+let cleanTextForSpeech = null;
+try {
+  const { LocalSupertonicProvider } = await import(pathToFileURL(path.join(controlRoot, 'host/dist/audio/local-supertonic.js')).href);
+  const translit = await import(pathToFileURL(path.join(controlRoot, 'host/dist/audio/korean-transliterate.js')).href);
+  cleanTextForSpeech = translit.cleanTextForSpeech;
+  tts = new LocalSupertonicProvider();
+  // Pre-warm Supertonic resident worker and load GPU model on startup
+  tts.warmup().catch(() => {});
+  console.log('  Supertonic TTS Engine : READY (Fallback: Supertonic GPU -> Supertonic CPU -> OS Native)');
+} catch (ttsErr) {
+  console.warn('  Supertonic TTS Engine : NOTE (' + ttsErr.message + ')');
+}
+
+const langStatus = languageManager.getStatus();
+console.log(`  Active Languages      : [Primary: ${langStatus.primary.name} (${langStatus.primary.id}), Enabled: ${langStatus.enabled.map(l => l.id).join(', ')}] (Auto-detected from OS: ${langStatus.osDetected})`);
+
+function extractSpokenAgentResponse(rawText) {
+  if (!rawText) return '';
+  if (typeof cleanTextForSpeech === 'function') {
+    return cleanTextForSpeech(rawText);
+  }
+  let t = String(rawText).trim();
+  // Strip markdown code fences (```...```)
+  t = t.replace(/```[\s\S]*?```/g, ' 코드 블록 생략. ');
+  // Strip inline code backticks (`code` -> code)
+  t = t.replace(/`([^`]+)`/g, '$1');
+  // Strip markdown links [text](url) -> text
+  t = t.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+  // Strip markdown headers (# Header -> Header)
+  t = t.replace(/^#{1,6}\s+/gm, '');
+  // Strip blockquotes (> Quote -> Quote)
+  t = t.replace(/^>\s+/gm, '');
+  // Strip bold/italics (**text** or *text* -> text)
+  t = t.replace(/[*_]{1,3}([^*_]+)[*_]{1,3}/g, '$1');
+  // Strip bullet markers (- item -> item, * item -> item)
+  t = t.replace(/^[\s]*[-*+]\s+/gm, '');
+  // Strip numbered lists (1. item -> item)
+  t = t.replace(/^[\s]*\d+\.\s+/gm, '');
+  // Strip horizontal rules (---, ***, ___)
+  t = t.replace(/^[-\*_]{3,}\s*$/gm, '');
+  // Normalize line breaks: ensure punctuation at end of lines so TTS pauses naturally
+  t = t.split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+    if (/[.!?:,;~]$/.test(line)) return line;
+    return line + '.';
+  }).join(' ');
+  // Collapse whitespace
+  t = t.replace(/\s+/g, ' ').trim();
+  return t;
+}
+
+function getLatestAgentResponse(curSess) {
+  if (!curSess) return '';
+  const turns = curSess.turns || context.currentTurns || [];
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const t = turns[i];
+    if (!t) continue;
+    let text = t.agentResponse || '';
+    if (!text && t.role === 'agent' && t.text) text = t.text;
+    if (!text && Array.isArray(t.items)) {
+      text = t.items.filter(it => it.type === 'agentMessage').map(it => it.text || '').join('\n');
+    }
+    if (text && text.trim()) return text.trim();
+  }
+  return curSess.preview || '';
+}
+
+async function speakCurrentSession(forceText = null, destination = 'device') {
+  if (!tts) return;
+  const curSess = context.getCurrentSession();
+  const rawText = forceText || getLatestAgentResponse(curSess);
+  const text = extractSpokenAgentResponse(rawText);
+  if (!text) {
+    console.log('[TTS] No spoken agent text available in current session.');
+    return;
+  }
+  const hasKorean = /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/.test(text);
+  const targetLang = hasKorean ? 'ko' : languageManager.getPrimaryLanguage().id;
+  const targetVoice = 'F1';
+
+  console.log(`[TTS] Speaking (${text.length} chars, destination=${destination}, lang=${targetLang}): "${text.slice(0, 60)}..."`);
+  if (destination === 'host') {
+    context.isSpeakingHost = true;
+  } else {
+    context.isSpeakingDevice = true;
+  }
+  context.isSpeaking = true;
+  void paintMk20();
+  const t0 = Date.now();
+  try {
+    await tts.speak(text, {
+      destination,
+      volume: (context.volume || 75) / 100,
+      language: targetLang,
+      voice: targetVoice,
+    });
+    console.log(`[TTS] Playback (${destination}) completed in ${((Date.now() - t0) / 1000).toFixed(2)}s`);
+  } catch (err) {
+    console.error(`[TTS] Playback (${destination}) error:`, err.message);
+  } finally {
+    if (destination === 'host') {
+      context.isSpeakingHost = false;
+    } else {
+      context.isSpeakingDevice = false;
+    }
+    context.isSpeaking = context.isSpeakingDevice || context.isSpeakingHost;
+    void paintMk20();
+  }
+}
+
+async function stopSpeaking() {
+  if (!tts) return;
+  context.isSpeakingDevice = false;
+  context.isSpeakingHost = false;
+  context.isSpeaking = false;
+  try {
+    await tts.stop();
+  } catch {}
+  void paintMk20();
+}
 
 const context = new ContextManager();
 const nativeDispatches = new Map();
@@ -1053,6 +1188,9 @@ async function handleMk20Input(input) {
         }
       }
     } else if (kid === 20) {
+      if (context.isSpeaking) {
+        await stopSpeaking();
+      }
       // Talk (Voice input)
       if (context.isTranscribingVoice) {
         return;
@@ -1221,6 +1359,9 @@ async function handleMk20Input(input) {
               context.setSessionTurns(curSess?.turns || completedTurns);
               context.updateReaderForCurrentSession();
               void paintMk20();
+              if (context.autoTts && result.response) {
+                void speakCurrentSession(result.response);
+              }
             } else {
               console.log(`[Dispatch] Background turn complete for [${curHarness.id}] session [${result.sessionId}]. Persisted ${curSess?.turnCount || 2} turns in store.`);
             }
@@ -1246,7 +1387,28 @@ async function handleMk20Input(input) {
           }
         })().finally(() => { if (nativeDispatches.get(curSess) === dispatchAbort) nativeDispatches.delete(curSess); });
       }
+    } else if (kid === 12) {
+      // Speak on MK20 Hardware Speaker (Key 12)
+      console.log(`[Main] Speak on MK20 (K12) pressed. isSpeakingDevice: ${context.isSpeakingDevice}, isSpeaking: ${context.isSpeaking}`);
+      if (context.isSpeakingDevice) {
+        await stopSpeaking();
+      } else {
+        void speakCurrentSession(null, 'device');
+      }
+      void paintMk20();
+    } else if (kid === 8) {
+      // Speak on Host PC/Mac Speaker (Key 8)
+      console.log(`[Main] Speak on Host PC/Mac (K8) pressed. isSpeakingHost: ${context.isSpeakingHost}, isSpeaking: ${context.isSpeaking}`);
+      if (context.isSpeakingHost) {
+        await stopSpeaking();
+      } else {
+        void speakCurrentSession(null, 'host');
+      }
+      void paintMk20();
     } else if (kid === 4) {
+      if (context.isSpeaking) {
+        await stopSpeaking();
+      }
       // Stop / Cancel / Discard
       const curSess = context.getCurrentSession();
 
@@ -1333,6 +1495,7 @@ process.on('unhandledRejection', (reason) => {
 
 const cleanup = async () => {
   clearInterval(timer);
+  if (tts) { try { tts.close(); } catch {} }
   await mk20.close();
   await api.close();
   await sources.close();

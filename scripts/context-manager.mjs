@@ -207,6 +207,9 @@ export class ContextManager {
     this.volume = 75;
     this.isMuted = false;
     this.isSpeaking = false;
+    this.isSpeakingDevice = false;
+    this.isSpeakingHost = false;
+    this.autoTts = false;
     this.isRecordingVoice = false;
     this.isTranscribingVoice = false;
     this.voiceDraftText = '';
@@ -1586,10 +1589,24 @@ export class ContextManager {
           isFocused: false,
         });
       } else {
+        const isMac = process.platform === 'darwin';
         keys.push({ keyId: 20, labelTop: 'VOICE', labelMain: 'Talk', isFilled: false });
         keys.push({ keyId: 16, labelTop: 'ACTION', labelMain: 'Send', isFilled: false });
-        keys.push({ keyId: 12, labelTop: 'AUDIO', labelMain: 'Speak', isFilled: this.isSpeaking });
-        keys.push({ keyId: 8, labelTop: '', labelMain: '', isDisabled: true });
+        keys.push({
+          keyId: 12,
+          labelTop: 'MK20',
+          labelMain: 'Speak',
+          labelSub: this.isSpeakingDevice ? 'Speaking' : (this.autoTts ? 'Auto ON' : 'Speaker'),
+          isFilled: this.isSpeakingDevice || (this.autoTts && this.isSpeaking),
+        });
+        keys.push({
+          keyId: 8,
+          labelTop: isMac ? 'MAC' : 'PC',
+          labelMain: isMac ? 'Speak Mac' : 'Speak PC',
+          labelSub: this.isSpeakingHost ? 'Speaking' : (isMac ? 'Mac' : 'PC'),
+          isFilled: this.isSpeakingHost,
+          isDisabled: false,
+        });
         keys.push({ keyId: 4, labelTop: 'ABORT', labelMain: 'Stop', isFilled: false });
       }
 
