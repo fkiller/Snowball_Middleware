@@ -26,6 +26,8 @@ async function stop(code = 0) {
 }
 process.on('SIGINT', () => void stop());
 process.on('SIGTERM', () => void stop());
+process.on('message', message => { if (message === 'snowball.stop') void stop(); });
+process.on('disconnect', () => void stop());
 function launch(script, args, cwd, env = {}) {
   const child = spawn(process.execPath, [script, ...args], { cwd, env: { ...process.env, ...env }, windowsHide: true, shell: false, stdio: ['pipe', 'inherit', 'inherit', 'ipc'] });
   children.push(child);
@@ -51,6 +53,8 @@ try {
   if (config.profile === 'm5stack') launch(path.join(config.deviceRoot, 'scripts/gateway.mjs'), ['--serial', config.serial, '--python', config.python, '--bind', config.bind, '--backend', origin, ...(config.device ? ['--device', config.device] : [])], config.deviceRoot);
   console.log(`Snowball is responding at ${origin}/ — ${config.profile} + Codex + Antigravity + OpenCode plugins`);
   console.log('Press Ctrl+C to stop. The launcher starts the installed suite again without downloads.');
-  if (process.platform === 'win32') spawn('explorer.exe', [origin + '/'], { windowsHide: true, stdio: 'ignore' }).unref();
-  else if (process.platform === 'darwin') spawn('open', [origin + '/'], { stdio: 'ignore' }).unref();
+  if (config.openBrowser !== false) {
+    if (process.platform === 'win32') spawn('explorer.exe', [origin + '/'], { windowsHide: true, stdio: 'ignore' }).unref();
+    else if (process.platform === 'darwin') spawn('open', [origin + '/'], { stdio: 'ignore' }).unref();
+  }
 } catch (error) { console.error(error.message); await stop(1); }
