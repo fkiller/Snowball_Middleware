@@ -22,6 +22,7 @@ async function stop(code = 0) {
   await plugins.close();
   // The IPC stop message allows state/checkpoint flush on Windows as well.
   await Promise.all(children.map(child => new Promise(resolve => { if (child.exitCode !== null) return resolve(); child.once('exit', resolve); setTimeout(() => { child.kill('SIGKILL'); resolve(); }, 5000).unref(); })));
+  if (process.connected) process.disconnect();
   process.exitCode = code;
 }
 process.on('SIGINT', () => void stop());
