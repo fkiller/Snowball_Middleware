@@ -33,11 +33,13 @@ function Refresh-Path {
 $node = Get-Command node.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
 $validNode = $false
 if ($node) {
-    $validNode = (& $node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.stdout.write(String(a>22||a===22&&b>=12))') -eq 'true'
+    $nodeVersion = (& $node --version).Trim().TrimStart('v')
+    $validNode = [version]$nodeVersion -ge [version]'22.12.0'
 }
 if (-not $validNode) {
     $arch = if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() -eq 'Arm64') {'arm64'} else {'x64'}
-    $release = Invoke-RestMethod 'https://nodejs.org/dist/index.json' | Where-Object { $_.lts -and [version]($_.version.TrimStart('v')) -ge [version]'22.12.0' } | Select-Object -First 1
+    $releases = Invoke-RestMethod 'https://nodejs.org/dist/index.json'
+    $release = $releases | Where-Object { $_.lts -and [version]($_.version.TrimStart('v')) -ge [version]'22.12.0' } | Select-Object -First 1
     if (-not $release) { throw 'No supported Node LTS release found.' }
     $filename = "node-$($release.version)-win-$arch.zip"
     $base = "https://nodejs.org/dist/$($release.version)"
