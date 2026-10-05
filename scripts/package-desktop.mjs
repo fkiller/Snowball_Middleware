@@ -20,7 +20,7 @@ function copy(relative,destination=relative){
  inventory.push({path:destination.replaceAll('\\','/'),sha256:createHash('sha256').update(fs.readFileSync(target)).digest('hex')});
 }
 for(const name of ['main.mjs','core-worker.mjs','presentation.mjs','codex-connections.mjs','windows-device-presence.mjs'])copy('apps/desktop/'+name);
-for(const name of ['runtime.mjs','codex-plugin.mjs','opencode-owned.mjs','settings-store.mjs','private-state.mjs','native-picker.mjs','mk20-lan.mjs','index.html','app.js','style.css'])copy('apps/supervisor/'+name);
+for(const name of ['runtime.mjs','controller-store.mjs','codex-plugin.mjs','opencode-owned.mjs','settings-store.mjs','private-state.mjs','native-picker.mjs','mk20-lan.mjs','index.html','app.js','style.css'])copy('apps/supervisor/'+name);
 // Reviewed Codex control and explicitly configured OpenCode observation are
 // bundled. No optional native drivers, account homes or runtime state.
 const packages=['plugin-sdk','plugin-host','core','api','client-sdk','harness-codex','harness-opencode','device-lan'];

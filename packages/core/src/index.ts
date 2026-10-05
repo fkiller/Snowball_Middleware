@@ -119,3 +119,5 @@ export {
   type SttModelName,
   type SttModelSelectionResult,
 } from './stt-config.js';
+export * from './controller-state.js';
+export type {PluginPresentation} from '@snowball/plugin-sdk';

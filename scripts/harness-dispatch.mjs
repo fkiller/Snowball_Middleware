@@ -6,6 +6,7 @@ import readline from 'node:readline';
 import { scanAntigravityCatalog, scanOpenCodeCatalog } from './harness-catalog-scanner.mjs';
 
 import { resolveHarnessExecutable } from './harness-runtime.mjs';
+import { nativeAccessParams } from './native-access.mjs';
 
 /**
  * Synchronizes Codex thread metadata in ~/.codex/state_5.sqlite so it is immediately visible in Codex Desktop.
@@ -80,7 +81,9 @@ if os.path.exists(cli_db) and os.path.exists(app_db):
 /**
  * Executes a turn on Codex via stdio app-server.
  */
-export async function runCodexTurn(threadId, promptText, cwd, model, effort, onDelta, signal) {
+export async function runCodexTurn(threadId, promptText, cwd, model, effort, onDelta, signal, access) {
+  const accessParams=await nativeAccessParams('snowball.codex',access);
+  signal?.throwIfAborted();
   return new Promise((resolve, reject) => {
     const p = cp.spawn(resolveHarnessExecutable('codex'), ['app-server', '--listen', 'stdio://'], {
       env: { ...process.env, CODEX_HOME: path.join(os.homedir(), '.codex') },
@@ -149,7 +152,8 @@ export async function runCodexTurn(threadId, promptText, cwd, model, effort, onD
           }
           const turnParams = {
             threadId: currentThreadId,
-            input: [{ type: 'text', text: promptText }]
+            input: [{ type: 'text', text: promptText }],
+            ...accessParams
           };
           if (model) turnParams.model = model;
           if (effort && effort !== 'none') turnParams.effort = effort;
@@ -392,10 +396,11 @@ export async function runOpenCodeTurn(sessionId, promptText, cwd, model, variant
 /**
  * Dispatches a prompt to whichever harness is active.
  */
-export async function dispatchHarnessTurn({ harnessId, sessionId, promptText, cwd, model, effort, onDelta, signal }) {
+export async function dispatchHarnessTurn({ harnessId, sessionId, promptText, cwd, model, effort, access, onDelta, signal }) {
   signal?.throwIfAborted();
+  if(access&&harnessId!=='snowball.codex')throw Error('unsupported_native_access');
   if (harnessId === 'snowball.codex') {
-    return runCodexTurn(sessionId, promptText, cwd, model, effort, onDelta, signal);
+    return runCodexTurn(sessionId, promptText, cwd, model, effort, onDelta, signal, access);
   } else if (harnessId === 'snowball.antigravity') {
     return runAntigravityTurn(sessionId, promptText, cwd, model, effort, onDelta, signal);
   } else if (harnessId === 'snowball.opencode') {

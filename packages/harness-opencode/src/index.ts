@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { formatSessionKey, parseSessionKey, type DispatchPort, type DispatchReceipt, type CommandRecord, type DecisionRecord } from '@snowball/plugin-sdk';
 export { opencodeManifest } from './manifest.js';
+export {harnessPresentation} from './presentation.js';
 
 const OBSERVED_SERVER_VERSION = '1.18.31';
 

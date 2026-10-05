@@ -6,6 +6,7 @@ import { formatSessionKey, parseSessionKey, type DispatchPort, type DispatchRece
 import { CodexFault, CodexStdio, type CodexLaunch, type RpcPort } from './transport.js';
 export { CodexFault, codexLaunchDigest, CodexStdio, type CodexLaunch, type RpcPort } from './transport.js';
 export { codexManifest } from './manifest.js';
+export {harnessPresentation} from './presentation.js';
 
 const record = (value: unknown): value is Record<string, any> => !!value && typeof value === 'object' && !Array.isArray(value);
 const id = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 256 && !/[\x00-\x1f]/.test(value);

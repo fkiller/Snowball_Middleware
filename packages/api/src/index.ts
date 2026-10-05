@@ -1,8 +1,9 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import os from 'node:os';
 import { randomBytes, createHash } from 'node:crypto';
-import { CommandJournal, SessionFault, type SessionService, type SessionCreateStore, createControllerId, JournalFault, type CommandInput, type DeviceRegistry, type DiscoverySnapshot, type WorkspaceStore } from '@snowball/core';
+import { CommandJournal, ControllerStateStore, SessionFault, type SessionService, type SessionCreateStore, createControllerId, JournalFault, type CommandInput, type DeviceRegistry, type DiscoverySnapshot, type WorkspaceStore } from '@snowball/core';
 import { WorkspaceFiles } from './workspaces.js';
+import type {PluginPresentation} from '@snowball/core';
 import type { SupervisorAssets } from './supervisor.js';
 export { loadSupervisorAssets, type SupervisorAssets } from './supervisor.js';
 export { WorkspaceFiles, type WorkspaceSummary } from './workspaces.js';
@@ -37,6 +38,7 @@ interface Session { controllerId: string; csrfHash: string; expiresAt: number; r
 interface Stream { response: ServerResponse; session: Session }
 interface Event { cursor: string; data: string }
 export interface LocalApiOptions {
+  controllerStates?: ControllerStateStore;
   journal: CommandJournal; workspaces?: WorkspaceFiles; devices?: DeviceRegistry; harness?: HarnessSurvey; port?: number;
   sessionService?: SessionService;
   createStore?: SessionCreateStore;
@@ -51,6 +53,7 @@ export interface LocalApiOptions {
   /** Local UI has no login/PIN; network boundaries still apply. */
   noAuth?: boolean;
   hostname?: string;
+  harnessPresentations?: Record<string,PluginPresentation>;
   realSessions?: unknown;
   turnsStore?: unknown;
   connectedHarnesses?: Array<{
@@ -64,6 +67,7 @@ export interface LocalApiOptions {
     sessionListTruncated?: boolean;
   }>;
   listModels?: (pluginId: string, instanceId: string) => Promise<Array<{ model: string; displayName: string; efforts: string[] }>>;
+  listAccess?: (pluginId: string, instanceId: string) => Promise<string[]>;
   createSession?: (pluginId: string, workspaceCanonical: string, options: { title?: string; model?: string; workspaceId?: string }, instanceId: string) => Promise<{ sessionKey: string; ownerId: string; title: string }>;
   /** Trusted native picker. The HTTP request never supplies a path or display name. */
   chooseWorkspace?: (signal: AbortSignal) => Promise<{ root: string; displayName: string } | null>;
@@ -92,6 +96,7 @@ export interface HarnessSurvey {
 
 /** Constructed by the local runtime. Construction does not start any harness or device. */
 export class LocalApi {
+  private readonly controllerStates: ControllerStateStore;
   private readonly server: http.Server;
   private readonly sessions = new Map<string, Session>();
   private readonly localSessions = new Map<string, Session>();
@@ -122,6 +127,7 @@ export class LocalApi {
   private closed = false;
   private starting = false;
   constructor(private readonly options: LocalApiOptions) {
+    this.controllerStates=options.controllerStates??new ControllerStateStore();
     this.now = options.now ?? Date.now;
     this.settings = {
       revision: 1,
@@ -310,6 +316,7 @@ export class LocalApi {
       harness: this.options.harness?.describe() ?? null,
       hostname: this.options.hostname || os.hostname(),
       realSessions: this.options.realSessions ?? null,
+      harnessPresentations: structuredClone(this.options.harnessPresentations??{}),
       turnsStore: this.options.turnsStore ?? null,
     };
   }
@@ -491,6 +498,17 @@ export class LocalApi {
       finally { this.mk20LanBusy = false; }
       this.send(res, 200, { snapshot: this.snapshot() }); return;
     }
+    if (url.pathname === '/v1/controller' && req.method === 'GET') {
+      this.send(res,200,this.controllerStates.get(session.controllerId));return;
+    }
+    if (url.pathname === '/v1/controller' && req.method === 'POST') {
+      const body=await this.body(req);this.stillAuthorized(req,session);
+      if(Object.keys(body).sort().join(',')!=='expectedRevision,patch'||!Number.isSafeInteger(body.expectedRevision))fail(400,'invalid_controller_request');
+      try{this.send(res,200,this.controllerStates.update(session.controllerId,Number(body.expectedRevision),body.patch));}
+      catch(error){const code=(error as Error).message;fail(code==='stale_controller_revision'||code==='draft_destination_locked'?409:code==='controller_capacity'?429:400,code.startsWith('invalid_')||['stale_controller_revision','draft_destination_locked','controller_capacity'].includes(code)?code:'invalid_controller_state');}
+      // UI-only changes deliberately do not broadcast a global SSE repaint.
+      return;
+    }
     if (url.pathname === '/v1/snapshot' && req.method === 'GET') { this.send(res, 200, this.snapshot()); return; }
     if (url.pathname === '/v1/settings' && req.method === 'GET') {
       this.send(res, 200, { settings: structuredClone(this.settings) }); return;
@@ -564,6 +582,14 @@ export class LocalApi {
       const intent = this.options.createStore?.get(body.requestId);
       if (!intent) fail(404, 'create_request_not_found');
       this.send(res, 200, { requestId: body.requestId, status: intent.status === 'pending' ? 'unconfirmed' : 'confirmed', ...(intent.sessionKey ? { sessionKey: intent.sessionKey } : {}) }); return;
+    }
+    if (url.pathname === '/v1/harness/access' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).some(k => !['pluginId', 'instanceId'].includes(k)) || typeof body.pluginId !== 'string' || typeof body.instanceId !== 'string') fail(400, 'invalid_request');
+      if (!this.options.listAccess) fail(503, 'native_access_unavailable');
+      try { this.send(res, 200, { access: await this.options.listAccess(body.pluginId, body.instanceId) }); }
+      catch { fail(503, 'native_access_unavailable'); }
+      return;
     }
     if (['/v1/harness/sessions', '/v1/harness/models', '/v1/sessions/attach'].includes(url.pathname) && req.method === 'POST') {
       const body = await this.body(req); this.stillAuthorized(req, session);

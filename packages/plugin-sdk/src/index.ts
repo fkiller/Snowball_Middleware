@@ -3,6 +3,8 @@ export const API_VERSION = '1.0.0';
 export const SDK_API_RANGE = '^1.0.0';
 export type PluginKind = 'hardware' | 'harness' | 'speech';
 export interface Capability { operation: string; access: 'observe' | 'control' }
+/** Bounded local pixels: row mask plus optional 512-byte big-endian RGB565. */
+export interface PluginPresentation { name: string; icon: { size: 16; rows: number[]; rgb565?: string } }
 export interface PluginManifest {
   id: string; publisher: string; version: string; kind: PluginKind;
   sdkApiRange: typeof SDK_API_RANGE; entrypoint: string;
@@ -10,6 +12,7 @@ export interface PluginManifest {
   capabilities: Capability[]; permissions: string[];
   configSchema: { type: 'object'; properties: Record<string, unknown>; additionalProperties: false };
   integrity: { entrySha256: string }; license: string;
+  presentation?: PluginPresentation;
 }
 export function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -44,6 +47,12 @@ export function parseManifest(value: unknown): PluginManifest {
   required(Array.isArray(value.permissions) && value.permissions.every(nonempty), 'permissions required');
   required(record(value.configSchema) && value.configSchema.type === 'object' && record(value.configSchema.properties) && value.configSchema.additionalProperties === false, 'closed object config schema required');
   required(record(value.integrity) && typeof value.integrity.entrySha256 === 'string' && /^[a-f0-9]{64}$/.test(value.integrity.entrySha256), 'SHA-256 entry integrity required');
+  if(value.presentation!==undefined){
+    const p=value.presentation;
+    required(record(p)&&typeof p.name==='string'&&p.name.trim().length>0&&p.name.length<=64&&!/[\x00-\x1f]/.test(p.name),'invalid presentation name');
+    required(record(p.icon)&&p.icon.size===16&&Array.isArray(p.icon.rows)&&p.icon.rows.length===16&&p.icon.rows.every(row=>Number.isInteger(row)&&row>=0&&row<=65535),'invalid presentation icon');
+    if(p.icon.rgb565!==undefined)required(typeof p.icon.rgb565==='string'&&/^[A-Za-z0-9+/]{682}[AEIMQUYcgkosw048]=$/.test(p.icon.rgb565),'invalid presentation RGB565');
+  }
   // Serialize to detach caller-owned references and strip prototypes.
   const manifest = JSON.parse(JSON.stringify(value)) as PluginManifest;
   const freeze = (item: unknown): void => {

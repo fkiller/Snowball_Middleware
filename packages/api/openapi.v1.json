@@ -417,13 +417,61 @@
         "operationId": "connectCodex",
         "description": "Open native Codex CLI executable, existing home and working-directory pickers; verify version and SHA-256; ask the user to review the exact launch. The browser supplies no path, account or command. A successful connection registers a new explicit instance; existing sessions remain read-only until attached.",
         "parameters": [
-          { "name": "Origin", "in": "header", "required": true, "schema": { "type": "string" } },
-          { "name": "X-Snowball-CSRF", "in": "header", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Snowball-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false } } } },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "responses": {
-          "200": { "description": "Native reviewed instance connected and private selection saved.", "content": { "application/json": { "schema": { "type": "object", "required": ["instanceId", "snapshot"], "additionalProperties": false, "properties": { "instanceId": { "type": "string" }, "snapshot": { "$ref": "#/components/schemas/Snapshot" } } } } } },
-          "default": { "$ref": "#/components/responses/Error" }
+          "200": {
+            "description": "Native reviewed instance connected and private selection saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "instanceId",
+                    "snapshot"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "instanceId": {
+                      "type": "string"
+                    },
+                    "snapshot": {
+                      "$ref": "#/components/schemas/Snapshot"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
         }
       }
     },
@@ -432,11 +480,67 @@
         "operationId": "disconnectCodex",
         "description": "After native confirmation, remove one saved middleware-owned Codex instance. Its observed tasks remain read-only and unknown commands are never replayed.",
         "parameters": [
-          { "name": "Origin", "in": "header", "required": true, "schema": { "type": "string" } },
-          { "name": "X-Snowball-CSRF", "in": "header", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Snowball-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["instanceId"], "additionalProperties": false, "properties": { "instanceId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$" } } } } } },
-        "responses": { "200": { "description": "Saved instance removed after native confirmation.", "content": { "application/json": { "schema": { "type": "object", "required": ["snapshot"], "additionalProperties": false, "properties": { "snapshot": { "$ref": "#/components/schemas/Snapshot" } } } } } }, "default": { "$ref": "#/components/responses/Error" } }
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "instanceId"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "instanceId": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved instance removed after native confirmation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "snapshot"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "snapshot": {
+                      "$ref": "#/components/schemas/Snapshot"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/v1/harness/reset-codex": {
@@ -444,29 +548,189 @@
         "operationId": "resetCodex",
         "description": "Native-confirmed repair of all saved Codex connection references. Does not delete the provider login home or middleware task history.",
         "parameters": [
-          { "name": "Origin", "in": "header", "required": true, "schema": { "type": "string" } },
-          { "name": "X-Snowball-CSRF", "in": "header", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Snowball-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false } } } },
-        "responses": { "200": { "description": "Saved Codex references cleared after native confirmation.", "content": { "application/json": { "schema": { "type": "object", "required": ["snapshot"], "additionalProperties": false, "properties": { "snapshot": { "$ref": "#/components/schemas/Snapshot" } } } } } }, "default": { "$ref": "#/components/responses/Error" } }
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved Codex references cleared after native confirmation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "snapshot"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "snapshot": {
+                      "$ref": "#/components/schemas/Snapshot"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/v1/devices/mk20-lan/configure": {
       "post": {
         "operationId": "configureMk20Lan",
         "description": "Save a manually selected on-link MK20 development locator and probe TCP 5555 from the chosen local interface. This never pairs or grants control.",
-        "parameters": [{ "name": "Origin", "in": "header", "required": true, "schema": { "type": "string" } }, { "name": "X-Snowball-CSRF", "in": "header", "required": true, "schema": { "type": "string" } }],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["targetAddress", "interfaceName"], "additionalProperties": false, "properties": { "targetAddress": { "type": "string", "format": "ipv4" }, "interfaceName": { "type": "string" } } } } } },
-        "responses": { "200": { "description": "Locator saved; current unpaired observation returned.", "content": { "application/json": { "schema": { "type": "object", "required": ["snapshot"], "additionalProperties": false, "properties": { "snapshot": { "$ref": "#/components/schemas/Snapshot" } } } } } }, "default": { "$ref": "#/components/responses/Error" } }
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Snowball-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "targetAddress",
+                  "interfaceName"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "targetAddress": {
+                    "type": "string",
+                    "format": "ipv4"
+                  },
+                  "interfaceName": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Locator saved; current unpaired observation returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "snapshot"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "snapshot": {
+                      "$ref": "#/components/schemas/Snapshot"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/v1/devices/mk20-lan/remove": {
       "post": {
         "operationId": "removeMk20Lan",
         "description": "Remove only the saved lab locator. No device firmware or harness session changes.",
-        "parameters": [{ "name": "Origin", "in": "header", "required": true, "schema": { "type": "string" } }, { "name": "X-Snowball-CSRF", "in": "header", "required": true, "schema": { "type": "string" } }],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false } } } },
-        "responses": { "200": { "description": "Locator removed; current snapshot returned.", "content": { "application/json": { "schema": { "type": "object", "required": ["snapshot"], "additionalProperties": false, "properties": { "snapshot": { "$ref": "#/components/schemas/Snapshot" } } } } } }, "default": { "$ref": "#/components/responses/Error" } }
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Snowball-CSRF",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Locator removed; current snapshot returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "snapshot"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "snapshot": {
+                      "$ref": "#/components/schemas/Snapshot"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/v1/workspaces/{workspaceId}/recheck": {
@@ -819,8 +1083,34 @@
       "post": {
         "operationId": "readHarnessSessionCreateReceipt",
         "description": "Read a durable creation receipt by request ID. Unconfirmed means native creation may or may not have occurred; inspect the native session list and attach an exact selected session manually.",
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": false, "required": ["requestId"], "properties": { "requestId": { "type": "string", "format": "uuid" } } } } } },
-        "responses": { "200": { "description": "confirmed with sessionKey, or unconfirmed without one" }, "404": { "description": "Unknown request ID" } }
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "requestId"
+                ],
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "confirmed with sessionKey, or unconfirmed without one"
+          },
+          "404": {
+            "description": "Unknown request ID"
+          }
+        }
       }
     },
     "/v1/settings": {
@@ -920,6 +1210,79 @@
           },
           "503": {
             "description": "Native or persistence side effect failed"
+          }
+        }
+      }
+    },
+    "/v1/controller": {
+      "get": {
+        "operationId": "controller",
+        "description": "Read the current authenticated controller only. Local no-auth clients use a distinct X-Snowball-Controller header per physical device or Web tab. Token mode uses the token-bound identity.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ControllerState"
+          }
+        }
+      },
+      "post": {
+        "operationId": "updateController",
+        "description": "Replace selection, merge preferences and explicitly update/clear this controller draft. A pending draft destination cannot change without explicit clearing. Reject stale revisions with 409. UI updates never submit commands.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "expectedRevision",
+                  "patch"
+                ],
+                "properties": {
+                  "expectedRevision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "patch": {
+                    "type": "object",
+                    "properties": {
+                      "selection": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/components/schemas/ControllerSelection"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "preferences": {
+                        "$ref": "#/components/schemas/ControllerPreferences"
+                      },
+                      "draft": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/components/schemas/ControllerDraft"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ControllerState"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
           }
         }
       }
@@ -1560,7 +1923,70 @@
           },
           "mk20Lan": {
             "description": "Manually selected unpaired development locator and available local interfaces, or null when unavailable.",
-            "oneOf": [{ "type": "null" }, { "type": "object", "properties": { "selected": { "oneOf": [{ "type": "null" }, { "type": "object", "required": ["version", "targetAddress", "interfaceName"], "properties": { "version": { "type": "integer" }, "targetAddress": { "type": "string" }, "interfaceName": { "type": "string" } }, "additionalProperties": false }] }, "interfaces": { "type": "array", "items": { "type": "object", "required": ["name", "address"], "properties": { "name": { "type": "string" }, "address": { "type": "string" } }, "additionalProperties": false } }, "error": { "type": "string" } }, "required": ["selected", "interfaces"], "additionalProperties": false }]
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "selected": {
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "version",
+                          "targetAddress",
+                          "interfaceName"
+                        ],
+                        "properties": {
+                          "version": {
+                            "type": "integer"
+                          },
+                          "targetAddress": {
+                            "type": "string"
+                          },
+                          "interfaceName": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "interfaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "name",
+                        "address"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "address": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "error": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "selected",
+                  "interfaces"
+                ],
+                "additionalProperties": false
+              }
+            ]
           },
           "deviceSources": {
             "type": "array",
@@ -1728,6 +2154,12 @@
               "null"
             ],
             "description": "Legacy transcript projection; production runtime uses bounded sessionMessages."
+          },
+          "harnessPresentations": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PluginPresentation"
+            }
           }
         },
         "required": [
@@ -2127,6 +2559,165 @@
           "defaultEffort"
         ],
         "additionalProperties": false
+      },
+      "ControllerState": {
+        "type": "object",
+        "required": [
+          "controllerId",
+          "revision",
+          "selection",
+          "preferences"
+        ],
+        "properties": {
+          "controllerId": {
+            "type": "string",
+            "pattern": "^ctl_[a-f0-9]{16}$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "selection": {
+            "$ref": "#/components/schemas/ControllerSelection"
+          },
+          "preferences": {
+            "$ref": "#/components/schemas/ControllerPreferences"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/ControllerDraft"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ControllerSelection": {
+        "type": "object",
+        "properties": {
+          "harnessPluginId": {
+            "type": "string"
+          },
+          "harnessInstanceId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "sessionKey": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ControllerPreferences": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "effort": {
+            "type": "string"
+          },
+          "view": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "projectName": {
+            "type": "string"
+          },
+          "skinId": {
+            "type": "string"
+          },
+          "language": {
+            "enum": [
+              "en",
+              "ko"
+            ]
+          },
+          "focus": {
+            "enum": [
+              "top",
+              "content"
+            ]
+          },
+          "cursor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "scroll": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "crumb": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4
+          }
+        },
+        "additionalProperties": false
+      },
+      "ControllerDraft": {
+        "type": "object",
+        "required": [
+          "destinationKey",
+          "text"
+        ],
+        "properties": {
+          "destinationKey": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "description": "Unsent UTF-8 text, at most 8192 bytes. Does not authorize execution."
+          }
+        },
+        "additionalProperties": false
+      },
+      "PluginPresentation": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "icon": {
+            "type": "object",
+            "properties": {
+              "size": {
+                "type": "integer",
+                "const": 16
+              },
+              "rgb565": {
+                "type": "string",
+                "minLength": 684,
+                "maxLength": 684,
+                "pattern": "^[A-Za-z0-9+/]{682}[AEIMQUYcgkosw048]=$",
+                "description": "512 bytes of row-major big-endian RGB565 pixels, canonical base64; rows is the visibility mask."
+              },
+              "rows": {
+                "type": "array",
+                "minItems": 16,
+                "maxItems": 16,
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                }
+              }
+            },
+            "required": [
+              "size",
+              "rows"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "name",
+          "icon"
+        ],
+        "additionalProperties": false
       }
     },
     "responses": {
@@ -2136,6 +2727,16 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "ControllerState": {
+        "description": "Only the authenticated controller state. No command execution or global UI repaint.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ControllerState"
             }
           }
         }

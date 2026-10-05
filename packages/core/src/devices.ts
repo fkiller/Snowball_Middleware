@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { ControllerContext, type ControllerSelection } from './context.js';
+import { ControllerContext, ControllerStore, type ControllerSelection } from './context.js';
+import {deviceControllerId} from './controller-state.js';
 import { createControllerId, parseControllerId, parseInstanceId, parsePluginId, parseSessionKey, type PersistedController } from './identity.js';
 import { copy, isRecord, nonnegative, requireThat } from './journal-model.js';
 
@@ -42,7 +43,7 @@ export class DeviceRegistry {
   private readonly contexts = new Map<string, ControllerContext>();
   private readonly connections = new Map<string, Connection>();
   private readonly listeners = new Set<() => void>();
-  constructor(private readonly now: () => number = Date.now) {}
+  constructor(private readonly now: () => number = Date.now, private readonly controllerStore = new ControllerStore()) {}
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private changed(): void { for (const listener of this.listeners) { try { listener(); } catch { /* Observers cannot change authority. */ } } }
   beginScan(source: DeviceSource): number {
@@ -87,8 +88,8 @@ export class DeviceRegistry {
     requireThat(this.bindings.size < 64, 'Device registration limit', 'capacity');
     requireThat(![...this.connections.values()].some(x => x.candidateId === candidateId && x.state === 'ready'), 'Candidate already registered', 'conflict');
     requireThat(!c.verifiedIdentity || ![...this.bindings.values()].some(b => sourceKey(b.source) === sourceKey(c.source) && b.verifiedIdentity === c.verifiedIdentity), 'Verified device already registered; reconnect explicitly', 'conflict');
-    const binding: DeviceBinding = { deviceId: id('dev'), controllerId: createControllerId(), source: copy(c.source), label: c.label, transport: c.transport, capabilities: [...c.capabilities], revision: 0, ...(c.verifiedIdentity ? { verifiedIdentity: c.verifiedIdentity } : {}) };
-    this.bindings.set(binding.deviceId, binding); this.contexts.set(binding.controllerId, new ControllerContext(binding.controllerId));
+    const binding: DeviceBinding = { deviceId: id('dev'), controllerId: c.verifiedIdentity ? deviceControllerId(c.source.pluginId,c.source.instanceId,c.verifiedIdentity) : createControllerId(), source: copy(c.source), label: c.label, transport: c.transport, capabilities: [...c.capabilities], revision: 0, ...(c.verifiedIdentity ? { verifiedIdentity: c.verifiedIdentity } : {}) };
+    this.bindings.set(binding.deviceId, binding); this.contexts.set(binding.controllerId, this.controllerStore.getOrCreate(binding.controllerId));
     const lease = secretLease(); this.connections.set(binding.deviceId, { candidateId, nativeDeviceId: c.nativeDeviceId, lease, lastSequence: 0, state: 'ready' }); this.changed();
     return { binding: copy(binding), lease };
   }
@@ -155,9 +156,9 @@ export class DeviceRegistry {
     return { schema: 1, bindings: [...this.bindings.values()].map(copy), controllers: [...this.contexts.values()].map(c => c.snapshot()) };
   }
   /** Validate atomically into a fresh registry; no lease/candidate/input is persisted or replayed. */
-  static restore(raw: unknown, now: () => number = Date.now): DeviceRegistry {
+  static restore(raw: unknown, now: () => number = Date.now, controllerStore = new ControllerStore()): DeviceRegistry {
     requireThat(isRecord(raw) && raw.schema === 1 && Array.isArray(raw.bindings) && Array.isArray(raw.controllers) && raw.bindings.length <= 64 && raw.controllers.length === raw.bindings.length, 'Invalid device store');
-    const registry = new DeviceRegistry(now);
+    const registry = new DeviceRegistry(now, controllerStore);
     for (const entry of raw.bindings) {
       requireThat(isRecord(entry) && isRecord(entry.source), 'Invalid device binding');
       const source = { pluginId: parsePluginId(entry.source.pluginId), instanceId: parseInstanceId(entry.source.instanceId) };
@@ -168,6 +169,14 @@ export class DeviceRegistry {
       requireThat(saved, 'Missing controller context');
       const context = new ControllerContext(binding.controllerId); context.restore(saved as PersistedController);
       registry.bindings.set(binding.deviceId, binding); registry.contexts.set(binding.controllerId, context);
+    }
+    // Validate every record before joining the canonical store. If that store
+    // already has this controller, its current selection/draft wins over an
+    // older device-binding snapshot; recovery never overwrites another owner.
+    for (const [id, recovered] of registry.contexts) {
+      const canonical = controllerStore.get(id);
+      if (canonical) registry.contexts.set(id, canonical);
+      else {const context=controllerStore.getOrCreate(id);context.restore(recovered.snapshot());registry.contexts.set(id,context);}
     }
     return registry;
   }

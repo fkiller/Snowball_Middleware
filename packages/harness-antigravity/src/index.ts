@@ -6,6 +6,7 @@ import * as cp from 'node:child_process';
 import * as readline from 'node:readline';
 import { formatSessionKey, parseSessionKey, type DispatchPort, type DispatchReceipt, type CommandRecord, type DecisionRecord } from '@snowball/plugin-sdk';
 export { antigravityManifest } from './manifest.js';
+export {harnessPresentation} from './presentation.js';
 
 export interface AntigravityBinding {
   hostId: string;

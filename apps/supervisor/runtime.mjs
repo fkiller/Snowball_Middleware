@@ -6,6 +6,9 @@ import { LocalApi, loadSupervisorAssets } from '../../packages/api/dist/index.js
 import { ensurePrivateStateDirectory } from './private-state.mjs';
 import { chooseNativeWorkspace } from './native-picker.mjs';
 import { loadSettings, saveSettings } from './settings-store.mjs';
+import { loadControllerStore } from './controller-store.mjs';
+import {harnessPresentation as codexPresentation} from '../../packages/harness-codex/dist/presentation.js';
+import {harnessPresentation as ocodePresentation} from '../../packages/harness-opencode/dist/presentation.js';
 
 function loadHostId(directory) {
   const file = path.join(directory, 'host.v1.json');
@@ -34,16 +37,17 @@ function privateJournalDirectory(directory) {
 }
 
 /** Local composition root for the CLI and native tray; no cloud control plane. */
-export async function startLocalRuntime({ dataDir = resolveUserDataDir(), repositoryRoot = fileURLToPath(new URL('../..', import.meta.url)), providers = [], enableNativePicker = false, chooseWorkspace, connectCodex, disconnectCodex, resetCodex, devicePresence, mk20Lan, noAuth = true, createHarnessAdapters = async () => [], desktop } = {}) {
+export async function startLocalRuntime({ dataDir = resolveUserDataDir(), repositoryRoot = fileURLToPath(new URL('../..', import.meta.url)), providers = [], enableNativePicker = false, chooseWorkspace, connectCodex, disconnectCodex, resetCodex, devicePresence, mk20Lan, noAuth = true, createHarnessAdapters = async () => [], desktop, harnessPresentations = {'snowball.codex':codexPresentation,'snowball.opencode':ocodePresentation} } = {}) {
   // This boundary validates native privacy before any user registration is loaded.
   const directory = ensurePrivateStateDirectory(dataDir);
+  const controllerPersistence = await loadControllerStore(directory);
   const hostId = loadHostId(directory);
   const commandDir = privateJournalDirectory(path.join(directory, 'commands'));
   const workspaceDir = privateJournalDirectory(path.join(directory, 'workspaces'));
   let journal; let store; let metadata; let creates; let api; let sessions; let bindings = []; let deviceScanTimer; let deviceScanPromise;
   const dispatches = new Map(); let stopping = false;
   const discovery = new HarnessDiscovery();
-  const devices = devicePresence || mk20Lan ? new DeviceRegistry() : undefined;
+  const devices = devicePresence || mk20Lan ? new DeviceRegistry(Date.now, controllerPersistence.store.contexts) : undefined;
   const qmkSource = { pluginId: 'snowball.device-presence', instanceId: 'windows-qmk-hid' };
   const cdcSource = { pluginId: 'snowball.device-presence', instanceId: 'windows-product-cdc' };
   const lanSource = { pluginId: 'snowball.device-presence', instanceId: 'mk20-lan-lab' };
@@ -117,7 +121,7 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
       describe: () => discovery.snapshot(),
       rescan: () => discovery.scan(reviewed, { platform: process.platform, pathValue: process.env.PATH ?? '' }),
     } : undefined;
-    api = new LocalApi({ journal, workspaceStore: store, devices, harness, noAuth, sessionService: sessions, createStore: creates, onCommandQueued: queueDispatch,
+    api = new LocalApi({ journal, workspaceStore: store, devices, harness, noAuth, controllerStates: controllerPersistence.store, sessionService: sessions, createStore: creates, onCommandQueued: queueDispatch, harnessPresentations,
       initialSettings, desktopCapabilities: {tray: !!desktop, autostart: !!desktop, codexSelection: !!connectCodex},
       applySettings: async (next, previous) => {
         const changedAutostart = next.autostart !== previous.autostart;
@@ -146,7 +150,7 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
       async close() {
         if (closed) return; closed = true; stopping = true; discovery.cancel();
         clearInterval(deviceScanTimer);
-        try { await api.close(); for (const { pluginId, adapter } of bindings) await sessions.removeAdapter(pluginId, adapter.status?.().instanceId ?? 'default'); await Promise.allSettled(dispatches.values()); } finally { try { store.close(); } finally { creates.close(); metadata.close(); journal.close(); } }
+        try { await api.close(); for (const { pluginId, adapter } of bindings) await sessions.removeAdapter(pluginId, adapter.status?.().instanceId ?? 'default'); await Promise.allSettled(dispatches.values()); await controllerPersistence.close(); } finally { try { store.close(); } finally { creates.close(); metadata.close(); journal.close(); } }
       },
     };
   } catch (error) {

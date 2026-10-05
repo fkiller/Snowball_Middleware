@@ -1,4 +1,4 @@
-import type { SessionSummary, CommandInput, CommandRecord, DecisionRecord, SessionRecord, DeviceRegistry, DeviceCandidate, DiscoverySnapshot } from '@snowball/core';
+import type { SessionSummary, CommandInput, CommandRecord, DecisionRecord, SessionRecord, DeviceRegistry, DeviceCandidate, DiscoverySnapshot, ControllerState,ControllerPreferences,ControllerSelection } from '@snowball/core';
 import type { WorkspaceStatus, ProjectCandidate } from '@snowball/core';
 export interface WorkspaceSummary { workspaceId: string; projectId: string; displayName: string; status: WorkspaceStatus }
 
@@ -42,10 +42,12 @@ export class ClientFault extends Error {
 /** Memory-only credentials. Never automatically retry a mutation after a network failure. */
 export class LocalClient {
   private credentials?: Credentials;
-  private readonly localControllerId = `ctl_${Array.from(globalThis.crypto.getRandomValues(new Uint8Array(8)), b => b.toString(16).padStart(2, '0')).join('')}`;
+  private readonly localControllerId: string;
   // Browser fetch requires its Window receiver; Node accepts the unbound call and
   // would otherwise hide this failure until real browser onboarding.
-  constructor(readonly origin: string, private readonly transport: typeof fetch = globalThis.fetch.bind(globalThis)) {
+  constructor(readonly origin: string, private readonly transport: typeof fetch = globalThis.fetch.bind(globalThis), controllerId?: string) {
+    this.localControllerId=controllerId??`ctl_${Array.from(globalThis.crypto.getRandomValues(new Uint8Array(8)), b => b.toString(16).padStart(2, '0')).join('')}`;
+    if(!/^ctl_[a-f0-9]{16}$/.test(this.localControllerId))throw Error('Invalid controller id');
     const url = new URL(origin);
     if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.origin !== origin || !url.port) throw new Error('Exact loopback origin required');
   }
@@ -63,6 +65,8 @@ export class LocalClient {
     return { controllerId: this.credentials.controllerId, expiresAt: this.credentials.expiresAt };
   }
   snapshot(signal?: AbortSignal): Promise<Snapshot> { return this.request('/v1/snapshot', undefined, signal); }
+  controller(signal?:AbortSignal):Promise<ControllerState>{return this.request('/v1/controller',undefined,signal);}
+  updateController(expectedRevision:number,patch:{selection?:ControllerSelection|null;preferences?:ControllerPreferences;draft?:{destinationKey:string;text:string}|null},signal?:AbortSignal):Promise<ControllerState>{return this.request('/v1/controller',{expectedRevision,patch},signal);}
   /** Explicit user-triggered metadata rescan. Runs no probes and grants nothing. */
   scanHarness(signal?: AbortSignal): Promise<DiscoverySnapshot> { return this.request('/v1/harness/scan', {}, signal); }
   /** Opens the local native picker; no executable path crosses this API. */
