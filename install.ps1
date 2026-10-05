@@ -84,7 +84,7 @@ if (-not (Test-Path -LiteralPath $middleware)) {
 }
 $arguments = @((Join-Path $middleware 'scripts\setup.mjs'),'--profile',$Profile,'--root',$InstallRoot,'--npm',$npm,'--port',"$Port")
 foreach ($pair in @(@('serial',$Serial),@('bind',$Bind),@('device',$Device),@('mk20-address',$Mk20Address),@('adb',$Adb),@('python',$Python),@('data-dir',$DataDir))) {
-    if ($pair[1]) { $arguments += @('--' + $pair[0],$pair[1]) }
+    if ($pair[1]) { $arguments += ('--' + $pair[0]); $arguments += $pair[1] }
 }
 if ($NoStart) { $arguments += '--no-start' }
 if ($NoFlash) { $arguments += '--no-flash' }
