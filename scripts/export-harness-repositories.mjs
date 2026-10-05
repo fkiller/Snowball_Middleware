@@ -45,7 +45,7 @@ for (const { name, repoName, provider, title } of targets) {
   pkg.bundledDependencies = ['@snowball/plugin-sdk'];
   pkg.devDependencies = { typescript: '5.9.3', '@types/node': '20.19.43' };
   pkg.engines = { node: '>=22.12' };
-  pkg.files = ['dist', 'src', 'README.md', 'LICENSE', 'assets', 'vendor', 'docs', 'scripts'];
+  pkg.files = ['dist', 'src', 'README.md', 'README.ko.md', 'LICENSE', 'assets', 'vendor', 'docs', 'scripts'];
   pkg.scripts = {
     build: 'tsc -p tsconfig.json',
     test: 'npm run build && node --test tests/protocol.test.mjs' + (name === 'harness-codex' ? '' : ' tests/adapter.test.mjs'),
@@ -136,15 +136,24 @@ test('independent worker uses SDK protocol and exits on EOF without launching a 
   <img src="assets/banner.png" alt="Snowball Banner" width="100%">
 </p>
 
-# ${pkg.name}
+<h1 align="center">
+  <img src="assets/icon.png" width="48" height="48" valign="middle" alt="Snowball Icon">
+  Snowball Harness · ${provider === 'codex' ? 'Codex' : provider === 'opencode' ? 'OpenCode' : 'Antigravity'} — Preview
+</h1>
 
-<p align="left">
+<p align="center"><a href="README.md">English</a> | <a href="README.ko.md">한국어</a></p>
+
+<p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache-2.0"></a>
   <img src="https://img.shields.io/badge/Node.js-%3E%3D22.12-brightgreen.svg" alt="Node.js: >=22.12">
   <img src="https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg" alt="Platform">
 </p>
 
-Official standalone harness plugin for **${title}** in the [Snowball Local Control ecosystem](https://github.com/fkiller/Snowball_Control).
+Standalone harness plugin for **${title}** in the [Snowball Local Control ecosystem](https://github.com/fkiller/Snowball_Control).
+
+## Install Snowball
+
+[Snowball Middleware's common installer](https://github.com/fkiller/Snowball_Middleware#one-shot-install) installs every harness plugin with your choice of **MK20**, **M5Stack + FACES**, or **Web UI only**. Middleware owns installation and PC runtime; Control owns MK20 hardware, and Device M5Stack owns the ESP32 firmware/gateway. Native provider installation and sign-in remain vendor prerequisites.
 
 This plugin provides seamless, sandbox-isolated orchestration between the [Snowball Middleware](https://github.com/fkiller/Snowball_Middleware) host and the local \`${provider}\` native execution environment.
 
@@ -155,7 +164,7 @@ This plugin provides seamless, sandbox-isolated orchestration between the [Snowb
 - **Zero Simulation**: Direct native interaction with live local CLI processes and runtime sessions without fake/mock delays or synthetic responses.
 - **Living Source of Truth**: Scans local caches and native CLI models/variants dynamically; never hardcodes models or supported reasoning effort tiers.
 - **Local-First & Sandbox Isolation**: Strictly bounded JSON-RPC protocol over \`@snowball/plugin-sdk\`, running isolated worker processes with entrypoint digest verification.
-- **Cross-Platform**: Tested and verified across Windows, macOS, and Linux.
+- **Cross-Platform**: Native worker runtime targets Windows and macOS.
 
 ---
 
@@ -203,6 +212,17 @@ ${provider === 'opencode' ? 'Ownership and isolation evidence gates are document
 This project is licensed under the Apache-2.0 License - see the [LICENSE](LICENSE) file for details.
 `;
   fs.writeFileSync(path.join(destination, 'README.md'), readmeContent);
+  const header = readmeContent.slice(0, readmeContent.indexOf('Standalone harness plugin'));
+  fs.writeFileSync(path.join(destination, 'README.ko.md'), header + `## Snowball 설치
+
+[Snowball Middleware 공통 설치기](https://github.com/fkiller/Snowball_Middleware#one-shot-install)를 사용하면 MK20, M5Stack + FACES, Web UI 중 원하는 구성과 하네스 플러그인 3종을 함께 설치합니다. Middleware는 PC 실행·설치를, Control은 MK20 기기 코드를, Device M5Stack은 ESP32 펌웨어·게이트웨이를 담당합니다. 네이티브 공급자 앱 설치·로그인은 공급자별 사용자 단계입니다.
+
+## 플러그인 개발
+
+Node >=22.12와 이 저장소에 포함된 SDK 패키지를 사용합니다. npm ci --ignore-scripts, npm run build, npm test, npm run test:package를 실행하세요. 워커 런타임은 Windows·macOS 대상입니다.
+
+[공통 아키텍처](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.md) · [통합 계약](docs/INTEGRATION.md) · [Apache-2.0](LICENSE)
+`);
 
   // docs/INTEGRATION.md
   fs.writeFileSync(

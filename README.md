@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Snowball Middleware Banner" width="100%">
+  <img src="assets/banner.png" alt="Snowball Banner" width="100%">
 </p>
 
 <h1 align="center">
@@ -7,9 +7,7 @@
   Snowball Middleware — Preview
 </h1>
 
-<p align="center">
-  <strong>Local Control Plane, Web Supervisor & Desktop Middleware for AI Coding Agents</strong>
-</p>
+<p align="center"><strong>One installation for local Web UI, devices and AI harness plugins</strong></p>
 
 <p align="center">
   <a href="README.md">English</a> | <a href="README.ko.md">한국어</a>
@@ -18,9 +16,34 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
   <img src="https://img.shields.io/badge/Node.js-%3E%3D22.12-green.svg" alt="Node.js">
-  <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux-orange.svg" alt="Platforms">
-  <a href="https://github.com/fkiller/Snowball_Control"><img src="https://img.shields.io/badge/Companion-Snowball%20Control-purple.svg" alt="Companion Repo"></a>
+  <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS-orange.svg" alt="Platforms">
+  <a href="https://github.com/fkiller/Snowball_Middleware#one-shot-install"><img src="https://img.shields.io/badge/Install-Snowball-purple.svg" alt="Install Snowball"></a>
 </p>
+
+---
+
+<a id="one-shot-install"></a>
+## Install Snowball
+
+**Snowball Middleware is the common installer and PC runtime.** Snowball Control owns the MK20 firmware, HUD and device tools; Snowball Device · M5Stack owns the ESP32 firmware and gateway. Web UI and M5Stack do not require a Control checkout. The three Snowball Harness repositories provide the Codex, Antigravity and OpenCode plugins, included in every profile.
+
+Run **one** command in Windows PowerShell:
+
+| Your setup | Installed together | Command |
+| --- | --- | --- |
+| MK20 | MK20 runtime + Middleware + all three harness plugins | `& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.ps1'))) -Profile mk20` |
+| M5Stack + FACES | M5Stack firmware/gateway + Middleware + all three harness plugins | `& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.ps1'))) -Profile m5stack` |
+| Web UI only | Middleware + all three harness plugins | `& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.ps1'))) -Profile web` |
+
+The installer prepares Node/Git (Python for hardware profiles), builds the selected repositories, verifies each isolated plugin's handshake, creates a **Start-Snowball.ps1** launcher and desktop shortcut, then opens **http://127.0.0.1:8765/** after the real API responds. Default location: `%LOCALAPPDATA%\Snowball`. The launcher runs the installed suite again without downloading dependencies.
+
+Connect M5Stack by USB for first installation; flash size is detected, existing flash is backed up privately, and the actual firmware/FACES handshake is checked before enrollment. Connect MK20 to the same private LAN; its guided installer discovers ADB or walks through SD/Wi-Fi bootstrap and the physical QMK DFU step. Keep a full MK20 SD disk image before modifying it. Hardware access/USB reconnects and native harness sign-in require the owner; installed plugins do not fabricate a working provider when its native app is absent.
+
+Options: `-InstallRoot PATH`, `-Serial COMx`, `-Bind PRIVATE_PC_IP`, `-Mk20Address DEVICE_IP:5555`, `-Port 8765`, `-NoStart`, `-NoFlash` (verify an already installed firmware). On ambiguous adapters or USB ports supply the matching option; installation stops on errors. The one-command bootstrap currently targets **Windows**; macOS developers with Node/Git can run `npm run setup -- --profile web` or `--profile m5stack` from a sibling checkout layout. Linux suite workers are not yet supported.
+
+[Common architecture and repository ownership](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.md)
+
+[Control · MK20](https://github.com/fkiller/Snowball_Control) · [Middleware · Installer / Web UI](https://github.com/fkiller/Snowball_Middleware) · [Device · M5Stack](https://github.com/fkiller/Snowball_Device_M5Stack) · Harness: [Codex](https://github.com/fkiller/Snowball_Harness_Codex), [Antigravity](https://github.com/fkiller/Snowball_Harness_Antigravity), [OpenCode](https://github.com/fkiller/Snowball_Harness_OpenCode)
 
 ---
 
@@ -33,7 +56,7 @@
 It provides developers with:
 - **Web Supervisor (`http://127.0.0.1:8765/`)**: Local-loopback dashboard without a login/PIN. Available control operations depend on the native adapters connected to the selected runtime; discovery alone does not grant execution or approval capabilities.
 - **Native Desktop System Tray**: Electron tray shell for managing the local runtime. The package builder currently supports Windows and macOS; this review's installed harness baseline is Windows.
-- **MK20 Hardware Integration**: The companion **Snowball_Control** checkout supplies the device transport and local STT implementation for `scripts/start-all.mjs`. Native approval, cancellation, and recovery boundaries are defined in the architecture specification.
+- **MK20 Hardware Integration**: Only the MK20 profile loads the companion **Snowball Control** transport and STT library; the Web and M5Stack profiles use the common native-session runtime independently. Native approval, cancellation, and recovery boundaries are defined in the architecture specification.
 
 > 💡 **Looking for MK20 Firmware and Hardware Tooling?**  
 > Check out the companion repository: 👉 **[`Snowball_Control`](https://github.com/fkiller/Snowball_Control)** (QMK firmware, Tina Linux OS/BSP, and native C HUD daemon).
@@ -84,7 +107,7 @@ Current component ownership, transport paths, security boundaries and implementa
 
 ---
 
-## 💻 Multi-Platform Installation & Execution
+## 💻 Developer builds and tray shell
 
 ### Prerequisites
 - **Node.js**: `>= 22.12.0`
@@ -124,6 +147,14 @@ npm run package:desktop
 # (Windows) Build NSIS per-user installer (.exe)
 npm run package:windows-installer
 ```
+
+---
+
+## M5Stack + FACES hardware demo
+
+[![M5Stack + FACES](https://raw.githubusercontent.com/fkiller/Snowball_Device_M5Stack/main/assets/screenshots/m5stack_navigation_demo.gif)](https://github.com/fkiller/Snowball_Device_M5Stack/blob/main/assets/videos/m5stack_navigation_demo.mp4)
+
+[Device firmware and setup](https://github.com/fkiller/Snowball_Device_M5Stack) · [Full MP4 on GitHub](https://github.com/fkiller/Snowball_Device_M5Stack/blob/main/assets/videos/m5stack_navigation_demo.mp4) · [X](https://x.com/fkiller/status/2106892916149158101?s=20)
 
 ---
 

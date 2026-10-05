@@ -1,7 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import fs from 'node:fs';
-import net from 'node:net';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 const execFileAsync=promisify(execFile);
@@ -28,7 +27,6 @@ import {harnessPresentation as agyPresentation} from '../packages/harness-antigr
 import {harnessPresentation as ocodePresentation} from '../packages/harness-opencode/dist/presentation.js';
 import { ensurePrivateStateDirectory } from '../apps/supervisor/private-state.mjs';
 const controlRoot=process.env.SNOWBALL_CONTROL_ROOT ? path.resolve(process.env.SNOWBALL_CONTROL_ROOT) : fileURLToPath(new URL('../../Snowball_Control',import.meta.url));
-const {Mk20LabTransport}=await import(pathToFileURL(path.join(controlRoot,'plugins/device-mk20/src/index.mjs')).href);
 import { HidDiscovery, loadNativeBackend } from '../packages/device-hid/dist/index.js';
 import { reviewedProfiles } from '../packages/device-hid/dist/profiles.js';
 import os from 'node:os';
@@ -37,8 +35,17 @@ import { loadControllerStore } from '../apps/supervisor/controller-store.mjs';
 import { controllerUiStore } from './controller-ui-store.mjs';
 import { dispatchHarnessTurn } from './harness-dispatch.mjs';
 import { listNativeAccess } from './native-access.mjs';
+import { chooseLanAddress, privateIpv4 } from './setup-profile.mjs';
+import { loadSuitePlugins } from './suite-plugins.mjs';
 
-const directory = ensurePrivateStateDirectory(resolveUserDataDir());
+const profile = process.env.SNOWBALL_PROFILE ?? 'web';
+if (!['web', 'mk20', 'm5stack'].includes(profile)) throw Error('Invalid Snowball profile');
+const apiPort = Number(process.env.SNOWBALL_PORT ?? 8765);
+if (!Number.isInteger(apiPort) || apiPort < 1024 || apiPort > 65535) throw Error('Invalid Snowball port');
+let updateDeviceSession = () => {};
+const suiteConfig = process.env.SNOWBALL_SUITE_CONFIG ? JSON.parse(fs.readFileSync(process.env.SNOWBALL_SUITE_CONFIG, 'utf8')) : null;
+const suite = suiteConfig ? await loadSuitePlugins(suiteConfig, { start: false }) : null;
+const directory = ensurePrivateStateDirectory(process.env.SNOWBALL_DATA_DIR ? path.resolve(process.env.SNOWBALL_DATA_DIR) : resolveUserDataDir());
 const sources = new NativeSourceService();
 const controllerPersistence = await loadControllerStore(directory);
 const controllerStates = controllerPersistence.store;
@@ -223,13 +230,7 @@ async function handleCommandQueued(sessionKey) {
           }
         }
 
-        const activeSession = typeof context !== 'undefined' ? context?.getCurrentSession?.() : null;
-        if (activeSession && (activeSession.id === nativeSessionId || activeSession.id === result.sessionId)) {
-          activeSession.turns = realTurnsData[result.sessionId];
-          context.setSessionTurns(activeSession.turns);
-          context.updateReaderForCurrentSession();
-          void paintMk20();
-        }
+        updateDeviceSession(nativeSessionId, result.sessionId);
 
         return { status: 'completed', correlationId };
       }
@@ -254,11 +255,11 @@ const api = new LocalApi({
   controllerStates,
   harness,
   supervisor,
-  port: 8765,
+  port: apiPort,
   hostname: os.hostname(),
   noAuth: true,
   realSessions: realSessionsData,
-  harnessPresentations:{'snowball.codex':codexPresentation,'snowball.antigravity':agyPresentation,'snowball.opencode':ocodePresentation},
+  harnessPresentations:suite?.presentations ?? {'snowball.codex':codexPresentation,'snowball.antigravity':agyPresentation,'snowball.opencode':ocodePresentation},
   turnsStore: realTurnsData,
   connectedHarnesses,
   listModels: handleListModels,
@@ -287,7 +288,7 @@ function refreshCode() {
 }
 
 const currentBootstrap = refreshCode();
-setInterval(refreshCode, 30_000);
+const bootstrapTimer = setInterval(refreshCode, 30_000);
 
 console.log('====================================================');
 console.log('  SNOWBALL MIDDLEWARE IS ONLINE');
@@ -295,64 +296,22 @@ console.log('====================================================');
 console.log(`  Web Supervisor URL : ${api.origin}/`);
 console.log('====================================================');
 
-function findLocalBindAddress() {
-  const nets = os.networkInterfaces();
-  for (const [name, addrs] of Object.entries(nets)) {
-    if (name.toLowerCase().includes('wi-fi') || name.toLowerCase().includes('wifi') || name.toLowerCase().includes('wlan')) {
-      for (const a of addrs) {
-        if (a.family === 'IPv4' && !a.internal && a.address.startsWith('192.168.1.')) {
-          return a.address;
-        }
-      }
-    }
-  }
-  for (const [name, addrs] of Object.entries(nets)) {
-    for (const a of addrs) {
-      if (a.family === 'IPv4' && !a.internal && a.address.startsWith('192.168.1.')) {
-        return a.address;
-      }
-    }
-  }
-  return '192.168.1.197';
-}
-
-const localBindIp = findLocalBindAddress();
+async function startMk20Runtime() {
+const targetAddress = process.env.SNOWBALL_MK20_ADDRESS;
+if (!privateIpv4(targetAddress)) throw Error('MK20 requires SNOWBALL_MK20_ADDRESS (private device IPv4)');
+const localBindIp = chooseLanAddress(undefined, process.env.SNOWBALL_BIND, targetAddress);
+const adbTool = process.env.MK20_ADB ?? 'adb';
+const adbDevice = process.env.SNOWBALL_MK20_ADB_DEVICE ?? `${targetAddress}:5555`;
+const { Mk20LabTransport } = await import(pathToFileURL(path.join(controlRoot,'plugins/device-mk20/src/index.mjs')).href);
 console.log(`  Local MK20 Bind IP : ${localBindIp}`);
 
-// Start loopback ADB Wi-Fi relay for dual-homed PC so audio capture and screen inspection work cleanly
-try {
-  const adbRelay = net.createServer((client) => {
-    const upstream = net.connect({
-      host: '192.168.1.248',
-      port: 5555,
-      localAddress: localBindIp
-    });
-    client.pipe(upstream);
-    upstream.pipe(client);
-    client.on('error', () => upstream.destroy());
-    upstream.on('error', () => client.destroy());
-  });
-  adbRelay.listen(15555, '127.0.0.1', () => {
-    console.log(`  MK20 ADB Relay     : READY (127.0.0.1:15555 -> 192.168.1.248:5555 via ${localBindIp})`);
-    try {
-      const adbTool = path.join(process.env.LOCALAPPDATA || '', 'Temp', 'Codex-MK20-ADB', 'platform-tools', 'adb.exe');
-      if (fs.existsSync(adbTool)) {
-        void execFileAsync(adbTool, ['connect', '127.0.0.1:15555'], { windowsHide: true,timeout:4000 }).catch(()=>{});
-        console.log(`  MK20 ADB Tool      : CONNECTED (127.0.0.1:15555)`);
-      }
-    } catch {}
-  });
-  adbRelay.on('error', () => {});
-} catch {}
-
-// Connect to physical MK20 device at 192.168.1.248:7701
+// Connect to the selected physical MK20 endpoint.
 // A private IP routes packets; it is not a durable physical identity or pairing
 // proof. Obtain the installed board's MAC through the owner's native ADB link.
 const mk20IdentityFile=path.join(directory,'mk20-lab.identity.json');
 let mk20Identity;
 try {
-  const adbTool=path.join(process.env.LOCALAPPDATA||'','Temp','Codex-MK20-ADB','platform-tools','adb.exe');
-  const {stdout}=await execFileAsync(adbTool,['-s','192.168.1.248:5555','shell','cat','/sys/class/net/wlan0/address'],{windowsHide:true,timeout:4000});
+  const {stdout}=await execFileAsync(adbTool,['-s',adbDevice,'shell','cat','/sys/class/net/wlan0/address'],{windowsHide:true,timeout:4000});
   const mac=stdout.trim().toLowerCase();if(!/^([a-f0-9]{2}:){5}[a-f0-9]{2}$/.test(mac))throw Error('invalid_board_identity');
   mk20Identity='mk20-mac-'+mac;fs.writeFileSync(mk20IdentityFile,JSON.stringify({identity:mk20Identity})+'\n',{mode:0o600});
 } catch {
@@ -363,7 +322,7 @@ const mk20 = new Mk20LabTransport({
   controllerId: mk20ControllerId,
   labEnabled: true,
   localAddress: localBindIp,
-  targetAddress: '192.168.1.248',
+  targetAddress,
   targetPort: 7701
 });
 
@@ -371,14 +330,14 @@ let mk20Online = false;
 try {
   await mk20.start();
   mk20Online = true;
-  console.log('  MK20 LAN Hardware  : CONNECTED (192.168.1.248:7701)');
+  console.log(`  MK20 LAN Hardware  : CONNECTED (${targetAddress}:7701)`);
 
   // Register MK20 LAN device in DeviceRegistry
   const lanSource = { pluginId: 'plugin.mk20', instanceId: 'desk-terminal' };
   const lanGen = devices.beginScan(lanSource);
   const lanCand = devices.observe(lanSource, lanGen, {
-    nativeDeviceId: 'mk20-lan-192.168.1.248:7701',
-    label: 'MK20 Smart Desk Terminal (192.168.1.248:7701)',
+    nativeDeviceId: `mk20-lan-${targetAddress}:7701`,
+    label: `MK20 Smart Desk Terminal (${targetAddress}:7701)`,
     transport: 'lan',
     capabilities: ['button', 'select-session', 'display'],
     supported: !!mk20Identity,
@@ -420,9 +379,9 @@ try {
   console.log('  MK20 USB Raw HID   : FAILED (' + err.message + ')');
 }
 
-import { ContextManager, GitProvider } from './context-manager.mjs';
-import { CodexDesktopClient } from './codex-desktop-client.mjs';
-import { LocalWhisperProvider } from '../../Snowball_Control/host/dist/audio/local-whisper.js';
+const { ContextManager, GitProvider } = await import('./context-manager.mjs');
+const { CodexDesktopClient } = await import('./codex-desktop-client.mjs');
+const { LocalWhisperProvider } = await import(pathToFileURL(path.join(controlRoot, 'host/dist/audio/local-whisper.js')).href);
 
 const desktop = new CodexDesktopClient();
 try {
@@ -462,7 +421,7 @@ let modelSelectionNote = 'explicit env override';
 if (!selectedSttModel) {
   try {
     const assessPy = path.resolve('scripts/assess_stt_backend.py');
-    const {stdout:out} = await execFileAsync('python', [assessPy, '--json'], { encoding: 'utf8', windowsHide: true,timeout:30000 });
+    const {stdout:out} = await execFileAsync(process.env.PYTHON_BIN ?? 'python', [assessPy, '--json'], { encoding: 'utf8', windowsHide: true,timeout:30000 });
     const assessRes = JSON.parse(out);
     selectedSttModel = assessRes.selected_model;
     selectedBackend = assessRes.selected_backend || 'auto';
@@ -500,12 +459,21 @@ try {
   console.warn(`  Whisper Model DL   : NOTE (${dlErr.message})`);
 }
 
-const voice = new LocalWhisperProvider(selectedSttModel, '127.0.0.1:15555', modelsDir, selectedBackend);
+const voice = new LocalWhisperProvider(selectedSttModel, adbDevice, modelsDir, selectedBackend);
 let currentVoiceCaptureId = null;
 // Pre-warm local whisper resident worker
 voice.status().catch(() => {});
 
 const context = new ContextManager();
+updateDeviceSession = (nativeSessionId, resultSessionId) => {
+  const activeSession = context.getCurrentSession();
+  if (activeSession && (activeSession.id === nativeSessionId || activeSession.id === resultSessionId)) {
+    activeSession.turns = realTurnsData[resultSessionId];
+    context.setSessionTurns(activeSession.turns);
+    context.updateReaderForCurrentSession();
+    void paintMk20();
+  }
+};
 const nativeDispatches = new Map();
 const shortGpu = backendDeviceName.includes('GeForce') ? 'RTX ' + backendDeviceName.split('GeForce')[1].trim().split(' ')[0] : (backendDeviceName.split(' ')[0] || '');
 context.sttEngineLabel = `${selectedSttModel.toUpperCase()} ${selectedBackend.toUpperCase()}${shortGpu ? ' (' + shortGpu + ')' : ''}`;
@@ -1331,17 +1299,30 @@ process.on('unhandledRejection', (reason) => {
   console.error('[UNHANDLED REJECTION]:', reason);
 });
 
-const cleanup = async () => {
+return async () => {
   clearInterval(timer);
+  clearInterval(activeTranscriptionTimer);
   await mk20.close();
+  await mk20Ui.flush();
+  await desktop.close?.();
+};
+}
+
+let closeDevice = async () => {}, closing = false;
+const cleanup = async (code = 0) => {
+  if (closing) return; closing = true;
+  clearInterval(bootstrapTimer);
+  await closeDevice();
   await api.close();
   await sources.close();
   await controllerPersistence.close();
-  await mk20Ui.flush();
-  store.close();
-  journal.close();
-  process.exit(0);
+  await suite?.close();
+  store.close(); journal.close();
+  process.exit(typeof code === 'number' ? code : 0);
 };
-
 process.on('SIGINT', cleanup);
 process.on('SIGTERM', cleanup);
+process.on('disconnect', cleanup);
+process.on('message', message => { if (message === 'snowball.stop') void cleanup(); });
+try { if (profile === 'mk20') closeDevice = await startMk20Runtime(); }
+catch (error) { console.error(error.message); await cleanup(1); }

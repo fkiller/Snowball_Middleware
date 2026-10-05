@@ -1,0 +1,104 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { parseSetupOptions, repositoriesFor, harnessRepositories, chooseLanAddress, pythonInVenv } from './setup-profile.mjs';
+
+const options = parseSetupOptions(process.argv.slice(2));
+if (!['win32', 'darwin'].includes(process.platform)) throw Error('Suite plugin workers currently support Windows and macOS');
+const middleware = fileURLToPath(new URL('..', import.meta.url));
+const root = path.resolve(options.root ?? path.dirname(middleware));
+if (path.join(root, 'Snowball_Middleware') !== path.resolve(middleware)) throw Error('Install root must contain this Snowball_Middleware checkout');
+const [major, minor] = process.versions.node.split('.').map(Number);
+if (major < 22 || major === 22 && minor < 12) throw Error('Node >=22.12 is required');
+const npm = options.npm ?? process.env.npm_execpath ?? path.join(path.dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
+if (!fs.existsSync(npm)) throw Error('Cannot locate npm-cli.js. Run npm run setup -- ... or supply --npm PATH');
+function run(executable, args, cwd = root, { capture = false, env = process.env } = {}) {
+  const result = spawnSync(executable, args, { cwd, env, windowsHide: true, shell: false, encoding: 'utf8', stdio: capture ? 'pipe' : 'inherit', maxBuffer: 4 * 1024 * 1024 });
+  if (result.error) throw result.error;
+  if (result.status !== 0) throw Error(`${path.basename(executable)} failed (${result.status}). Installation remains incomplete.`);
+  return result.stdout?.trim();
+}
+const npmRun = (args, cwd) => run(process.execPath, [npm, ...args], cwd);
+const installDir = path.join(root, '.snowball');
+fs.mkdirSync(installDir, { recursive: true, mode: 0o700 });
+const commits = {};
+for (const repository of repositoriesFor(options.profile)) {
+  const directory = path.join(root, repository);
+  if (!fs.existsSync(directory)) run('git', ['clone', '--branch', 'main', 'https://github.com/fkiller/' + repository + '.git', directory]);
+  const remote = run('git', ['remote', 'get-url', 'origin'], directory, { capture: true });
+  if (!new RegExp(`^(?:https://github\\.com/|git@github\\.com:)fkiller/${repository}(?:\\.git)?$`, 'i').test(remote)) throw Error('Unexpected repository origin: ' + repository);
+  if (run('git', ['status', '--porcelain', '--untracked-files=no'], directory, { capture: true })) throw Error('Tracked local changes in ' + repository + '; commit or use a separate install root');
+  // Existing checkouts are deliberately not reset or switched. Rerunning is safe offline.
+  commits[repository] = run('git', ['rev-parse', 'HEAD'], directory, { capture: true });
+}
+console.log('Building Snowball Middleware and all harness plugins...');
+npmRun(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], middleware);
+npmRun(['run', 'build'], middleware);
+const plugins = [];
+for (const [kind, repository] of Object.entries(harnessRepositories)) {
+  const directory = path.join(root, repository);
+  npmRun(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], directory);
+  npmRun(['run', 'build'], directory);
+  const entry = await import(pathToFileURL(path.join(directory, 'dist/index.js')).href);
+  const manifest = await entry[kind + 'Manifest']();
+  plugins.push({ kind, directory, entrySha256: manifest.integrity.entrySha256 });
+}
+const config = { version: 1, profile: options.profile, root, middleware, plugins, commits, port: options.port,
+  ...(options['data-dir'] ? { dataDir: path.resolve(options['data-dir']) } : {}) };
+if (options.profile !== 'web') {
+  const deviceAddress = options.profile === 'mk20' ? options['mk20-address']?.split(':')[0] : options.device;
+  config.bind = chooseLanAddress(undefined, options.bind, deviceAddress);
+  const python = options.python ?? (process.platform === 'win32' ? 'python' : 'python3');
+  if (options.profile === 'm5stack') {
+    const deviceRoot = path.join(root, 'Snowball_Device_M5Stack');
+    config.python = pythonInVenv(path.join(deviceRoot, '.venv'));
+    if (!fs.existsSync(config.python)) run(python, ['-m', 'venv', path.join(deviceRoot, '.venv')]);
+    run(config.python, ['-m', 'pip', 'install', '-r', path.join(deviceRoot, 'requirements.txt')]);
+    const provision = [path.join(deviceRoot, 'scripts/install_device.py'), '--output', path.join(installDir, 'm5stack-device.json')];
+    if (options.serial) provision.push('--port', options.serial);
+    if (options['no-flash']) provision.push('--no-flash');
+    run(config.python, provision, deviceRoot);
+    config.serial = JSON.parse(fs.readFileSync(path.join(installDir, 'm5stack-device.json'), 'utf8')).port;
+    config.device = options.device;
+    config.deviceRoot = deviceRoot;
+  } else {
+    if (process.platform !== 'win32') throw Error('MK20 guided deployment currently requires Windows PowerShell');
+    const control = path.join(root, 'Snowball_Control');
+    npmRun(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], path.join(control, 'host'));
+    npmRun(['run', 'build'], path.join(control, 'host'));
+    const deployment = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(control, 'hardware/mk20/dev-tools/install-mk20.ps1'), '-Output', path.join(installDir, 'mk20-device.json')];
+    if (options['mk20-address']) deployment.push('-Device', options['mk20-address']);
+    if (options.adb) deployment.push('-Adb', options.adb);
+    if (options['no-flash']) deployment.push('-NoDeploy');
+    run('powershell.exe', deployment, control);
+    Object.assign(config, JSON.parse(fs.readFileSync(path.join(installDir, 'mk20-device.json'), 'utf8')), { controlRoot: control });
+    const venv = path.join(middleware, '.venv-whisper');
+    config.python = pythonInVenv(venv);
+    if (!fs.existsSync(config.python)) run(python, ['-m', 'venv', venv]);
+    run(config.python, [path.join(middleware, 'scripts/ensure_stt_runtime.py'), '--install', '--python', config.python]);
+  }
+}
+const { loadSuitePlugins } = await import('./suite-plugins.mjs');
+const loaded = await loadSuitePlugins(config);
+await loaded.close();
+const configFile = path.join(installDir, 'suite.json');
+const temporary = configFile + '.tmp';
+fs.writeFileSync(temporary, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
+fs.renameSync(temporary, configFile);
+const launchScript = path.join(middleware, 'scripts/start-suite.mjs');
+if (process.platform === 'win32') {
+  const quote = s => "'" + s.replaceAll("'", "''") + "'";
+  const launcher = path.join(root, 'Start-Snowball.ps1');
+  fs.writeFileSync(launcher, `& ${quote(process.execPath)} ${quote(launchScript)} --config ${quote(configFile)}\nexit $LASTEXITCODE\n`);
+  const desktop = run('powershell.exe', ['-NoProfile', '-Command', '[Environment]::GetFolderPath("Desktop")'], root, { capture: true });
+  if (!options['no-shortcut'] && fs.existsSync(desktop)) {
+    // A .lnk keeps paths with spaces/non-ASCII characters intact; no cmd interpolation.
+    const ps = `$s=(New-Object -ComObject WScript.Shell).CreateShortcut(${quote(path.join(desktop, 'Snowball.lnk'))});$s.TargetPath='powershell.exe';$s.Arguments=${quote('-NoProfile -ExecutionPolicy Bypass -File "' + launcher + '"')};$s.WorkingDirectory=${quote(root)};$s.Save()`;
+    run('powershell.exe', ['-NoProfile', '-Command', ps]);
+  }
+} else fs.writeFileSync(path.join(root, 'Start-Snowball.sh'), `#!/bin/sh\nexec '${process.execPath.replaceAll("'", "'\\''")}' '${launchScript.replaceAll("'", "'\\''")}' --config '${configFile.replaceAll("'", "'\\''")}'\n`, { mode: 0o700 });
+console.log(`Installed ${options.profile} profile with all three verified harness plugins. Launcher: ${root}`);
+console.log('Native Codex / Antigravity / OpenCode applications and their sign-in remain owned by their vendors. Missing native apps are shown as unavailable.');
+if (!options['no-start']) run(process.execPath, [launchScript, '--config', configFile], middleware);
