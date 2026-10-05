@@ -37,6 +37,13 @@ if ($node) {
     $validNode = [version]$nodeVersion -ge [version]'22.12.0'
 }
 if (-not $validNode) {
+    $cachedNodes = Get-ChildItem -LiteralPath $tools -Filter node.exe -Recurse -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
+    foreach ($candidate in $cachedNodes) {
+        $candidateVersion = (& $candidate.FullName --version).Trim().TrimStart('v')
+        if ([version]$candidateVersion -ge [version]'22.12.0') { $node = $candidate.FullName; $validNode = $true; break }
+    }
+}
+if (-not $validNode) {
     $arch = if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() -eq 'Arm64') {'arm64'} else {'x64'}
     $releases = Invoke-RestMethod 'https://nodejs.org/dist/index.json'
     $release = $releases | Where-Object { $_.lts -and [version]($_.version.TrimStart('v')) -ge [version]'22.12.0' } | Select-Object -First 1
