@@ -213,4 +213,4 @@ Snowball_Middleware/
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
-Installed tool versions on the review PC are documented in [config/harness-compatibility.json](config/harness-compatibility.json). Recording installed versions does not constitute universal compatibility certification. Full MK20 integration (`node scripts/start-all.mjs`) references the sibling Snowball_Control checkout and built `host/dist`. Full SD backup before modification and the modified QMK update are required.
+Installed tool versions on the review PC are documented in [config/harness-compatibility.json](config/harness-compatibility.json). Recording installed versions does not constitute universal compatibility certification. Use the installed suite launcher above for the complete runtime. `start:local` and the tray are developer entry points that require explicit native adapter configuration.
