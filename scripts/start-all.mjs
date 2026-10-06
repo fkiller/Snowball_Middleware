@@ -435,7 +435,7 @@ try {
 
 import { ContextManager, GitProvider } from './context-manager.mjs';
 import { CodexDesktopClient } from './codex-desktop-client.mjs';
-import { LocalWhisperProvider } from '../../Snowball_Control/host/dist/audio/local-whisper.js';
+const { LocalWhisperProvider } = await import(pathToFileURL(path.join(controlRoot, 'host/dist/audio/local-whisper.js')).href);
 
 const desktop = new CodexDesktopClient();
 try {
@@ -948,6 +948,7 @@ async function handleMk20Input(input) {
       context.onLeftKnob(input.delta);
     } else if (input.knob === 'right') {
       context.onRightKnob(input.delta);
+      if (tts?.setVolume) tts.setVolume((context.volume || 0) / 100, context.isMuted);
     }
     void paintMk20();
     return;
@@ -962,6 +963,7 @@ async function handleMk20Input(input) {
       }
     } else if (input.knob === 'right') {
       context.onRightKnobClick();
+      if (tts?.setVolume) tts.setVolume((context.volume || 0) / 100, context.isMuted);
     }
     await paintMk20();
     return;
