@@ -8,7 +8,7 @@
 </h1>
 
 <p align="center">
-  <strong>Local Control Plane, Web Supervisor & Desktop Middleware for AI Coding Agents</strong>
+  <strong>inter-Harness Local Control, Web Supervisor & Desktop Middleware</strong>
 </p>
 
 <p align="center">
@@ -25,6 +25,10 @@
 ---
 
 ## 🌟 Overview
+
+**Snowball is an inter-Harness local control interface.** It gives developers a common way to navigate and control Codex, AGY, and OpenCode through an MK20 desk terminal and local Web Supervisor. The user chooses the harness, project, and session; each harness keeps its native runtime, history, models, and permissions.
+
+Our philosophy is to keep control in the user's hands and on their computer: make switching tools and following work immediate, discover capabilities from the installed environment, and show real results and limitations. The full [product philosophy](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.md#product-philosophy-inter-harness-local-control) is maintained with the central architecture.
 
 **Preview:** Intended exclusively for personal workstations and trusted local networks. The loopback Web UI requires no login or PIN. The omission of authentication/encryption in MK20 UDP and development TCP ADB is detailed in [Current Design and Pre-Release Checklist](docs/ARCHITECTURE.md).
 
@@ -64,14 +68,14 @@ The companion **[`Snowball_Control`](https://github.com/fkiller/Snowball_Control
 
 1. **Zero Simulation**
    - No mock delays, fake approvals, or simulated responses.
-   - All session turns, file edits, and tool approvals dispatch directly into native agent runtimes (`codex app-server`, `agy stream-json`, `opencode run`).
+   - Supported actions must reach native agent runtimes (`codex app-server`, `agy stream-json`, `opencode run`) and report actual results. Native approval and cancellation support varies by adapter; current limits are documented in the architecture.
 2. **Living Source of Truth**
    - Models, efforts (variants), sessions, and workspaces are dynamically discovered from native tools and local caches. Zero static hardcoding.
 3. **Local-First & Security Boundary**
    - Web Supervisor runs strictly on `127.0.0.1` loopback with zero mandatory cloud dependencies.
    - Production device transports require their own reviewed pairing. The MK20 lab Preview uses a trusted private LAN and does not provide cryptographic device authentication.
 4. **Plugin Sandbox Isolation**
-   - Device and harness plugins run in security-isolated sandboxes, preventing arbitrary filesystem access while preserving native host dispatching.
+   - Plugins should have limited permissions while preserving authorized native host dispatch. Current child-process isolation does not enforce an OS filesystem sandbox; untrusted plugins are outside this Preview's security boundary.
 
 ---
 

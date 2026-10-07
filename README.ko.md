@@ -8,7 +8,7 @@
 </h1>
 
 <p align="center">
-  <strong>AI 코딩 에이전트를 위한 로컬 제어 평면, 웹 수퍼바이저 및 데스크톱 미들웨어</strong>
+  <strong>inter-Harness 로컬 제어, 웹 수퍼바이저 및 데스크톱 미들웨어</strong>
 </p>
 
 <p align="center">
@@ -25,6 +25,10 @@
 ---
 
 ## 🌟 개요 (Overview)
+
+**Snowball은 inter-Harness 로컬 제어 인터페이스입니다.** 개발자가 MK20 데스크 터미널과 로컬 Web Supervisor에서 Codex, AGY, OpenCode를 공통된 조작 방식으로 탐색하고 제어합니다. 사용자가 하네스·프로젝트·세션을 선택하고, 각 하네스는 고유한 실행 환경·이력·모델·권한을 유지합니다.
+
+제품의 철학은 **제어권을 사용자의 손과 컴퓨터에 두는 것**입니다. 도구를 오가고 작업을 확인하는 동작은 즉각적이어야 하며, 기능은 실제 설치 환경에서 발견하고 결과와 한계는 사실대로 보여줘야 합니다. 자세한 [제품 철학](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.ko.md#제품-철학-inter-harness-로컬-제어)은 중앙 아키텍처 문서에서 관리합니다.
 
 **Preview:** 개인 PC와 신뢰하는 내부 네트워크 전용입니다. 루프백 Web UI에는 로그인/PIN을 요구하지 않습니다. MK20 UDP/개발 ADB의 인증·암호화 생략은 [현재 설계 문서](docs/ARCHITECTURE.ko.md)에 명시합니다.
 
@@ -64,14 +68,14 @@
 
 1. **Zero Simulation (시뮬레이션 전면 금지)**
    - 가짜 지연, 모의 승인, 시뮬레이션된 응답을 일절 배제합니다.
-   - 모든 세션 턴, 파일 수정 및 도구 승인은 네이티브 에이전트 런타임(`codex app-server`, `agy stream-json`, `opencode run`)으로 직접 전달(dispatch)됩니다.
+   - 지원되는 동작은 네이티브 에이전트 런타임(`codex app-server`, `agy stream-json`, `opencode run`)에 전달하고 실제 결과를 보고해야 합니다. 네이티브 승인·취소 지원은 어댑터마다 다르며, 현재 한계는 아키텍처 문서에 명시합니다.
 2. **Living Source of Truth (살아있는 원천 기반 동적 발견)**
    - 모델, effort(variant), 세션 및 작업공간은 네이티브 CLI 도구와 로컬 캐시에서 동적으로 발견됩니다. 정적 하드코딩이 존재하지 않습니다.
 3. **Local-First & Security Boundary (로컬 우선 및 보안 경계)**
    - 웹 수퍼바이저는 필수적인 외부 클라우드 의존성 없이 `127.0.0.1` 루프백에서 엄격히 실행됩니다.
    - MK20 lab Preview는 신뢰하는 개인 LAN을 사용하며 암호화된 기기 인증을 제공하지 않습니다.
 4. **Plugin Sandbox Isolation (플러그인 샌드박스 격리)**
-   - 디바이스 및 하네스 플러그인은 보안 격리된 프로세스에서 실행되어, 네이티브 호스트 디스패치를 유지하면서 임의 파일 시스템 접근을 방지합니다.
+   - 승인된 네이티브 호스트 실행을 유지하면서 플러그인 권한을 제한해야 합니다. 현재 자식 프로세스 격리는 OS 파일 시스템 샌드박스를 강제하지 않으며, 신뢰할 수 없는 플러그인은 Preview의 보안 범위 밖입니다.
 
 ---
 
