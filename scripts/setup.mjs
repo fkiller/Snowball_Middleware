@@ -50,6 +50,7 @@ const config = { version: 1, profile: options.profile, root, middleware, plugins
 if (options.profile !== 'web') {
   const deviceAddress = options.profile === 'mk20' ? options['mk20-address']?.split(':')[0] : options.device;
   config.bind = chooseLanAddress(undefined, options.bind, deviceAddress);
+  config.bindExplicit = Boolean(options.bind);
   const python = options.python ?? (process.platform === 'win32' ? 'python' : 'python3');
   if (options.profile === 'm5stack') {
     const deviceRoot = path.join(root, 'Snowball_Device_M5Stack');
@@ -64,20 +65,16 @@ if (options.profile !== 'web') {
     config.device = options.device;
     config.deviceRoot = deviceRoot;
   } else {
-    if (process.platform !== 'win32') throw Error('MK20 guided deployment currently requires Windows PowerShell');
     const control = path.join(root, 'Snowball_Control');
     npmRun(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], path.join(control, 'host'));
     npmRun(['run', 'build'], path.join(control, 'host'));
-    const deployment = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(control, 'hardware/mk20/dev-tools/install-mk20.ps1'), '-Output', path.join(installDir, 'mk20-device.json')];
-    if (options['mk20-address']) deployment.push('-Device', options['mk20-address']);
-    if (options.adb) deployment.push('-Adb', options.adb);
-    if (options['no-flash']) deployment.push('-NoDeploy');
-    run('powershell.exe', deployment, control);
-    Object.assign(config, JSON.parse(fs.readFileSync(path.join(installDir, 'mk20-device.json'), 'utf8')), { controlRoot: control });
+    config.controlRoot = control;
+    console.log('MK20 joins over Wi-Fi. Select this middleware on the device (K17); USB/ADB deployment is a separate maintenance action.');
     const venv = path.join(middleware, '.venv-whisper');
     config.python = pythonInVenv(venv);
     if (!fs.existsSync(config.python)) run(python, ['-m', 'venv', venv]);
     run(config.python, [path.join(middleware, 'scripts/ensure_stt_runtime.py'), '--install', '--python', config.python]);
+    run(config.python, [path.join(control, 'scripts/ensure_tts_runtime.py'), '--ensure']);
   }
 }
 const { loadSuitePlugins } = await import('./suite-plugins.mjs');

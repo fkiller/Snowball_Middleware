@@ -40,9 +40,9 @@ try {
   // Never take over an unrelated service already bound to the selected port.
   const { createServer } = await import('node:net');
   await new Promise((resolve, reject) => { const server = createServer(); server.once('error', reject); server.listen(config.port, '127.0.0.1', () => server.close(resolve)); });
-  const env = { SNOWBALL_PROFILE: config.profile, SNOWBALL_PORT: String(config.port), SNOWBALL_SUITE_CONFIG: configFile };
+  const env = { SNOWBALL_PROFILE: config.profile, SNOWBALL_PORT: String(config.port), SNOWBALL_SUITE_CONFIG: configFile, AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
   if (config.dataDir) env.SNOWBALL_DATA_DIR = config.dataDir;
-  if (config.profile === 'mk20') Object.assign(env, { SNOWBALL_CONTROL_ROOT: config.controlRoot, SNOWBALL_MK20_ADDRESS: config.mk20Address, SNOWBALL_MK20_ADB_DEVICE: config.mk20AdbDevice, MK20_ADB: config.adb, ADB_PATH: config.adb, SNOWBALL_BIND: config.bind, PYTHON_BIN: config.python });
+  if (config.profile === 'mk20') Object.assign(env, { SNOWBALL_CONTROL_ROOT: config.controlRoot, SNOWBALL_BIND: config.bindExplicit === false ? '' : config.bind, PYTHON_BIN: config.python });
   launch(path.join(middleware, 'scripts/start-all.mjs'), [], middleware, env);
   const deadline = Date.now() + 180000;
   let ready = false;

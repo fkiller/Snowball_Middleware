@@ -52,3 +52,21 @@ test('native catalog reads leave the main event loop responsive and coalesce con
   try{const first=sources.read('catalog','snowball.codex');assert.equal(first,sources.read('catalog','snowball.codex'));const result=await first;assert.ok(Array.isArray(result));assert.ok(ticks>0);await assert.rejects(sources.read('catalog','unsupported'),/unknown/);}
   finally{clearInterval(timer);await sources.close();}
 });
+
+test('MK20 local draft created with native UI identifier survives restart',()=>{
+  const make=()=>{const c=new ContextManager();c.projectsByScope['dev-pc/snowball.codex']=[{id:'actual',name:'actual',path:process.cwd()}];c.sessionsByScope['dev-pc/snowball.codex/actual']=[];c.resolveProjectAndSession();return c;};
+  const first=make();first.sessionsByScope['dev-pc/snowball.codex/actual'].push({id:'s-m9abc123',title:'Unsent task',createdAt:Date.now(),turns:[]});first.voiceDraftText='preserved draft';first.voiceSubmission='ready';
+  const second=make();second.restoreUi(first.snapshotUi());assert.equal(second.getCurrentSession().id,'s-m9abc123');assert.equal(second.voiceDraftText,'preserved draft');assert.equal(second.getCurrentSession().turnCount,0);
+});
+
+test('native refresh separates equal project names and retains pending session ownership',async t=>{
+  const {reconcileNativeContext}=await import('../scripts/native-context.mjs');
+  const directory=await fs.mkdtemp(path.join(os.tmpdir(),'snowball-native-context-'));t.after(()=>fs.rm(directory,{recursive:true,force:true}));
+  const left=path.join(directory,'left','same'),right=path.join(directory,'right','same');await fs.mkdir(left,{recursive:true});await fs.mkdir(right,{recursive:true});
+  const c=new ContextManager(),h='snowball.codex';c.harnesses=[{id:h,name:'Codex',isEnabled:true}];
+  const records={[h]:{same:[{id:'left-native',title:'Left',cwd:left},{id:'right-native',title:'Right',cwd:right}]}};
+  reconcileNativeContext(c,records);const projects=c.projectsByScope['dev-pc/'+h];assert.equal(projects.length,2);assert.notEqual(projects[0].id,projects[1].id);
+  const session=c.sessionsByScope['dev-pc/'+h+'/'+projects[0].id][0];assert.equal(session.cwd,projects[0].path);session.voiceSubmission='sending';session.voiceDraftText='owned draft';c.voiceSubmission='sending';c.voiceDraftText='owned draft';
+  records[h].same.push({id:'new-native',title:'New',cwd:projects[0].path});reconcileNativeContext(c,records);
+  assert.equal(c.sessionsByScope['dev-pc/'+h+'/'+projects[0].id][0],session);assert.equal(session.voiceSubmission,'sending');assert.equal(session.voiceDraftText,'owned draft');assert.equal(c.sessionsByScope['dev-pc/'+h+'/'+projects[0].id].length,2);
+});

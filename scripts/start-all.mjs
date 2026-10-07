@@ -33,8 +33,11 @@ import os from 'node:os';
 import { NativeSourceService } from './source-service.mjs';
 import { loadControllerStore } from '../apps/supervisor/controller-store.mjs';
 import { controllerUiStore } from './controller-ui-store.mjs';
+import { reconcileNativeContext } from './native-context.mjs';
 import { dispatchHarnessTurn } from './harness-dispatch.mjs';
 import { listNativeAccess } from './native-access.mjs';
+import { startMk20Lan } from './mk20-lan.mjs';
+process.env.AGY_CLI_DISABLE_AUTO_UPDATE = 'true';
 import { languageManager } from './language-manager.mjs';
 import { chooseLanAddress, privateIpv4 } from './setup-profile.mjs';
 import { loadSuitePlugins } from './suite-plugins.mjs';
@@ -44,6 +47,7 @@ if (!['web', 'mk20', 'm5stack'].includes(profile)) throw Error('Invalid Snowball
 const apiPort = Number(process.env.SNOWBALL_PORT ?? 8765);
 if (!Number.isInteger(apiPort) || apiPort < 1024 || apiPort > 65535) throw Error('Invalid Snowball port');
 let updateDeviceSession = () => {};
+const mk20Contexts=new Map();
 const suiteConfig = process.env.SNOWBALL_SUITE_CONFIG ? JSON.parse(fs.readFileSync(process.env.SNOWBALL_SUITE_CONFIG, 'utf8')) : null;
 const suite = suiteConfig ? await loadSuitePlugins(suiteConfig, { start: false }) : null;
 const directory = ensurePrivateStateDirectory(process.env.SNOWBALL_DATA_DIR ? path.resolve(process.env.SNOWBALL_DATA_DIR) : resolveUserDataDir());
@@ -306,41 +310,28 @@ console.log('====================================================');
 console.log(`  Web Supervisor URL : ${api.origin}/`);
 console.log('====================================================');
 
-async function startMk20Runtime() {
-const targetAddress = process.env.SNOWBALL_MK20_ADDRESS;
-if (!privateIpv4(targetAddress)) throw Error('MK20 requires SNOWBALL_MK20_ADDRESS (private device IPv4)');
-const localBindIp = chooseLanAddress(undefined, process.env.SNOWBALL_BIND, targetAddress);
-const adbTool = process.env.MK20_ADB ?? 'adb';
-const adbDevice = process.env.SNOWBALL_MK20_ADB_DEVICE ?? `${targetAddress}:5555`;
-const { Mk20LabTransport } = await import(pathToFileURL(path.join(controlRoot,'plugins/device-mk20/src/index.mjs')).href);
-console.log(`  Local MK20 Bind IP : ${localBindIp}`);
-
-// Connect to the selected physical MK20 endpoint.
-// A private IP routes packets; it is not a durable physical identity or pairing
-// proof. Obtain the installed board's MAC through the owner's native ADB link.
-const mk20IdentityFile=path.join(directory,'mk20-lab.identity.json');
-let mk20Identity;
+async function startMk20Runtime({targetAddress, deviceId, leaseToken, isActive}) {
+const startupCleanup=[];let compositionReady=false;
 try {
-  const {stdout}=await execFileAsync(adbTool,['-s',adbDevice,'shell','cat','/sys/class/net/wlan0/address'],{windowsHide:true,timeout:4000});
-  const mac=stdout.trim().toLowerCase();if(!/^([a-f0-9]{2}:){5}[a-f0-9]{2}$/.test(mac))throw Error('invalid_board_identity');
-  mk20Identity='mk20-mac-'+mac;fs.writeFileSync(mk20IdentityFile,JSON.stringify({identity:mk20Identity})+'\n',{mode:0o600});
-} catch {
-  try{const saved=JSON.parse(fs.readFileSync(mk20IdentityFile,'utf8'));if(/^mk20-mac-([a-f0-9]{2}:){5}[a-f0-9]{2}$/.test(saved.identity))mk20Identity=saved.identity;}catch{}
-}
-const mk20ControllerId=mk20Identity?deviceControllerId('plugin.mk20','desk-terminal',mk20Identity):createControllerId();
+const localBindIp = chooseLanAddress(undefined, process.env.SNOWBALL_BIND, targetAddress);
+const { Mk20LabTransport } = await import(pathToFileURL(path.join(controlRoot,'plugins/device-mk20/src/index.mjs')).href);
+const mk20Identity='mk20-mac-'+deviceId.slice(5).match(/../g).join(':');
+const mk20ControllerId=deviceControllerId('plugin.mk20','desk-terminal',mk20Identity);
 const mk20 = new Mk20LabTransport({
   controllerId: mk20ControllerId,
+  leaseToken,
   labEnabled: true,
   localAddress: localBindIp,
   targetAddress,
   targetPort: 7701
 });
 
+startupCleanup.push(()=>mk20.close());
 let mk20Online = false;
 try {
   await mk20.start();
   mk20Online = true;
-  console.log(`  MK20 LAN Hardware  : CONNECTED (${targetAddress}:7701)`);
+  console.log(`  MK20 LAN Transport : READY (${targetAddress}:7701)`);
 
   // Register MK20 LAN device in DeviceRegistry
   const lanSource = { pluginId: 'plugin.mk20', instanceId: 'desk-terminal' };
@@ -358,7 +349,7 @@ try {
     devices.register(lanCand.candidateId, lanGen);
   }
 } catch (err) {
-  console.log('  MK20 LAN Hardware  : FAILED (' + err.message + ')');
+  throw Error('MK20 LAN transport failed: '+err.message);
 }
 
 // Detect and register MK20 USB Raw HID controller in DeviceRegistry
@@ -394,6 +385,7 @@ const { CodexDesktopClient } = await import('./codex-desktop-client.mjs');
 const { LocalWhisperProvider } = await import(pathToFileURL(path.join(controlRoot, 'host/dist/audio/local-whisper.js')).href);
 
 const desktop = new CodexDesktopClient();
+startupCleanup.push(()=>desktop.close?.());
 try {
   const connected = await desktop.connect();
   if (connected) {
@@ -446,6 +438,15 @@ if (!selectedSttModel) {
   }
 }
 
+// The resident provider uses faster-whisper, which currently implements
+// CUDA/CPU only. A successful Vulkan/Metal diagnostic is not this backend.
+if(!['auto','cuda','cpu'].includes(selectedBackend)){
+  const diagnosticBackend=selectedBackend;selectedBackend='cpu';backendDeviceName=os.cpus()[0]?.model??'';
+  const evaluated=resolveSttModel('cpu',{cores:os.cpus().length,availRamGb:os.freemem()/(1024**3)},sttConfig);
+  if(!process.env.SNOWBALL_WHISPER_MODEL)selectedSttModel=evaluated.selectedModel;
+  modelSelectionNote=`${diagnosticBackend} diagnostic is not a resident backend; CPU selected`;
+}
+
 const devLabel = backendDeviceName ? ` (${backendDeviceName})` : '';
 console.log(`  Whisper Model Plan : ${selectedSttModel} [${modelSelectionNote}] | Backend: ${selectedBackend.toUpperCase()}${devLabel}`);
 console.log(`  Whisper Cache Dir  : ${modelsDir}`);
@@ -469,7 +470,10 @@ try {
   console.warn(`  Whisper Model DL   : NOTE (${dlErr.message})`);
 }
 
-const voice = new LocalWhisperProvider(selectedSttModel, adbDevice, modelsDir, selectedBackend);
+const { AudioTransport } = await import(pathToFileURL(path.join(controlRoot,'host/dist/audio/transport.js')).href);
+const { AudioPlayer } = await import(pathToFileURL(path.join(controlRoot,'host/dist/audio/player.js')).href);
+const voice = new LocalWhisperProvider(selectedSttModel, targetAddress, modelsDir, selectedBackend, new AudioTransport(targetAddress, undefined, 7702, leaseToken, localBindIp));
+startupCleanup.push(()=>voice.close());
 let currentVoiceCaptureId = null;
 // Pre-warm local whisper resident worker
 voice.status().catch(() => {});
@@ -481,10 +485,10 @@ try {
   const { LocalSupertonicProvider } = await import(pathToFileURL(path.join(controlRoot, 'host/dist/audio/local-supertonic.js')).href);
   const translit = await import(pathToFileURL(path.join(controlRoot, 'host/dist/audio/korean-transliterate.js')).href);
   cleanTextForSpeech = translit.cleanTextForSpeech;
-  tts = new LocalSupertonicProvider();
+  tts = new LocalSupertonicProvider(undefined, new AudioPlayer(targetAddress, undefined, leaseToken, 7702, localBindIp));
+  startupCleanup.push(async()=>{await tts.stop();tts.close();});
   // Pre-warm Supertonic resident worker and load GPU model on startup
-  tts.warmup().catch(() => {});
-  console.log('  Supertonic TTS Engine : READY (Fallback: Supertonic GPU -> Supertonic CPU -> OS Native)');
+  void tts.warmup().then(ready=>{if(ready)console.log('  Local TTS worker ready');else console.warn('  Local TTS worker unavailable');}).catch(error=>console.warn('  Local TTS unavailable:',error.message));
 } catch (ttsErr) {
   console.warn('  Supertonic TTS Engine : NOTE (' + ttsErr.message + ')');
 }
@@ -543,7 +547,8 @@ function getLatestAgentResponse(curSess) {
 }
 
 async function speakCurrentSession(forceText = null, destination = 'device') {
-  if (!tts) return;
+  if (!tts || !isActive()) return;
+  if(context.isSpeaking)await stopSpeaking();
   const curSess = context.getCurrentSession();
   const rawText = forceText || getLatestAgentResponse(curSess);
   const text = extractSpokenAgentResponse(rawText);
@@ -561,6 +566,7 @@ async function speakCurrentSession(forceText = null, destination = 'device') {
   } else {
     context.isSpeakingDevice = true;
   }
+  const speechGeneration=context.speechGeneration=(context.speechGeneration??0)+1;
   context.isSpeaking = true;
   void paintMk20();
   const t0 = Date.now();
@@ -574,7 +580,9 @@ async function speakCurrentSession(forceText = null, destination = 'device') {
     console.log(`[TTS] Playback (${destination}) completed in ${((Date.now() - t0) / 1000).toFixed(2)}s`);
   } catch (err) {
     console.error(`[TTS] Playback (${destination}) error:`, err.message);
+    context.readerTitle='Audio unavailable';context.readerLines=[err.message];
   } finally {
+    if(context.speechGeneration!==speechGeneration)return;
     if (destination === 'host') {
       context.isSpeakingHost = false;
     } else {
@@ -587,6 +595,7 @@ async function speakCurrentSession(forceText = null, destination = 'device') {
 
 async function stopSpeaking() {
   if (!tts) return;
+  context.speechGeneration=(context.speechGeneration??0)+1;
   context.isSpeakingDevice = false;
   context.isSpeakingHost = false;
   context.isSpeaking = false;
@@ -596,8 +605,13 @@ async function stopSpeaking() {
   void paintMk20();
 }
 
-const context = new ContextManager();
+let cachedContext=mk20Contexts.get(mk20ControllerId);
+if(!cachedContext&&mk20Contexts.size>=16)throw Error('MK20 controller context capacity reached');
+const context = cachedContext?.context ?? new ContextManager();
+const nativeDispatches = cachedContext?.nativeDispatches ?? new Map();
+if(!cachedContext)mk20Contexts.set(mk20ControllerId,{context,nativeDispatches});
 updateDeviceSession = (nativeSessionId, resultSessionId) => {
+  if(!compositionReady||!isActive())return;
   const activeSession = context.getCurrentSession();
   if (activeSession && (activeSession.id === nativeSessionId || activeSession.id === resultSessionId)) {
     activeSession.turns = realTurnsData[resultSessionId];
@@ -606,7 +620,7 @@ updateDeviceSession = (nativeSessionId, resultSessionId) => {
     void paintMk20();
   }
 };
-const nativeDispatches = new Map();
+
 const shortGpu = backendDeviceName.includes('GeForce') ? 'RTX ' + backendDeviceName.split('GeForce')[1].trim().split(' ')[0] : (backendDeviceName.split(' ')[0] || '');
 context.sttEngineLabel = `${selectedSttModel.toUpperCase()} ${selectedBackend.toUpperCase()}${shortGpu ? ' (' + shortGpu + ')' : ''}`;
 
@@ -637,40 +651,16 @@ await refreshHarnessCatalogs();
 
 context.accessLevels = ['Native policy'];
 
-// Configure projects and sessions from real scanner data
-if (realSessionsData) {
-  for (const h of context.harnesses) {
-    const harnessData = realSessionsData[h.id] || {};
-    const scopeKey = `dev-pc/${h.id}`;
-    const projs = [];
-    const projEntries = Object.entries(harnessData);
-    // Sort entries so current working project Snowball_Control is always prioritized first
-    projEntries.sort(([a], [b]) => {
-      if (a === 'Snowball_Control') return -1;
-      if (b === 'Snowball_Control') return 1;
-      if (a === 'Snowball_Middleware') return -1;
-      if (b === 'Snowball_Middleware') return 1;
-      return a.localeCompare(b);
-    });
-    for (const [projName, sessList] of projEntries) {
-      const projPath = sessList.find(session => session.cwd && path.isAbsolute(session.cwd))?.cwd;
-      if (!projPath || !fs.existsSync(projPath)) continue;
-      projs.push({ id: projName, name: projName, path: projPath });
-      context.sessionsByScope[`${scopeKey}/${projName}`] = sessList.map(s => ({
-        id: s.id,
-        sessionKey: s.sessionKey,
-        title: s.title,
-        preview: s.preview,
-        createdAt: s.createdAt || 0,
-        model: s.model,
-        effort: s.effort,
-        access: s.access || 'on-request',
-        turnCount: s.turnCount
-      }));
-    }
-    context.projectsByScope[scopeKey] = projs;
-  }
+// Observe this PC again on every selection; saved controller objects retain
+// drafts and owned dispatch handles while native additions remain discoverable.
+const [nativeSessions,nativeProjects]=await Promise.all([sources.read('sessions'),sources.read('projects')]);
+realSessionsData=nativeSessions.sessionsByHarness;
+Object.assign(realTurnsData,nativeSessions.turnsStore);
+for(const [pluginId,groups] of Object.entries(realSessionsData))for(const list of Object.values(groups))for(const native of list){
+  native.sessionKey=formatSessionKey({hostId,harness:{pluginId,instanceId:'default'},nativeSessionId:native.id});
+  journal.registerSession(native.sessionKey,'user');
 }
+reconcileNativeContext(context,realSessionsData,nativeProjects);
 
 // Function to load turns for currently selected session
 async function loadCurrentSessionTurns() {
@@ -756,7 +746,7 @@ async function loadCurrentSessionTurns() {
 context.resolveProjectAndSession();
 context.syncSessionSettings();
 const mk20Ui = await controllerUiStore(directory, mk20ControllerId);
-if(mk20Ui.saved)context.restoreUi(mk20Ui.saved);
+if(!cachedContext&&mk20Ui.saved)context.restoreUi(mk20Ui.saved);
 const previousSkin=controllerStates.get(mk20ControllerId).preferences.skinId;
 if(previousSkin){try{mk20.setSkin(previousSkin);}catch{console.warn('MK20 saved skin is unavailable; use a currently installed skin.');}}
 const savedMk20Scroll = context.readerScrollLine;
@@ -766,6 +756,7 @@ if(mk20Ui.saved)context.readerScrollLine=savedMk20Scroll;
 
 let activeAudioCapture = null; // { captureId, harnessId, sessionObj }
 let activeTranscriptionTimer = null;
+let transcriptionPromise=null;
 let activeTranscriptionCancelled = false;
 
 function finishVoiceCapture() {
@@ -796,6 +787,7 @@ function finishVoiceCapture() {
   clearInterval(activeTranscriptionTimer);
   activeTranscriptionTimer = setInterval(() => {
     sec++;
+    if(targetSessionObj?.voiceCaptureId!==capId){clearInterval(activeTranscriptionTimer);return;}
     if (targetSessionObj) targetSessionObj.transcribingSeconds = sec;
     const activeSess = context.getCurrentSession();
     if (activeSess === targetSessionObj && context.isTranscribingVoice) {
@@ -806,10 +798,11 @@ function finishVoiceCapture() {
   }, 1000);
 
   // Background STT processing to ensure zero UI event blocking
-  void (async () => {
+  transcriptionPromise = (async () => {
     try {
       const text = await voice.finish(capId);
       clearInterval(activeTranscriptionTimer);
+      if(targetSessionObj?.voiceCaptureId!==capId)return;
 
       if (targetSessionObj?.transcriptionCancelled) {
         console.log(`[Voice] Discarding transcription for [${targetHarnessId}] because session was cancelled.`);
@@ -861,7 +854,7 @@ function finishVoiceCapture() {
       }
     } catch (err) {
       clearInterval(activeTranscriptionTimer);
-      if (targetSessionObj?.transcriptionCancelled) return;
+      if (targetSessionObj?.transcriptionCancelled || targetSessionObj?.voiceCaptureId!==capId) return;
       console.error(`[Voice] Transcription error on [${targetHarnessId}]:`, err.message);
       if (targetSessionObj) {
         targetSessionObj.isTranscribingVoice = false;
@@ -879,11 +872,12 @@ function finishVoiceCapture() {
         void paintMk20();
       }
     }
-  })();
+  })().finally(async()=>{await mk20Ui.save(context.snapshotUi());});
+  return transcriptionPromise;
 }
 
 async function paintMk20() {
-  if (!mk20Online) return;
+  if (!mk20Online || !isActive()) return;
   try {
     void mk20Ui.save(context.snapshotUi()).catch(error=>console.error('MK20 state save failed:',error.code??error.message));
     const session=context.getCurrentSession(), preferences={model:'',effort:'',...context.getExecutionSettings(),view:context.viewMode,scroll:context.readerScrollLine,skinId:mk20.getActiveSkin().id};
@@ -899,10 +893,13 @@ async function paintMk20() {
 
 // Initial paint and periodic heartbeat
 await paintMk20();
+compositionReady=true;
 const timer = setInterval(() => { void paintMk20(); }, 1200);
+startupCleanup.push(()=>clearInterval(timer));
 
 // MK20 Hardware Input Dispatcher
 async function handleMk20Input(input) {
+  if(!isActive())return;
   if (input.kind !== 'presence') {
     console.log('[MK20 INPUT RECEIVED]:', input);
   }
@@ -1159,7 +1156,7 @@ async function handleMk20Input(input) {
         await stopSpeaking();
       }
       // Talk (Voice input)
-      if (context.isTranscribingVoice) {
+      if (context.isTranscribingVoice || (activeAudioCapture && !context.isRecordingVoice)) {
         return;
       }
       if (context.isRecordingVoice) {
@@ -1171,16 +1168,19 @@ async function handleMk20Input(input) {
         const capId = `cap_${Date.now()}`;
         activeAudioCapture = {
           captureId: capId,
+          hostId, controllerId:mk20ControllerId, leaseToken,
           harnessId: curHarness.id,
           sessionObj: curSess
         };
-        context.isRecordingVoice = true;
+        currentVoiceCaptureId=capId;
+        context.isRecordingVoice = false;
         context.isTranscribingVoice = false;
         context.voiceDraftText = '';
         context.voiceSubmission = 'idle';
         context.lastDispatchError = null;
         if (curSess) {
-          curSess.isRecordingVoice = true;
+          curSess.voiceCaptureId=capId;
+          curSess.isRecordingVoice = false;
           curSess.isTranscribingVoice = false;
           curSess.voiceDraftText = '';
           curSess.voiceSubmission = 'idle';
@@ -1188,19 +1188,24 @@ async function handleMk20Input(input) {
           curSess.transcriptionCancelled = false;
         }
         context.voiceDestinationLabel = curSess ? curSess.title : '';
-        context.updateReaderForCurrentSession();
+        context.readerTitle='Starting microphone';
+        context.readerLines=['Waiting for native audio and speech worker readiness'];
         void paintMk20();
-        try {
+        void (async()=>{try {
           await voice.start(capId);
+          if(!isActive()||curSess?.voiceCaptureId!==capId){await voice.cancel(capId);return;}
+          context.isRecordingVoice=true;if(curSess)curSess.isRecordingVoice=true;
+          context.updateReaderForCurrentSession();await paintMk20();
         } catch (err) {
           console.error('[Voice] Start recording error:', err.message);
+          if(curSess?.voiceCaptureId!==capId)return;
           context.isRecordingVoice = false;
           if (curSess) curSess.isRecordingVoice = false;
           activeAudioCapture = null;
           context.readerTitle = 'Microphone Error';
           context.readerLines = [`Failed to start recording: ${err.message}`, 'Check MK20 connection.'];
           void paintMk20();
-        }
+        }})();
       }
     } else if (kid === 16) {
       // Send / Done / Reconcile
@@ -1221,6 +1226,7 @@ async function handleMk20Input(input) {
         if (curSess) curSess.lastDispatchError = context.lastDispatchError;
         context.updateReaderForCurrentSession();
       } else if (context.voiceDraftText) {
+        if(!context.getCurrentProject()?.path){context.lastDispatchError='Select a real project before Send';context.updateReaderForCurrentSession();await paintMk20();return;}
         // Send prompt
         context.lastDispatchError = null;
         const promptText = context.voiceDraftText;
@@ -1235,7 +1241,7 @@ async function handleMk20Input(input) {
         const targetSessionId = curSess?.id;
         const model = context.models[context.selectedModelIdx];
         const effort = context.efforts[context.selectedEffortIdx];
-        const cwd = curProj?.path || process.cwd();
+        const cwd = curProj.path;
 
         if (curSess) {
           curSess.voiceSubmission = 'sending';
@@ -1244,11 +1250,15 @@ async function handleMk20Input(input) {
         }
 
         const dispatchAbort = new AbortController();
+        let dispatchStarted=false;
         const destinationScope = context.getFullScopeKey();
         nativeDispatches.set(curSess, dispatchAbort);
         // Non-blocking fire-and-forget background dispatch so MK20 never hangs
         void (async () => {
           try {
+            await mk20Ui.save(context.snapshotUi());
+            if(!isActive())throw Error("Machine selection changed before dispatch");
+            dispatchStarted=true;
             const result = await dispatchHarnessTurn({
               signal: dispatchAbort.signal,
               harnessId: curHarness.id,
@@ -1294,7 +1304,8 @@ async function handleMk20Input(input) {
               curSess.lastDispatchError = null;
 
               const sessionScopeKey = destinationScope;
-              curSess.sessionKey = `${sessionScopeKey}/${result.sessionId}`;
+              curSess.sessionKey = formatSessionKey({hostId,harness:{pluginId:curHarness.id,instanceId:'default'},nativeSessionId:result.sessionId});
+              journal.registerSession(curSess.sessionKey,'user');
               context.memorySessionPerProject.set(sessionScopeKey, result.sessionId);
             }
 
@@ -1335,7 +1346,7 @@ async function handleMk20Input(input) {
           } catch (err) {
             console.warn('[Main] Dispatch failed:', err.message);
             if (curSess) {
-              curSess.voiceSubmission = 'idle';
+              curSess.voiceSubmission = dispatchStarted ? 'unknown' : 'error';
               curSess.lastDispatchError = err.message;
               curSess.voiceDraftText = promptText;
             }
@@ -1345,14 +1356,14 @@ async function handleMk20Input(input) {
               (activeSession?.id === curSess?.id || activeSession === curSess);
 
             if (isViewingThisSession) {
-              context.voiceSubmission = 'idle';
+              context.voiceSubmission = dispatchStarted ? 'unknown' : 'error';
               context.lastDispatchError = err.message;
               context.voiceDraftText = promptText;
               context.updateReaderForCurrentSession();
               void paintMk20();
             }
           }
-        })().finally(() => { if (nativeDispatches.get(curSess) === dispatchAbort) nativeDispatches.delete(curSess); });
+        })().finally(async() => { if (nativeDispatches.get(curSess) === dispatchAbort) nativeDispatches.delete(curSess); await mk20Ui.save(context.snapshotUi()); }).catch(error=>console.error('MK20 operation state save failed:',error.message));
       }
     } else if (kid === 12) {
       // Speak on MK20 Hardware Speaker (Key 12)
@@ -1379,10 +1390,10 @@ async function handleMk20Input(input) {
       // Stop / Cancel / Discard
       const curSess = context.getCurrentSession();
 
-      if (context.isRecordingVoice || (curSess && curSess.isRecordingVoice)) {
+      if (activeAudioCapture || context.isRecordingVoice || (curSess && curSess.isRecordingVoice)) {
         // Cancel active recording on this session
         context.isRecordingVoice = false;
-        if (curSess) curSess.isRecordingVoice = false;
+        if (curSess) {curSess.isRecordingVoice=false;curSess.voiceCaptureId=null;}
         const capId = activeAudioCapture?.captureId || currentVoiceCaptureId;
         activeAudioCapture = null;
         currentVoiceCaptureId = null;
@@ -1401,6 +1412,7 @@ async function handleMk20Input(input) {
           curSess.isTranscribingVoice = false;
           curSess.transcribingSeconds = 0;
           curSess.transcriptionCancelled = true;
+          curSess.voiceCaptureId=null;
         }
         context.voiceDraftText = '';
         if (curSess) curSess.voiceDraftText = '';
@@ -1443,6 +1455,7 @@ async function handleMk20Input(input) {
 // remains asynchronous; a slow file/session read cannot reorder later choices.
 let mk20InputQueue=Promise.resolve(),mk20Pending=0;
 mk20.on('lab.input',input=>{
+  if(!isActive())return;
   if(input.kind==='presence'||mk20Pending>=100)return;
   mk20Pending++;
   mk20InputQueue=mk20InputQueue.then(()=>handleMk20Input(input)).catch(error=>console.error('MK20 input failed:',error.code??error.message)).finally(()=>{mk20Pending--;});
@@ -1452,28 +1465,27 @@ console.log('====================================================');
 console.log('  RUNNING DAEMON (Press Ctrl+C to stop)');
 console.log('====================================================');
 
-process.on('uncaughtException', (err) => {
-  console.error('[UNCAUGHT EXCEPTION]:', err);
-});
-
-process.on('unhandledRejection', (reason) => {
-  console.error('[UNHANDLED REJECTION]:', reason);
-});
-
 return async () => {
+  compositionReady=false;mk20Online=false;
   clearInterval(timer);
-  if (tts) { try { tts.close(); } catch {} }
+  if(activeAudioCapture)finishVoiceCapture();
+  if (tts) { await tts.stop().catch(()=>{}); try { tts.close(); } catch {} }
+  if(transcriptionPromise)await transcriptionPromise.catch(()=>{});
+  voice.close();
+  await mk20Ui.save(context.snapshotUi());
   clearInterval(activeTranscriptionTimer);
   await mk20.close();
   await mk20Ui.flush();
   await desktop.close?.();
 };
+} catch(error) {compositionReady=false;for(const release of startupCleanup.reverse()){try{await release();}catch{}}throw error;}
 }
 
 let closeDevice = async () => {}, closing = false;
 const cleanup = async (code = 0) => {
   if (closing) return; closing = true;
   clearInterval(bootstrapTimer);
+  for(const cached of mk20Contexts.values())for(const operation of cached.nativeDispatches.values())operation.abort();
   await closeDevice();
   await api.close();
   await sources.close();
@@ -1486,5 +1498,5 @@ process.on('SIGINT', cleanup);
 process.on('SIGTERM', cleanup);
 process.on('disconnect', cleanup);
 process.on('message', message => { if (message === 'snowball.stop') void cleanup(); });
-try { if (profile === 'mk20') closeDevice = await startMk20Runtime(); }
+try { if (profile === 'mk20') { const bind=chooseLanAddress(undefined,process.env.SNOWBALL_BIND); closeDevice = await startMk20Lan({hostId,name:os.hostname(),bind,startRuntime:startMk20Runtime}); console.log('MK20 discovery ready on LAN; select this machine on MK20 (K17).'); } }
 catch (error) { console.error(error.message); await cleanup(1); }

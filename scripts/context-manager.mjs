@@ -417,7 +417,7 @@ export class ContextManager {
       const list=this.sessionsByScope[scope];if(!list||!Array.isArray(records))continue;
       for(const record of records){
         let session=list.find(item=>item.id===record.id);
-        if(!session&&record.localDraft===true&&/^s-\d+$/.test(record.id)&&typeof record.title==='string') {session={id:record.id,title:record.title.slice(0,128),createdAt:record.createdAt,preview:'',turnCount:0};list.push(session);}
+        if(!session&&record.localDraft===true&&/^s-[a-z0-9]+$/.test(record.id)&&typeof record.title==='string') {session={id:record.id,title:record.title.slice(0,128),createdAt:record.createdAt,preview:'',turnCount:0};list.push(session);}
         if(!session)continue;
         for(const key of ['model','effort','access','voiceDraftText','voiceDestinationLabel'])if(typeof record[key]==='string'&&Buffer.byteLength(record[key])<=8192)session[key]=record[key];
         if(Number.isSafeInteger(record.readerScrollLine)&&record.readerScrollLine>=0)session.readerScrollLine=record.readerScrollLine;
