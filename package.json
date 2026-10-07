@@ -11,6 +11,8 @@
     "packages/*"
   ],
   "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "start:suite": "node scripts/start-suite.mjs --config ../.snowball/suite.json",
     "start:local": "node apps/supervisor/run.mjs",
     "build": "node scripts/build.mjs",
     "test": "npm run build && node scripts/test.mjs",

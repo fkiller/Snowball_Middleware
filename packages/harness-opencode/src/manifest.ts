@@ -30,6 +30,6 @@ export async function opencodeManifest() {
       additionalProperties: false,
     },
     integrity: { entrySha256: createHash('sha256').update(await readFile(new URL('./worker.js', import.meta.url))).digest('hex') },
-    license: 'UNLICENSED',
+    license: 'Apache-2.0',
   });
 }
