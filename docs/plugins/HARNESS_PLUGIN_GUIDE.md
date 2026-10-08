@@ -1,145 +1,23 @@
-# HARNESS PLUGIN GUIDE (하네스 플러그인 표준 및 개발 가이드)
+# 하네스 플러그인 개발 가이드
 
-## 1. 개요 및 목적
-하네스 플러그인(Harness Plugin)은 사용자의 로컬 PC에서 구동되는 다양한 AI 코딩 에이전트(Codex, Antigravity, OpenCode, Claude Code, Cursor 등)를 Snowball 미들웨어에 표준화된 방식으로 연동하는 어댑터입니다.
+현재 공개 범주는 Codex·Antigravity(AGY)·OpenCode다. 제품 철학·실행 경계·버전별 제한은 [중앙 아키텍처](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.ko.md), 설치 기준은 [harness-compatibility.json](../../config/harness-compatibility.json)에서 관리한다.
 
-하네스 플러그인은 **"하드코딩 없는 살아있는 원천(Source of Truth) 탐색"**과 **"보안 격리(Sandbox Isolation) 하에서의 실제 호스트 명령 디스패치"**를 핵심 원칙으로 합니다.
+## 프로세스 플러그인과 호스트 어댑터
 
----
+- 공통 worker 계약은 [plugin-sdk](../../packages/plugin-sdk/src/index.ts)의 Protocol 1 매니페스트·JSON-RPC다. 승인된 worker 다이제스트, 선언한 `harness.*` 기능, 플랫폼과 설정 스키마를 검사하고 `plugin.initialize`를 교환한다.
+- 호스트의 [HarnessAdapter](../../packages/core/src/sessions.ts)는 SDK의 [DispatchPort](../../packages/plugin-sdk/src/dispatch.ts)를 확장한다. 실행 계약은 `ownerId`와 `execute(envelope, signal)`이며 세션 조회·생성·attach·모델 조회는 어댑터별 선택 기능이다.
+- 워커의 관찰 기능과 승인된 호스트의 실행 기능을 구분한다. 매니페스트의 메타데이터나 `readOnly` 표기만으로 OS 파일 접근이 격리되거나 명령 소유권이 생기지 않는다. 정적 의존성 검사는 OS 샌드박스가 아니다.
 
-## 2. 하네스 플러그인 인터페이스 (`HarnessAdapter`)
+## 실제 데이터와 실행
 
-모든 하네스 플러그인은 `@snowball/core`의 `HarnessAdapter` 인터페이스를 구현합니다:
+모델·모델별 effort·프로젝트·세션·네이티브 access 값은 설치된 CLI, 캐시, 인덱스/DB, 프로토콜에서 읽는다. 실제로 보고되지 않은 모델이나 effort를 기본 배열로 채우지 않는다. 미지원/미확인은 빈 목록이나 오류로 남긴다. AGY를 호출하는 부모와 모든 자식 프로세스에는 호출 전 `AGY_CLI_DISABLE_AUTO_UPDATE=true`를 적용한다.
 
-```typescript
-export interface HarnessAdapter {
-  readonly id: string;               // 예: 'snowball.codex', 'snowball.antigravity', 'snowball.opencode'
-  readonly name: string;             // 표시 이름 (예: 'Codex', 'Antigrav', 'OpenCode')
-  readonly surface: string;          // 연동 방식 (예: 'stdio-rpc', 'stream-json', 'cli-runner')
-  readonly readOnly: boolean;        // 플러그인 자체의 샌드박스 격리 여부 (기본 true)
+Middleware의 `scripts/harness-runtime.mjs`, `harness-catalog-scanner.mjs`, `harness-session-scanner.mjs`, `harness-project-scanner.mjs`와 `harness-dispatch.mjs`가 현재 통합 진입점이다. 실행은 선택한 실제 프로젝트 경로·컨트롤러·하네스 인스턴스·세션·owner/revision에 결합한다. 승인·중단은 각 네이티브 런타임의 실제 지원과 확인 가능한 receipt를 따른다. 프로세스 종료나 텍스트 출력만으로 세션 생성/전송 완료를 만들지 않는다. 불명확한 전송은 `unknown`이며 자동 재전송하지 않는다.
 
-  /** 살아있는 모델 카탈로그 동적 스캔 */
-  listModels?(): Promise<ProviderModelItem[]>;
+## 수정 및 독립 배포 확인
 
-  /** 현재 머신의 세션 목록 스캔 */
-  listSessions(): Promise<SessionSummary[]>;
-
-  /** 세션의 대화 내역(Turns) 및 상세 읽기 */
-  readSession(sessionId: string): Promise<SessionDetail>;
-
-  /** 호스트 레벨 프롬프트 디스패치 및 실시간 스트리밍 */
-  dispatchTurn(params: HarnessTurnParams): Promise<HarnessTurnResult>;
-}
-```
-
----
-
-## 3. 핵심 구현 4대 원칙
-
-### 1. Living Model Catalog Discovery (동적 모델 카탈로그 탐색)
-- **금지**: 하네스가 제공하는 모델 리스트를 정적 배열로 코드에 고정하는 행위.
-- **표준**: 네이티브 CLI 명령어 또는 로컬 캐시 메타데이터를 직접 질의합니다:
-  - OpenCode: `opencode models` CLI 질의 + `~/.cache/opencode/models.json` 파싱.
-  - Antigravity: `agy.exe models` CLI 질의.
-  - Codex: 공식 롤아웃 JSONL 및 RPC 스키마 질의.
-- **모델 스펙 객체 필드**:
-  ```typescript
-  export interface ProviderModelItem {
-    model: string;            // CLI 실행 시 전달할 실제 식별자 (예: 'opencode/muse-spark-1.3-contributor-free')
-    displayName: string;      // LCD 화면에 표시할 직관적 명칭 (예: 'Muse Spark 1.3 Free')
-    efforts: string[];        // 해당 모델이 지원하는 Reasoning Effort 목록 (예: ['minimal', 'low', 'medium', 'high', 'xhigh'])
-    defaultEffort: string;    // 해당 모델의 기본 Effort
-    isDefault?: boolean;      // 기본 추천 모델 여부
-  }
-  ```
-  *(추론 미지원 모델의 경우 `efforts: ['none']`, `defaultEffort: 'none'`으로 설정)*
-
-### 2. Living Session & Turn Discovery (세션 및 대화 내역 인덱싱)
-- 하네스의 로컬 데이터베이스나 파일시스템을 직접 탐색하여 실시간 세션을 수집합니다:
-  - SQLite DB (`opencode.db`, Antigravity `brain.db` 등)
-  - 인덱스 파일 (`session_index.jsonl`, 세션 디렉터리 등)
-- 턴(Turn) 내역에서 유저 프롬프트, 에이전트 응답 텍스트, 프로세스 세부정보(`processDetails`)를 추출하여 MK20 상단 LCD 및 Local API에 제공합니다.
-
-### 3. Sandbox Isolation Boundary (플러그인 보안 격리)
-- 플러그인 매니페스트(`manifest.ts`)는 `readOnly: true`, `surface: 'transcript-observer'`를 선언하여 플러그인이 미들웨어의 코어 권한을 탈취하거나 무단 파일 변조를 수행할 수 없도록 격리합니다.
-- 실제 명령 실행은 승인된 호스트 디스패처(`scripts/harness-dispatch.mjs`)가 전담합니다.
-
-### 4. Host Dispatch Execution (실제 호스트 명령 실행)
-- K16(Send) 클릭 시 시뮬레이션 없이 실제 네이티브 프로세스를 스폰합니다:
-  - 표준 입출력 인터페이스(Stdio RPC, stream-json NDJSON, CLI argv).
-  - 에이전트 생성 텍스트를 `onDelta(textPiece)` 콜백으로 실시간 수신하여 MK20 화면에 즉시 스트리밍.
-  - 프로세스 종료 시 최종 세션 ID 및 완성된 텍스트 반환.
-
----
-
-## 4. 신규 하네스 플러그인 개발 튜토리얼 (예: `Claude Code` 연동)
-
-새로운 하네스(예: `Claude Code` CLI)를 추가하는 단계별 가이드:
-
-### 1단계: 플러그인 매니페스트 정의 (`packages/harness-claude-code`)
-```typescript
-import { HarnessManifest } from '@snowball/plugin-sdk';
-
-export const claudeCodeManifest: HarnessManifest = {
-  id: 'snowball.claudecode',
-  name: 'Claude Code',
-  version: '0.1.0',
-  readOnly: true,
-  surface: 'cli-process',
-  capabilities: ['harness.sessions', 'harness.models']
-};
-```
-
-### 2단계: 동적 모델 스캐너 추가 (`scripts/harness-catalog-scanner.mjs`)
-```javascript
-export function scanClaudeCodeCatalog() {
-  // claude models 또는 관련 설정 파일 조회
-  return [
-    {
-      model: 'claude-3-7-sonnet',
-      displayName: 'Claude 3.7 Sonnet',
-      efforts: ['low', 'medium', 'high', 'max'],
-      defaultEffort: 'high',
-      isDefault: true
-    },
-    {
-      model: 'claude-3-5-haiku',
-      displayName: 'Claude 3.5 Haiku',
-      efforts: ['none'],
-      defaultEffort: 'none',
-      isDefault: false
-    }
-  ];
-}
-```
-
-### 3단계: 세션 스캐너 추가 (`scripts/harness-session-scanner.mjs`)
-Claude Code의 세션 기록 파일(`~/.claude/sessions/`)을 탐색하여 활성 프로젝트명과 세션 제목, 최근 턴 내역을 수집합니다.
-
-### 4단계: 디스패처 러너 등록 (`scripts/harness-dispatch.mjs`)
-```javascript
-export async function runClaudeCodeTurn(sessionId, promptText, cwd, model, effort, onDelta) {
-  return new Promise((resolve, reject) => {
-    const args = ['--format', 'json', '--model', model];
-    if (sessionId) args.push('--session', sessionId);
-    if (effort && effort !== 'none') args.push('--effort', effort);
-    args.push(promptText);
-
-    const p = cp.spawn('claude', args, { cwd: cwd || process.cwd() });
-    let agentText = '';
-
-    p.stdout.on('data', chunk => {
-      const piece = chunk.toString();
-      agentText += piece;
-      if (onDelta) onDelta(piece);
-    });
-
-    p.on('close', code => {
-      resolve({ sessionId: sessionId || 'new-session', response: agentText.trim() });
-    });
-  });
-}
-```
-
-### 5단계: 통합 확인
-`scripts/start-all.mjs`의 `context.harnesses` 배열에 등록하고, MK20 K13 버튼을 눌러 새 하네스로 즉시 전환하여 물리 제어할 수 있습니다.
+1. `packages/harness-*`의 실제 manifest, worker, adapter와 기존 테스트를 읽고 지원 기능을 정한다. 아직 구현하지 않은 공급자의 CLI 옵션·모델·세션 경로를 예제로 단정하지 않는다.
+2. `npm run check:boundaries`로 SDK 외 내부 구현 의존성이 없는지 확인한다. 기존 PluginHost 및 어댑터 테스트를 실행한다.
+3. 독립 배포 경로는 [기존 배포 안내](../middleware/PLUGIN_DEVELOPMENT.md)를 따른다. 설치된 worker가 바뀌면 명시적 설치 검증으로 다이제스트를 다시 승인하며, 시작 시 임의로 승인하지 않는다.
+4. 공통 설치/트레이 변경은 세 하네스 worker 초기화와 Web·MK20·M5Stack 프로필에 영향을 준다. 장치의 화면 문구 수정만으로 하네스 프로토콜이나 SDK 버전을 바꾸지 않는다.
+5. 변경과 같은 변경 세트에서 중앙 문서·한국어 번역·관련 사용자 안내 및 검증 한계를 갱신한다. fixture 테스트와 실제 하네스/기기 검증을 구분한다.
