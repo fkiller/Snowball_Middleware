@@ -2045,6 +2045,11 @@
               "token"
             ]
           },
+          "hostId": {
+            "type": "string",
+            "pattern": "^host_[a-f0-9]{32}$",
+            "description": "Persistent public identity from the actual command journal; not an enrollment key or authorization grant."
+          },
           "desktopCapabilities": {
             "type": "object",
             "properties": {

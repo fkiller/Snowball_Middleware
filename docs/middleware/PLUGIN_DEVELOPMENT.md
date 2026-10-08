@@ -21,6 +21,8 @@ For public distribution, preserve each package's actual license notices and comp
 
 Common installation/tray/settings changes require checking Web, MK20 and M5Stack profiles plus all three harness workers. MK20 HUD status and its LAN diagnostics are device-specific; they do not change Protocol 1, harness RPC or M5Stack's pairing/control protocol. Update this operational guidance and the central bilingual specification with each relevant change set.
 
+Installed device setup now retains existing adapters in the same install root; check both installation orders and separate per-device Python/NIC settings. The M5Stack gateway must acknowledge actual listener readiness before suite readiness. `/v1/snapshot.hostId` is read-only journal identity metadata, not authorization; plugin initialization, approval and worker Protocol 1 are unchanged. Exercise the optional real dual-adapter test with `SNOWBALL_M5STACK_ROOT` pointing at the reviewed device source, and record physical firmware/PC-switching evidence separately in the central specification.
+
 ## Standalone harness extraction
 
 After build, run `npm run export:harnesses -- ABSOLUTE_NEW_DIRECTORY`. It creates separate Codex, OpenCode and Antigravity source packages, vendored prerelease SDK tarball, lockfiles, standalone TypeScript configuration, protocol and fresh release-install tests, and Windows/macOS CI definitions. The package bundles the SDK for consumers because a nested `file:vendor/...` dependency alone failed fresh tarball installation.

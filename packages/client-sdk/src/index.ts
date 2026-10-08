@@ -14,6 +14,8 @@ export interface LocalSettings {
 export interface Credentials { token: string; csrfToken: string; controllerId: string; expiresAt: number }
 export interface Snapshot {
   accessMode?: 'local-no-auth' | 'token';
+  /** Persistent public journal identity; never an enrollment credential. */
+  hostId?: string;
   desktopCapabilities?: {tray: boolean; autostart: boolean; codexSelection?: boolean};
   sessionDetails?: SessionSummary[];
   connectedHarnesses?: {pluginId: string; instanceId: string | null; disabled: boolean; connected: boolean; auth: string; sessionListTruncated: boolean; canAttach: boolean; canCreate: boolean; canListModels: boolean}[];

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { loadSuitePlugins } from './suite-plugins.mjs';
+import {suiteRuntime} from './suite-devices.mjs';
 
 const args = process.argv.slice(2);
 if (args.length !== 2 || args[0] !== '--config') throw Error('Usage: start-suite.mjs --config PATH');
@@ -11,6 +12,7 @@ const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
 if (config.version !== 1 || !['web', 'mk20', 'm5stack'].includes(config.profile) || !Number.isInteger(config.port) || config.port < 1024 || config.port > 65535) throw Error('Invalid installed suite');
 const middleware = fileURLToPath(new URL('..', import.meta.url));
 const origin = `http://127.0.0.1:${config.port}`;
+const adapters=suiteRuntime(config);
 const children = [], plugins = await loadSuitePlugins(config);
 let stopping = false;
 async function stop(code = 0) {
@@ -41,9 +43,8 @@ try {
   // Never take over an unrelated service already bound to the selected port.
   const { createServer } = await import('node:net');
   await new Promise((resolve, reject) => { const server = createServer(); server.once('error', reject); server.listen(config.port, '127.0.0.1', () => server.close(resolve)); });
-  const env = { SNOWBALL_PROFILE: config.profile, SNOWBALL_PORT: String(config.port), SNOWBALL_SUITE_CONFIG: configFile, AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
+  const env = { ...adapters.env, SNOWBALL_PORT: String(config.port), SNOWBALL_SUITE_CONFIG: configFile, AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
   if (config.dataDir) env.SNOWBALL_DATA_DIR = config.dataDir;
-  if (config.profile === 'mk20') Object.assign(env, { SNOWBALL_CONTROL_ROOT: config.controlRoot, SNOWBALL_BIND: config.bindExplicit === false ? '' : config.bind, PYTHON_BIN: config.python });
   const runtime=launch(path.join(middleware, 'scripts/start-all.mjs'), [], middleware, env);
   process.on('message',message=>{if(message?.kind==='native-result'&&runtime.connected)runtime.send(message);});
   await new Promise((resolve,reject)=>{
@@ -55,8 +56,17 @@ try {
   });
   const response=await fetch(origin+'/v1/snapshot',{headers:{Origin:origin},signal:AbortSignal.timeout(10000)});
   if(!response.ok)throw Error('Owned middleware snapshot failed (HTTP '+response.status+')');
-  if (config.profile === 'm5stack') launch(path.join(config.deviceRoot, 'scripts/gateway.mjs'), ['--serial', config.serial, '--python', config.python, '--bind', config.bind, '--backend', origin, ...(config.device ? ['--device', config.device] : [])], config.deviceRoot);
-  console.log(`Snowball is responding at ${origin}/ — ${config.profile} + Codex + Antigravity + OpenCode plugins`);
+  if (adapters.gateway) {
+    const g=adapters.gateway, gateway=launch(g.script,g.args,g.cwd);
+    await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>done(Error('M5Stack gateway did not report readiness')),15000);
+      const onMessage=message=>{if(message?.kind==='gateway-ready')done();};
+      const onExit=code=>done(Error('M5Stack gateway exited before readiness ('+code+')'));
+      function done(error){clearTimeout(timer);gateway.off('message',onMessage);gateway.off('exit',onExit);error?reject(error):resolve();}
+      gateway.on('message',onMessage);gateway.once('exit',onExit);
+    });
+  }
+  console.log(`Snowball is responding at ${origin}/ — ${adapters.profiles.join(' + ') || 'web'} + Codex + Antigravity + OpenCode plugins`);
   if(process.connected)process.send({kind:'suite-ready',origin});
   console.log('Press Ctrl+C to stop. The launcher starts the installed suite again without downloads.');
   if (config.openBrowser !== false && process.env.SNOWBALL_DESKTOP !== '1') {

@@ -43,6 +43,8 @@ M5Stack은 첫 설치 시 USB로 연결하세요. 플래시 용량 탐지, 기�
 
 기존 설치는 같은 `-InstallRoot`에 `-Update`를 추가해 공식 소스를 fast-forward하고 다시 빌드하세요. 상태·페어링·음성 캐시는 보존합니다.
 
+같은 설치 루트의 기기 설치는 추가 방식입니다. `mk20` 설치 뒤 `-Profile m5stack`을 실행해도 MK20을 유지하고 하나의 트레이/API로 두 어댑터를 실행합니다. PC마다 M5Stack을 USB로 한 번 연결해 등록하세요. 여러 PC 선택에는 펌웨어 0.3.0이 필요하며 설치기가 전체 플래시를 백업하고 업그레이드합니다. 이후 설치에는 `-NoFlash`를 사용할 수 있습니다. 기존에 등록한 PC의 게이트웨이도 업데이트한 뒤 기기의 머신 목록 또는 설정 → 미들웨어 검색에서 PC를 선택하세요. 검색만으로 미등록 PC를 등록하지 않습니다. 프로토콜과 검증 범위는 [중앙 문서](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.ko.md)에 기록합니다.
+
 이미 페어링한 MK20을 다시 선택하면 기존 컨트롤러에 재연결합니다. 해제·시작 실패 시에도 등록과 선택 상태는 보존합니다. 로그의 `MK20 LAN Registry` / `RECONNECTED`는 등록 단계 확인이고, 실제 연결은 기기의 유효한 화면 응답으로 확인합니다.
 
 옵션: `-Update`, `-InstallRoot 경로`, `-Serial COM번호`, `-Bind PC의_사설_IP`, `-Port 8765`, `-NoStart`, `-NoFlash`(M5Stack 기존 펌웨어 확인). 여러 USB 포트나 LAN 어댑터가 있으면 해당 옵션으로 지정하세요. 오류가 나면 완료로 처리하지 않습니다. 원샷 부트스트랩은 현재 **Windows** 대상입니다. Node/Git가 설치된 macOS 개발 환경에서는 같은 부모 폴더의 체크아웃 구성으로 `npm run setup -- --profile web` , `--profile mk20` 또는 `--profile m5stack`을 사용할 수 있습니다. Linux 전체 플러그인 런타임은 아직 지원하지 않습니다.

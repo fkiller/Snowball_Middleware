@@ -293,6 +293,7 @@ export class LocalApi {
     });
     return {
       accessMode: this.options.noAuth ? 'local-no-auth' : 'token',
+      hostId: this.options.journal.hostId,
       cursor: this.cursor,
       settings: structuredClone(this.settings),
       desktopCapabilities: this.options.desktopCapabilities ?? { tray: false, autostart: false },

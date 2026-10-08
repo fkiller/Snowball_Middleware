@@ -27,7 +27,7 @@ export class CommandJournal {
   private readonly sessions = new Map<string, SessionRecord>();
   private readonly decisions = new Map<string, DecisionRecord>();
   private readonly verifiedSessions = new Set<string>();
-  private readonly hostId: string;
+  readonly hostId: string;
   private readonly now: () => number;
   private readonly maxSession: number;
   private readonly maxTotal: number;

@@ -43,6 +43,8 @@ Connect M5Stack by USB for first installation; flash size is detected, existing 
 
 For an existing install, keep the same `-InstallRoot` and add `-Update` to fast-forward the official sources and rebuild. State, pairing and speech caches are preserved.
 
+Device setup is additive in the same install root: running `-Profile m5stack` after `mk20` retains MK20 and runs both adapters behind one tray/API. Connect M5Stack by USB once per PC to enroll that PC. Multi-PC selection requires firmware 0.3.0; the installer makes a full flash backup before upgrading. Later installs may use `-NoFlash`. Update each previously enrolled PC's gateway as well, then select the PC in M5Stack's Machine list or Settings → Find middleware. Discovery does not enroll an unknown PC. See the [central specification](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.md) for protocol and verification limits.
+
 Selecting a previously paired MK20 reconnects its existing controller; release or a failed startup preserves registration and selected context. The desktop log reports `MK20 LAN Registry` with `RECONNECTED` for that registry step; a valid device screen response confirms the connection.
 
 Options: `-Update`, `-InstallRoot PATH`, `-Serial COMx`, `-Bind PRIVATE_PC_IP`, `-Port 8765`, `-NoStart`, `-NoFlash` (M5Stack firmware verification). On ambiguous adapters or USB ports supply the matching option; installation stops on errors. The one-command bootstrap currently targets **Windows**; macOS developers with Node/Git can run `npm run setup -- --profile web` , `--profile mk20`, or `--profile m5stack` from a sibling checkout layout. Linux suite workers are not yet supported.

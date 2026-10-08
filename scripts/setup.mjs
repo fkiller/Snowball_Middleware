@@ -4,6 +4,7 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseSetupOptions, repositoriesFor, harnessRepositories, chooseLanAddress, pythonInVenv } from './setup-profile.mjs';
+import {planDevices,deviceConfig} from './suite-devices.mjs';
 process.env.AGY_CLI_DISABLE_AUTO_UPDATE='true';
 
 const options = parseSetupOptions(process.argv.slice(2));
@@ -27,11 +28,12 @@ fs.mkdirSync(installDir, { recursive: true, mode: 0o700 });
 const configFile = path.join(installDir, 'suite.json');
 let previousConfig;
 try { previousConfig=JSON.parse(fs.readFileSync(configFile,'utf8')); } catch {}
+const deviceProfiles=planDevices(options.profile,previousConfig);
 const previouslyInstalledTray=previousConfig?.desktopVersion===1;
 // Stop only this installed tray before replacing dependencies; preserve all state.
 if(fs.existsSync(path.join(installDir,'desktop.v1.json')))run(process.execPath,[path.join(middleware,'scripts/start-installed.mjs'),'--config',configFile,'--stop'],middleware);
 const commits = {};
-for (const repository of repositoriesFor(options.profile)) {
+for (const repository of repositoriesFor(deviceProfiles)) {
   const directory = path.join(root, repository);
   if (!fs.existsSync(directory)) run('git', ['clone', '--branch', 'main', 'https://github.com/fkiller/' + repository + '.git', directory]);
   const remote = run('git', ['remote', 'get-url', 'origin'], directory, { capture: true });
@@ -57,6 +59,7 @@ for (const [kind, repository] of Object.entries(harnessRepositories)) {
   plugins.push({ kind, directory, entrySha256: manifest.integrity.entrySha256 });
 }
 const config = { version: 1, desktopVersion: 1, nodeExecutable: process.execPath, profile: options.profile, root, middleware, plugins, commits, port: options.port,
+  deviceProfiles, devices:Object.fromEntries(deviceProfiles.filter(p=>p!==options.profile).map(p=>[p,deviceConfig(previousConfig,p)])),
   ...(options['data-dir'] ? { dataDir: path.resolve(options['data-dir']) } : previousConfig?.dataDir ? {dataDir:previousConfig.dataDir} : {}) };
 if (options.profile !== 'web') {
   const deviceAddress = options.profile === 'mk20' ? options['mk20-address']?.split(':')[0] : options.device;
@@ -87,6 +90,13 @@ if (options.profile !== 'web') {
     run(config.python, [path.join(middleware, 'scripts/ensure_stt_runtime.py'), '--install', '--python', config.python]);
     run(config.python, [path.join(control, 'scripts/ensure_tts_runtime.py'), '--ensure']);
   }
+  config.devices[options.profile]=Object.fromEntries(['bind','bindExplicit','python','serial','device','deviceRoot','controlRoot'].filter(k=>config[k]!==undefined).map(k=>[k,config[k]]));
+}
+// Retained MK20 sources may have advanced during Update too.
+if(deviceProfiles.includes('mk20')&&options.profile!=='mk20') {
+  const host=path.join(config.devices.mk20.controlRoot,'host');
+  npmRun(['ci','--ignore-scripts','--no-audit','--no-fund'],host);
+  npmRun(['run','build'],host);
 }
 const { loadSuitePlugins } = await import('./suite-plugins.mjs');
 const loaded = await loadSuitePlugins(config);
@@ -109,5 +119,6 @@ if (process.platform === 'win32') {
   }
 } else fs.writeFileSync(path.join(root, 'Start-Snowball.sh'), `#!/bin/sh\nexec '${process.execPath.replaceAll("'", "'\\''")}' '${launchScript.replaceAll("'", "'\\''")}' --config '${configFile.replaceAll("'", "'\\''")}'\n`, { mode: 0o700 });
 console.log(`Installed ${options.profile} profile with all three verified harness plugins. Launcher: ${root}`);
+console.log(`Enabled device adapters: ${deviceProfiles.join(', ') || 'none (Web UI only)'}. Existing adapters and state are preserved.`);
 console.log('Native Codex / Antigravity / OpenCode applications and their sign-in remain owned by their vendors. Missing native apps are shown as unavailable.');
 if (!options['no-start']) run(process.execPath, [launchScript, '--config', configFile,...(previouslyInstalledTray?[]:['--register-autostart'])], middleware);

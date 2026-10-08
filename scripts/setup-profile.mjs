@@ -43,6 +43,7 @@ export function chooseLanAddress(interfaces = os.networkInterfaces(), explicit, 
 }
 
 export function repositoriesFor(profile) {
+  if (Array.isArray(profile)) return [...new Set(['web', ...profile].flatMap(repositoriesFor))];
   if (!['web', 'mk20', 'm5stack'].includes(profile)) throw Error('Unknown profile');
   return ['Snowball_Middleware', ...Object.values(harnessRepositories), ...(profile === 'mk20' ? ['Snowball_Control'] : profile === 'm5stack' ? ['Snowball_Device_M5Stack'] : [])];
 }
