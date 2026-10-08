@@ -4,6 +4,7 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseSetupOptions, repositoriesFor, harnessRepositories, chooseLanAddress, pythonInVenv } from './setup-profile.mjs';
+process.env.AGY_CLI_DISABLE_AUTO_UPDATE='true';
 
 const options = parseSetupOptions(process.argv.slice(2));
 if (!['win32', 'darwin'].includes(process.platform)) throw Error('Suite plugin workers currently support Windows and macOS');
@@ -23,6 +24,12 @@ function run(executable, args, cwd = root, { capture = false, env = process.env 
 const npmRun = (args, cwd) => run(process.execPath, [npm, ...args], cwd);
 const installDir = path.join(root, '.snowball');
 fs.mkdirSync(installDir, { recursive: true, mode: 0o700 });
+const configFile = path.join(installDir, 'suite.json');
+let previousConfig;
+try { previousConfig=JSON.parse(fs.readFileSync(configFile,'utf8')); } catch {}
+const previouslyInstalledTray=previousConfig?.desktopVersion===1;
+// Stop only this installed tray before replacing dependencies; preserve all state.
+if(fs.existsSync(path.join(installDir,'desktop.v1.json')))run(process.execPath,[path.join(middleware,'scripts/start-installed.mjs'),'--config',configFile,'--stop'],middleware);
 const commits = {};
 for (const repository of repositoriesFor(options.profile)) {
   const directory = path.join(root, repository);
@@ -30,12 +37,16 @@ for (const repository of repositoriesFor(options.profile)) {
   const remote = run('git', ['remote', 'get-url', 'origin'], directory, { capture: true });
   if (!new RegExp(`^(?:https://github\\.com/|git@github\\.com:)fkiller/${repository}(?:\\.git)?$`, 'i').test(remote)) throw Error('Unexpected repository origin: ' + repository);
   if (run('git', ['status', '--porcelain', '--untracked-files=no'], directory, { capture: true })) throw Error('Tracked local changes in ' + repository + '; commit or use a separate install root');
-  // Existing checkouts are deliberately not reset or switched. Rerunning is safe offline.
+  if(options.update){
+    run('git',['fetch','origin','main'],directory);
+    run('git',['merge','--ff-only','origin/main'],directory);
+  }
   commits[repository] = run('git', ['rev-parse', 'HEAD'], directory, { capture: true });
 }
 console.log('Building Snowball Middleware and all harness plugins...');
 npmRun(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], middleware);
 npmRun(['run', 'build'], middleware);
+npmRun(['run', 'install:desktop'], middleware);
 const plugins = [];
 for (const [kind, repository] of Object.entries(harnessRepositories)) {
   const directory = path.join(root, repository);
@@ -45,7 +56,7 @@ for (const [kind, repository] of Object.entries(harnessRepositories)) {
   const manifest = await entry[kind + 'Manifest']();
   plugins.push({ kind, directory, entrySha256: manifest.integrity.entrySha256 });
 }
-const config = { version: 1, profile: options.profile, root, middleware, plugins, commits, port: options.port,
+const config = { version: 1, desktopVersion: 1, nodeExecutable: process.execPath, profile: options.profile, root, middleware, plugins, commits, port: options.port,
   ...(options['data-dir'] ? { dataDir: path.resolve(options['data-dir']) } : {}) };
 if (options.profile !== 'web') {
   const deviceAddress = options.profile === 'mk20' ? options['mk20-address']?.split(':')[0] : options.device;
@@ -80,11 +91,10 @@ if (options.profile !== 'web') {
 const { loadSuitePlugins } = await import('./suite-plugins.mjs');
 const loaded = await loadSuitePlugins(config);
 await loaded.close();
-const configFile = path.join(installDir, 'suite.json');
 const temporary = configFile + '.tmp';
 fs.writeFileSync(temporary, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
 fs.renameSync(temporary, configFile);
-const launchScript = path.join(middleware, 'scripts/start-suite.mjs');
+const launchScript = path.join(middleware, 'scripts/start-installed.mjs');
 if (process.platform === 'win32') {
   const quote = s => "'" + s.replaceAll("'", "''") + "'";
   const launcher = path.join(root, 'Start-Snowball.ps1');
@@ -92,10 +102,12 @@ if (process.platform === 'win32') {
   const desktop = run('powershell.exe', ['-NoProfile', '-Command', '[Environment]::GetFolderPath("Desktop")'], root, { capture: true });
   if (!options['no-shortcut'] && fs.existsSync(desktop)) {
     // A .lnk keeps paths with spaces/non-ASCII characters intact; no cmd interpolation.
-    const ps = `$s=(New-Object -ComObject WScript.Shell).CreateShortcut(${quote(path.join(desktop, 'Snowball.lnk'))});$s.TargetPath='powershell.exe';$s.Arguments=${quote('-NoProfile -ExecutionPolicy Bypass -File "' + launcher + '"')};$s.WorkingDirectory=${quote(root)};$s.Save()`;
+    const {createRequire}=await import('node:module');
+    const electron=createRequire(import.meta.url)('electron');
+    const ps = `$s=(New-Object -ComObject WScript.Shell).CreateShortcut(${quote(path.join(desktop, 'Snowball.lnk'))});$s.TargetPath=${quote(electron)};$s.Arguments=${quote('"'+path.join(middleware,'apps/desktop/main.mjs')+'" --suite-config "'+configFile+'"')};$s.WorkingDirectory=${quote(root)};$s.Save()`;
     run('powershell.exe', ['-NoProfile', '-Command', ps]);
   }
 } else fs.writeFileSync(path.join(root, 'Start-Snowball.sh'), `#!/bin/sh\nexec '${process.execPath.replaceAll("'", "'\\''")}' '${launchScript.replaceAll("'", "'\\''")}' --config '${configFile.replaceAll("'", "'\\''")}'\n`, { mode: 0o700 });
 console.log(`Installed ${options.profile} profile with all three verified harness plugins. Launcher: ${root}`);
 console.log('Native Codex / Antigravity / OpenCode applications and their sign-in remain owned by their vendors. Missing native apps are shown as unavailable.');
-if (!options['no-start']) run(process.execPath, [launchScript, '--config', configFile], middleware);
+if (!options['no-start']) run(process.execPath, [launchScript, '--config', configFile,...(previouslyInstalledTray?[]:['--register-autostart'])], middleware);

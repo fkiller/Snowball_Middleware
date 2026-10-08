@@ -41,6 +41,8 @@ process.env.AGY_CLI_DISABLE_AUTO_UPDATE = 'true';
 import { languageManager } from './language-manager.mjs';
 import { chooseLanAddress, privateIpv4 } from './setup-profile.mjs';
 import { loadSuitePlugins } from './suite-plugins.mjs';
+import {desktopBridge} from './desktop-bridge.mjs';
+import {loadSettings,saveSettings} from '../apps/supervisor/settings-store.mjs';
 
 const profile = process.env.SNOWBALL_PROFILE ?? 'web';
 if (!['web', 'mk20', 'm5stack'].includes(profile)) throw Error('Invalid Snowball profile');
@@ -48,9 +50,16 @@ const apiPort = Number(process.env.SNOWBALL_PORT ?? 8765);
 if (!Number.isInteger(apiPort) || apiPort < 1024 || apiPort > 65535) throw Error('Invalid Snowball port');
 let updateDeviceSession = () => {};
 const mk20Contexts=new Map();
+let speechPreparation;
+const speechAbort=new AbortController();
 const suiteConfig = process.env.SNOWBALL_SUITE_CONFIG ? JSON.parse(fs.readFileSync(process.env.SNOWBALL_SUITE_CONFIG, 'utf8')) : null;
 const suite = suiteConfig ? await loadSuitePlugins(suiteConfig, { start: false }) : null;
 const directory = ensurePrivateStateDirectory(process.env.SNOWBALL_DATA_DIR ? path.resolve(process.env.SNOWBALL_DATA_DIR) : resolveUserDataDir());
+const desktopSettings=desktopBridge();
+const savedSettings=loadSettings(directory);
+if(fs.existsSync(path.join(directory,'settings.v1.json')))languageManager.setPrimaryLanguage(savedSettings.language);
+if(desktopSettings.enabled)savedSettings.autostart=await desktopSettings.request('get-autostart');
+let controlPaused=savedSettings.controlPaused;
 const sources = new NativeSourceService();
 const controllerPersistence = await loadControllerStore(directory);
 const controllerStates = controllerPersistence.store;
@@ -264,9 +273,14 @@ const api = new LocalApi({
   hostname: os.hostname(),
   noAuth: true,
   initialSettings: {
+    ...savedSettings,
     language: languageManager.getPrimaryLanguage().id,
   },
+  desktopCapabilities:{tray:desktopSettings.enabled,autostart:desktopSettings.enabled},
   applySettings: async (next, prev) => {
+    if(next.autostart!==prev.autostart){const actual=await desktopSettings.request('set-autostart',next.autostart);if(actual!==next.autostart)throw Error('OS login setting was not confirmed');}
+    try{saveSettings(directory,next);}catch(error){if(next.autostart!==prev.autostart)await desktopSettings.request('set-autostart',prev.autostart);throw error;}
+    controlPaused=next.controlPaused;
     if (next.language && next.language !== prev.language) {
       languageManager.setPrimaryLanguage(next.language);
       console.log(`[LanguageManager] Primary language changed to: ${next.language}`);
@@ -351,6 +365,13 @@ try {
 } catch (err) {
   throw Error('MK20 LAN transport failed: '+err.message);
 }
+const paintStarting=()=>{
+  if(!isActive()||compositionReady)return;
+  return mk20.preview({mode:'session',title:os.hostname(),subtitle:'Connected · loading local harnesses',lines:['Reading native projects and sessions...','Machines (K17) remains available.'],scroll:0,totalLines:2,volume:75,muted:false,keys:Array.from({length:20},(_,i)=>({id:i+1,flags:i===16?4:8,top:i===16?'Machines':'',main:i===16?'Change PC':''}))}).catch(error=>console.warn('MK20 startup display:',error.message));
+};
+await paintStarting();
+const startupHeartbeat=setInterval(()=>void paintStarting(),1200);
+startupCleanup.push(()=>clearInterval(startupHeartbeat));
 
 // Detect and register MK20 USB Raw HID controller in DeviceRegistry
 try {
@@ -397,6 +418,8 @@ try {
   console.log('  Codex Desktop IPC  : STANDBY (' + err.message + ')');
 }
 
+if (!speechPreparation) {
+  speechPreparation=(async()=>{
 // --- Whisper STT Model Resolution & Boot Download Check ---
 const sttConfig = loadSttConfig();
 const modelsDir = resolveModelsDir(sttConfig);
@@ -406,7 +429,7 @@ fs.mkdirSync(modelsDir, { recursive: true });
 try {
   const depRes = await LocalWhisperProvider.ensureDependencies((msg) => {
     console.log(`  ${msg}`);
-  });
+  }, speechAbort.signal);
   if (!depRes.ok) console.warn('  Whisper Runtime    : Verification failed; voice capture will report an error until dependencies are ready');
   if (depRes.status && depRes.status.gpu_name) {
     console.log(`  Whisper Hardware   : ${depRes.status.gpu_name} (CUDA cuBLAS: ${depRes.status.cuda_ready ? 'READY' : 'ABSENT'})`);
@@ -423,7 +446,7 @@ let modelSelectionNote = 'explicit env override';
 if (!selectedSttModel) {
   try {
     const assessPy = path.resolve('scripts/assess_stt_backend.py');
-    const {stdout:out} = await execFileAsync(process.env.PYTHON_BIN ?? 'python', [assessPy, '--json'], { encoding: 'utf8', windowsHide: true,timeout:30000 });
+    const {stdout:out} = await execFileAsync(process.env.PYTHON_BIN ?? 'python', [assessPy, '--json'], { encoding: 'utf8', windowsHide: true,timeout:30000,signal:speechAbort.signal });
     const assessRes = JSON.parse(out);
     selectedSttModel = assessRes.selected_model;
     selectedBackend = assessRes.selected_backend || 'auto';
@@ -453,30 +476,33 @@ console.log(`  Whisper Cache Dir  : ${modelsDir}`);
 
 // Model Verification & Startup Download Check
 try {
-  const isDownloaded = await LocalWhisperProvider.isModelDownloaded(selectedSttModel, modelsDir);
+  const isDownloaded = await LocalWhisperProvider.isModelDownloaded(selectedSttModel, modelsDir, speechAbort.signal);
   if (!isDownloaded) {
     console.log(`  Whisper Model DL   : Downloading '${selectedSttModel}' to local cache...`);
     const dlResult = await LocalWhisperProvider.ensureModelDownloaded(selectedSttModel, modelsDir, (msg) => {
       if (msg.includes('Download') || msg.includes('MB') || msg.includes('%')) {
         process.stdout.write(`\r    [Download] ${msg.slice(0, 65).padEnd(65)}`);
       }
-    });
+    }, speechAbort.signal);
     if (!dlResult.ok) throw new Error(dlResult.error || 'Whisper model download was not confirmed');
     console.log(`\n  Whisper Model DL   : READY (${dlResult.status})`);
   } else {
     console.log(`  Whisper Model DL   : VERIFIED (Present in cache)`);
   }
 } catch (dlErr) {
-  console.warn(`  Whisper Model DL   : NOTE (${dlErr.message})`);
+  throw dlErr;
 }
 
+speechAbort.signal.throwIfAborted();
+return {selectedSttModel,selectedBackend,modelsDir};
+})();
+speechPreparation.catch(()=>{});
+}
+let voice=null,voiceError=null;
 const { AudioTransport } = await import(pathToFileURL(path.join(controlRoot,'host/dist/audio/transport.js')).href);
 const { AudioPlayer } = await import(pathToFileURL(path.join(controlRoot,'host/dist/audio/player.js')).href);
-const voice = new LocalWhisperProvider(selectedSttModel, targetAddress, modelsDir, selectedBackend, new AudioTransport(targetAddress, undefined, 7702, leaseToken, localBindIp));
-startupCleanup.push(()=>voice.close());
-let currentVoiceCaptureId = null;
-// Pre-warm local whisper resident worker
-voice.status().catch(() => {});
+startupCleanup.push(()=>voice?.close());
+let currentVoiceCaptureId=null;
 
 // --- Supertonic TTS Provider Setup with 3-tier Fallback ---
 let tts = null;
@@ -621,8 +647,7 @@ updateDeviceSession = (nativeSessionId, resultSessionId) => {
   }
 };
 
-const shortGpu = backendDeviceName.includes('GeForce') ? 'RTX ' + backendDeviceName.split('GeForce')[1].trim().split(' ')[0] : (backendDeviceName.split(' ')[0] || '');
-context.sttEngineLabel = `${selectedSttModel.toUpperCase()} ${selectedBackend.toUpperCase()}${shortGpu ? ' (' + shortGpu + ')' : ''}`;
+context.sttEngineLabel='Preparing speech';
 
 // Configure machines
 context.machines = [{ id: 'dev-pc', name: os.hostname().split('.')[0] || 'DEV-PC', isOnline: true }];
@@ -894,8 +919,17 @@ async function paintMk20() {
 // Initial paint and periodic heartbeat
 await paintMk20();
 compositionReady=true;
+clearInterval(startupHeartbeat);
 const timer = setInterval(() => { void paintMk20(); }, 1200);
 startupCleanup.push(()=>clearInterval(timer));
+void speechPreparation.then(async plan=>{
+  if(!isActive()||!compositionReady)return;
+  const provider=new LocalWhisperProvider(plan.selectedSttModel,targetAddress,plan.modelsDir,plan.selectedBackend,new AudioTransport(targetAddress,undefined,7702,leaseToken,localBindIp));
+  voice=provider;
+  try{await provider.ready();if(!isActive()||!compositionReady){provider.close();return;}context.sttEngineLabel=`${plan.selectedSttModel.toUpperCase()} ${plan.selectedBackend.toUpperCase()}`;}
+  catch(error){voiceError=error.message;context.sttEngineLabel='Speech unavailable';}
+  await paintMk20();
+}).catch(error=>{voiceError=error.message;if(isActive()&&compositionReady){context.sttEngineLabel='Speech unavailable';void paintMk20();}console.warn('Speech preparation failed:',error.message);});
 
 // MK20 Hardware Input Dispatcher
 async function handleMk20Input(input) {
@@ -1152,6 +1186,8 @@ async function handleMk20Input(input) {
         }
       }
     } else if (kid === 20) {
+      if(controlPaused&&!context.isRecordingVoice){context.readerTitle='Control paused';context.readerLines=['Resume control from the Snowball tray or Web UI.'];void paintMk20();return;}
+      if(!voice||voiceError){context.readerTitle=voiceError?'Speech unavailable':'Preparing speech';context.readerLines=[voiceError||'The speech model is preparing in the background.','Projects and sessions remain available.'];void paintMk20();return;}
       if (context.isSpeaking) {
         await stopSpeaking();
       }
@@ -1208,6 +1244,7 @@ async function handleMk20Input(input) {
         }})();
       }
     } else if (kid === 16) {
+      if(controlPaused){context.readerTitle='Control paused';context.readerLines=['Resume control from the Snowball tray or Web UI.'];void paintMk20();return;}
       // Send / Done / Reconcile
       if (context.isTranscribingVoice) {
         return;
@@ -1258,6 +1295,7 @@ async function handleMk20Input(input) {
           try {
             await mk20Ui.save(context.snapshotUi());
             if(!isActive())throw Error("Machine selection changed before dispatch");
+            if(controlPaused)throw Error('Control is paused');
             dispatchStarted=true;
             const result = await dispatchHarnessTurn({
               signal: dispatchAbort.signal,
@@ -1398,7 +1436,7 @@ async function handleMk20Input(input) {
         activeAudioCapture = null;
         currentVoiceCaptureId = null;
         if (capId) {
-          void voice.cancel(capId).catch(() => {});
+          void voice?.cancel(capId).catch(() => {});
         }
         context.voiceDraftText = '';
         if (curSess) curSess.voiceDraftText = '';
@@ -1469,9 +1507,10 @@ return async () => {
   compositionReady=false;mk20Online=false;
   clearInterval(timer);
   if(activeAudioCapture)finishVoiceCapture();
+  if(closing)voice?.close();
   if (tts) { await tts.stop().catch(()=>{}); try { tts.close(); } catch {} }
   if(transcriptionPromise)await transcriptionPromise.catch(()=>{});
-  voice.close();
+  voice?.close();
   await mk20Ui.save(context.snapshotUi());
   clearInterval(activeTranscriptionTimer);
   await mk20.close();
@@ -1485,6 +1524,7 @@ let closeDevice = async () => {}, closing = false;
 const cleanup = async (code = 0) => {
   if (closing) return; closing = true;
   clearInterval(bootstrapTimer);
+  speechAbort.abort();
   for(const cached of mk20Contexts.values())for(const operation of cached.nativeDispatches.values())operation.abort();
   await closeDevice();
   await api.close();
@@ -1500,3 +1540,4 @@ process.on('disconnect', cleanup);
 process.on('message', message => { if (message === 'snowball.stop') void cleanup(); });
 try { if (profile === 'mk20') { const bind=chooseLanAddress(undefined,process.env.SNOWBALL_BIND); closeDevice = await startMk20Lan({hostId,name:os.hostname(),bind,startRuntime:startMk20Runtime}); console.log('MK20 discovery ready on LAN; select this machine on MK20 (K17).'); } }
 catch (error) { console.error(error.message); await cleanup(1); }
+if(process.connected&&!closing)process.send({kind:'runtime-ready',origin:api.origin});

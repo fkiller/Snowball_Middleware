@@ -9,21 +9,29 @@ import { ensurePrivateStateDirectory } from '../supervisor/private-state.mjs';
 import { inspectCodexSelection } from './codex-connections.mjs';
 
 import { labels, AttentionNotifications } from './presentation.mjs';
+import {sourceLogin} from './source-login.mjs';
 
+try {
 const args=process.argv.slice(app.isPackaged?1:2);const smoke=args.includes('--smoke-test');
 const argument=name=>{const i=args.indexOf(name);if(i<0)return;const value=args[i+1];if(!value||!path.isAbsolute(value))throw new Error('Absolute '+name+' path required');return value;};
 const temporary=smoke?fs.mkdtempSync(path.join(os.tmpdir(),'snowball-tray-smoke-')):undefined;
-const dataDir=temporary?path.join(temporary,'state'):argument('--data-dir')??resolveUserDataDir();
+const suiteConfig=argument('--suite-config');
+const installed=suiteConfig?JSON.parse(fs.readFileSync(suiteConfig,'utf8')):null;
+const dataDir=temporary?path.join(temporary,'state'):argument('--data-dir')??installed?.dataDir??resolveUserDataDir();
+const marker=suiteConfig?path.join(path.dirname(suiteConfig),'desktop.v1.json'):null;
 ensurePrivateStateDirectory(dataDir);fs.mkdirSync(path.join(dataDir,'desktop'),{recursive:true});
-app.setName('Snowball Middleware');app.setPath('userData',path.join(dataDir,'desktop'));
+const desktopData=suiteConfig?path.join(path.dirname(suiteConfig),'desktop'):path.join(dataDir,'desktop');fs.mkdirSync(desktopData,{recursive:true});
+app.setName('Snowball Middleware');app.setPath('userData',desktopData);
 if(process.platform==='win32')app.setAppUserModelId('local.snowball.middleware');
 const lock=app.requestSingleInstanceLock();
-if(!lock){app.quit();}else{
+if(!lock){process.send?.({kind:'desktop-already-running'});app.quit();}else{
+if(marker){fs.writeFileSync(marker+'.tmp',JSON.stringify({version:1,pid:process.pid,origin:`http://127.0.0.1:${installed.port}`,suiteConfig,status:'starting'})+'\n',{mode:0o600});fs.renameSync(marker+'.tmp',marker);}
 let tray,worker,client,state,origin,stopping=false,startupFailed=false,stopPromise,poll,notification,enrollmentBusy=false,savedConnectionWarning=false;
 const attentionNotifications=new AttentionNotifications();
-const launchArgs=[...(app.isPackaged?[]:[fileURLToPath(import.meta.url)]),...args.filter(a=>a!=='--smoke-test')];
+const launchArgs=[...(app.isPackaged?[]:[fileURLToPath(import.meta.url)]),...args.filter(a=>!['--smoke-test','--register-autostart','--stop'].includes(a))];
 const loginConfig={path:process.execPath,args:launchArgs};
-const getAutostart=()=>app.getLoginItemSettings(loginConfig).openAtLogin;
+const login=suiteConfig?sourceLogin(app,loginConfig,suiteConfig):{get:()=>app.getLoginItemSettings(loginConfig).openAtLogin,set:value=>{app.setLoginItemSettings({...loginConfig,openAtLogin:value});if(app.getLoginItemSettings(loginConfig).openAtLogin!==value)throw Error('Autostart not applied');}};
+const getAutostart=()=>login.get();
 const open=async(settings=false)=>{if(origin)await shell.openExternal(origin+(settings?'#settings':''));};
 function drawIcon(){
   const pixels=Buffer.alloc(32*32*4);
@@ -38,11 +46,12 @@ function updateMenu(){
   tray.setContextMenu(Menu.buildFromTemplate([
     {label:'Snowball · '+status,enabled:false},{type:'separator'},
     {label:l.open,enabled:!!client,click:()=>void open()},
-    {label:l.connectCodex,enabled:!!client&&!smoke&&!enrollmentBusy&&!argument('--codex-control-config'),click:()=>{enrollmentBusy=true;updateMenu();worker?.postMessage({kind:'enroll-codex'});}},
+    ...(!suiteConfig?[{label:l.connectCodex,enabled:!!client&&!smoke&&!enrollmentBusy&&!argument('--codex-control-config'),click:()=>{enrollmentBusy=true;updateMenu();worker?.postMessage({kind:'enroll-codex'});}}]:[]),
     {label:paused?l.resume:l.pause,enabled:!!client,click:async()=>{try{await client.updateSettings(state.settings.revision,{controlPaused:!paused});await refresh();}catch{await refresh();}}},
     {label:l.autostart,type:'checkbox',checked:getAutostart(),enabled:!!client&&!smoke,click:async item=>{try{await client.updateSettings(state.settings.revision,{autostart:item.checked});}catch{}await refresh();}},
     {type:'separator'},{label:l.settings,enabled:!!client,click:()=>void open(true)},
     {label:l.diagnostics,click:()=>void dialog.showMessageBox({type:'info',title:'Snowball',message:l.state,detail:JSON.stringify({origin:origin??null,connectedHarnesses:state?.connectedHarnesses??[],savedConnectionWarning,devices:state?.devices?.length??0,mainWindows:BrowserWindow.getAllWindows().length},null,2)})},
+    {label:state?.settings?.language==='en'?'Restart middleware':'미들웨어 재시작',enabled:!stopping,click:async()=>{app.relaunch({args:process.argv.slice(1).filter(x=>!['--register-autostart','--stop'].includes(x))});await stop();}},
     {type:'separator'},{label:l.quit,click:()=>void stop()}
   ]));
 }
@@ -64,21 +73,25 @@ async function stop(){
     if(worker){const current=worker;await new Promise(resolve=>{const timer=setTimeout(()=>{current.kill();resolve();},7000);current.once('exit',()=>{clearTimeout(timer);resolve();});current.postMessage({kind:'stop'});});worker=undefined;}
     notification?.close();tray?.destroy();tray=undefined;
     if(temporary)try{fs.rmSync(temporary,{recursive:true,force:true,maxRetries:5,retryDelay:100});}catch{}
+    if(marker){try{const record=JSON.parse(fs.readFileSync(marker,'utf8'));if(record.pid===process.pid)fs.unlinkSync(marker);}catch{}}
     app.exit(process.exitCode ?? 0);
   })();return stopPromise;
 }
 app.on('before-quit',event=>{if(!stopping){event.preventDefault();void stop();}});
-app.on('window-all-closed',()=>{});app.on('second-instance',()=>void open());
+process.on('message',message=>{if(message==='snowball.stop')void stop();});
+app.on('window-all-closed',()=>{});app.on('second-instance',(_event,argv)=>{if(argv.includes('--stop'))void stop();else if(!argv.includes('--background'))void open();});
 void app.whenReady().then(async () => {
+if(args.includes('--stop')){process.send?.({kind:'desktop-stopped'});await stop();return;}
+if(args.includes('--register-autostart')&&!smoke)login.set(true);
 app.dock?.hide();tray=new Tray(drawIcon());tray.on('double-click',()=>void open());updateMenu();
-worker=utilityProcess.fork(fileURLToPath(new URL('./core-worker.mjs',import.meta.url)),[],{serviceName:'Snowball local core',stdio:'pipe'});
-worker.stdout?.resume();worker.stderr?.resume();
+worker=utilityProcess.fork(fileURLToPath(new URL(suiteConfig?'./suite-worker.mjs':'./core-worker.mjs',import.meta.url)),[],{serviceName:'Snowball local core',stdio:'pipe'});
+if(suiteConfig){for(const stream of [worker.stdout,worker.stderr])stream?.on('data',bytes=>process.stdout.write(bytes));}else{worker.stdout?.resume();worker.stderr?.resume();}
 worker.on('message',async message=>{
   if(message?.kind==='native'){
     try{
       let value;
       if(message.action==='get-autostart')value=getAutostart();
-      else if(message.action==='set-autostart'&&typeof message.value==='boolean'&&!smoke){app.setLoginItemSettings({...loginConfig,openAtLogin:message.value});value=getAutostart();if(value!==message.value)throw new Error('Autostart not applied');}
+      else if(message.action==='set-autostart'&&typeof message.value==='boolean'&&!smoke){login.set(message.value);value=getAutostart();if(value!==message.value)throw new Error('Autostart not applied');}
       else if(message.action==='choose-workspace'&&!smoke){const result=await dialog.showOpenDialog({properties:['openDirectory']});value=result.canceled?null:{root:result.filePaths[0],displayName:path.basename(result.filePaths[0])};}
       else if(message.action==='select-codex'&&!smoke)value=await chooseCodex();
       else if(message.action==='confirm-disconnect-codex'&&!smoke){const choice=await dialog.showMessageBox({type:'warning',title:'Disconnect Codex CLI',message:`Disconnect ${message.value}?`,detail:'This middleware-owned connection will stop. Previously observed tasks remain read-only; commands with unknown delivery are not retried.',buttons:['Disconnect','Cancel'],defaultId:1,cancelId:1,noLink:true});value=choice.response===0;}
@@ -95,6 +108,9 @@ worker.on('message',async message=>{
     try{
       const url=new URL(message.origin);if(url.protocol!=='http:'||url.hostname!=='127.0.0.1'||url.origin!==message.origin)throw new Error('Invalid runtime origin');
       origin=message.origin;savedConnectionWarning=message.savedConnectionWarning===true;client=new LocalClient(origin);await refresh();poll=setInterval(()=>void refresh(),2000);
+      if(!client)throw Error('Native runtime snapshot unavailable');
+      if(marker){fs.writeFileSync(marker+'.tmp',JSON.stringify({version:1,pid:process.pid,origin,suiteConfig})+'\n',{mode:0o600});fs.renameSync(marker+'.tmp',marker);}
+      process.send?.({kind:'desktop-ready',origin});
       if(smoke){
         if(!client||state.accessMode!=='local-no-auth'||BrowserWindow.getAllWindows().length!==0||!state.desktopCapabilities?.tray)throw new Error('Tray smoke failed');
         await client.updateSettings(state.settings.revision,{controlPaused:true});await refresh();if(!state.settings.controlPaused)throw new Error('Pause failed');
@@ -102,10 +118,12 @@ worker.on('message',async message=>{
         console.log(JSON.stringify({test:'native-tray',platform:process.platform,trayCreated:!tray.isDestroyed(),mainWindows:BrowserWindow.getAllWindows().length,loopbackNoPin:true,pauseRoundtrip:true,corePid:worker.pid,autostartChanged:false}));await stop();
       }
     }catch{console.error('Native tray/runtime verification failed');process.exitCode=1;await stop();}
-  }else if(message?.kind==='failed'){console.error(message.code,smoke?message.detail??'':'');process.exitCode=1;await stop();}
+  }else if(message?.kind==='failed'){console.error(message.code,smoke?message.detail??'':'');startupFailed=true;client=undefined;updateMenu();if(!origin){process.send?.({kind:'desktop-failed'});process.exitCode=1;await stop();}}
 });
 worker.on('exit',()=>{client=undefined;startupFailed=true;enrollmentBusy=false;clearInterval(poll);updateMenu();if(!stopping){console.error('Local core exited; no commands retried');if(smoke){process.exitCode=1;void stop();}}});
-worker.postMessage({kind:'start',dataDir,codexConfig:argument('--codex-control-config'),opencodeConfig:argument('--opencode-observer-config'),smoke});
+worker.postMessage({kind:'start',dataDir,suiteConfig,codexConfig:argument('--codex-control-config'),opencodeConfig:argument('--opencode-observer-config'),smoke});
 if(smoke)setTimeout(()=>{if(!stopping){console.error('Native tray smoke deadline');process.exitCode=1;void stop();}},30000).unref();
-}).catch(async () => { console.error('Native tray startup failed'); process.exitCode=1; await stop(); });
+}).catch(async error => { console.error('Native tray startup failed:',error.message);process.send?.({kind:'desktop-failed'});process.exitCode=1; await stop(); });
 }
+
+} catch(error) {console.error('Native tray bootstrap failed:',error.message);process.send?.({kind:'desktop-failed'});app.exit(1);}

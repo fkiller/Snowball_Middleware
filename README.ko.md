@@ -37,11 +37,13 @@ Windows PowerShell에서 원하는 구성의 명령 **하나만** 실행하세�
 | M5Stack + FACES | M5Stack 펌웨어/게이트웨이 + Middleware + 하네스 플러그인 3종 | `& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.ps1'))) -Profile m5stack` |
 | Web UI만 | Middleware + 하네스 플러그인 3종 | `& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.ps1'))) -Profile web` |
 
-설치기는 Node/Git(기기 프로필은 Python 포함) 준비, 저장소 빌드, 격리된 플러그인 프로세스의 실제 초기화 검증, **Start-Snowball.ps1** 실행 파일·바탕화면 바로가기 생성까지 수행합니다. 실제 API 응답을 확인한 뒤 **http://127.0.0.1:8765/**를 엽니다. 기본 설치 위치는 `%LOCALAPPDATA%\Snowball`이며, 이후 실행 파일은 다운로드 없이 설치된 구성을 다시 시작합니다.
+설치기는 Node/Git(기기 프로필은 Python 포함) 준비, 저장소 빌드, 격리된 플러그인 프로세스의 실제 초기화 검증, **Start-Snowball.ps1** 실행 파일·바탕화면 바로가기 생성까지 수행합니다. 숨김 네이티브 트레이를 시작하고 실제 API 응답을 확인하면 설치 터미널로 돌아옵니다. 트레이에서 **http://127.0.0.1:8765/**, 상태, 설정, 일시정지/재개, 재시작, 종료, OS 로그인 자동 시작을 제공합니다. 기본 설치 위치는 `%LOCALAPPDATA%\Snowball`이며, 이후 실행 파일은 다운로드 없이 설치된 구성을 다시 시작합니다.
 
 M5Stack은 첫 설치 시 USB로 연결하세요. 플래시 용량 탐지, 기존 전체 플래시 비공개 백업, 펌웨어 업로드, 실제 FACES 응답 확인 후 등록합니다. 독립 MK20은 Wi-Fi에 연결하고, 연결할 각 PC에 이 프로필을 설치하세요. MK20의 K17(Machines)에서 왼쪽 노브를 돌리고 클릭하면 온라인 PC를 페어링·선택합니다. 기기는 페어링 목록과 마지막 선택을 재부팅 뒤에도 유지하며, 선택한 PC의 하네스·프로젝트·세션을 표시합니다. PC 추가에는 USB·ADB·SD 변경이 필요 없습니다. 최초 펌웨어·Wi-Fi 준비와 이후 펌웨어 유지보수는 별도 기기 작업이며, 문제 발생 시 복원할 수 있도록 SD 이미지 백업을 권장합니다. USB 재연결·부트로더 진입·네이티브 하네스 로그인은 사용자가 수행해야 하며, 네이티브 앱이 없으면 해당 공급자는 사용 불가로 표시합니다.
 
-옵션: `-InstallRoot 경로`, `-Serial COM번호`, `-Bind PC의_사설_IP`, `-Port 8765`, `-NoStart`, `-NoFlash`(M5Stack 기존 펌웨어 확인). 여러 USB 포트나 LAN 어댑터가 있으면 해당 옵션으로 지정하세요. 오류가 나면 완료로 처리하지 않습니다. 원샷 부트스트랩은 현재 **Windows** 대상입니다. Node/Git가 설치된 macOS 개발 환경에서는 같은 부모 폴더의 체크아웃 구성으로 `npm run setup -- --profile web` , `--profile mk20` 또는 `--profile m5stack`을 사용할 수 있습니다. Linux 전체 플러그인 런타임은 아직 지원하지 않습니다.
+기존 설치는 같은 `-InstallRoot`에 `-Update`를 추가해 공식 소스를 fast-forward하고 다시 빌드하세요. 상태·페어링·음성 캐시는 보존합니다.
+
+옵션: `-Update`, `-InstallRoot 경로`, `-Serial COM번호`, `-Bind PC의_사설_IP`, `-Port 8765`, `-NoStart`, `-NoFlash`(M5Stack 기존 펌웨어 확인). 여러 USB 포트나 LAN 어댑터가 있으면 해당 옵션으로 지정하세요. 오류가 나면 완료로 처리하지 않습니다. 원샷 부트스트랩은 현재 **Windows** 대상입니다. Node/Git가 설치된 macOS 개발 환경에서는 같은 부모 폴더의 체크아웃 구성으로 `npm run setup -- --profile web` , `--profile mk20` 또는 `--profile m5stack`을 사용할 수 있습니다. Linux 전체 플러그인 런타임은 아직 지원하지 않습니다.
 
 [공통 아키텍처와 저장소 역할](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.md)
 

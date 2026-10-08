@@ -32,6 +32,7 @@ process.on('disconnect', () => void stop());
 function launch(script, args, cwd, env = {}) {
   const child = spawn(process.execPath, [script, ...args], { cwd, env: { ...process.env, ...env }, windowsHide: true, shell: false, stdio: ['pipe', 'inherit', 'inherit', 'ipc'] });
   children.push(child);
+  child.on('message',message=>{if(message?.kind==='native'&&process.connected)process.send(message);});
   child.once('error', error => { console.error(error.message); void stop(1); });
   child.once('exit', code => { if (!stopping) { console.error(`Snowball process exited (${code})`); void stop(code || 1); } });
   return child;
@@ -43,18 +44,22 @@ try {
   const env = { SNOWBALL_PROFILE: config.profile, SNOWBALL_PORT: String(config.port), SNOWBALL_SUITE_CONFIG: configFile, AGY_CLI_DISABLE_AUTO_UPDATE: 'true' };
   if (config.dataDir) env.SNOWBALL_DATA_DIR = config.dataDir;
   if (config.profile === 'mk20') Object.assign(env, { SNOWBALL_CONTROL_ROOT: config.controlRoot, SNOWBALL_BIND: config.bindExplicit === false ? '' : config.bind, PYTHON_BIN: config.python });
-  launch(path.join(middleware, 'scripts/start-all.mjs'), [], middleware, env);
-  const deadline = Date.now() + 180000;
-  let ready = false;
-  while (!stopping && Date.now() < deadline) {
-    try { const response = await fetch(origin + '/v1/snapshot', { headers: { Origin: origin }, signal: AbortSignal.timeout(3000) }); ready = response.ok; if (ready) break; } catch {}
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  }
-  if (!ready) throw Error('Middleware API did not become ready. See runtime errors above.');
+  const runtime=launch(path.join(middleware, 'scripts/start-all.mjs'), [], middleware, env);
+  process.on('message',message=>{if(message?.kind==='native-result'&&runtime.connected)runtime.send(message);});
+  await new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>done(Error('Middleware startup timed out before its owned runtime reported readiness')),180000);
+    const onMessage=message=>{if(message?.kind==='runtime-ready'&&message.origin===origin)done();};
+    const onExit=code=>done(Error('Middleware exited before readiness ('+code+')'));
+    function done(error){clearTimeout(timer);runtime.off('message',onMessage);runtime.off('exit',onExit);error?reject(error):resolve();}
+    runtime.on('message',onMessage);runtime.once('exit',onExit);
+  });
+  const response=await fetch(origin+'/v1/snapshot',{headers:{Origin:origin},signal:AbortSignal.timeout(10000)});
+  if(!response.ok)throw Error('Owned middleware snapshot failed (HTTP '+response.status+')');
   if (config.profile === 'm5stack') launch(path.join(config.deviceRoot, 'scripts/gateway.mjs'), ['--serial', config.serial, '--python', config.python, '--bind', config.bind, '--backend', origin, ...(config.device ? ['--device', config.device] : [])], config.deviceRoot);
   console.log(`Snowball is responding at ${origin}/ — ${config.profile} + Codex + Antigravity + OpenCode plugins`);
+  if(process.connected)process.send({kind:'suite-ready',origin});
   console.log('Press Ctrl+C to stop. The launcher starts the installed suite again without downloads.');
-  if (config.openBrowser !== false) {
+  if (config.openBrowser !== false && process.env.SNOWBALL_DESKTOP !== '1') {
     if (process.platform === 'win32') spawn('explorer.exe', [origin + '/'], { windowsHide: true, stdio: 'ignore' }).unref();
     else if (process.platform === 'darwin') spawn('open', [origin + '/'], { stdio: 'ignore' }).unref();
   }

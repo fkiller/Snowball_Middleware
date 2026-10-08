@@ -12,7 +12,8 @@ param(
     [string]$DataDir,
     [switch]$NoStart,
     [switch]$NoFlash,
-    [switch]$NoShortcut
+    [switch]$NoShortcut,
+    [switch]$Update
 )
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -89,6 +90,14 @@ $middleware = Join-Path $InstallRoot 'Snowball_Middleware'
 if (-not (Test-Path -LiteralPath $middleware)) {
     Invoke-Checked 'git.exe' @('clone','--branch','main','https://github.com/fkiller/Snowball_Middleware.git',$middleware)
 }
+if ($Update) {
+    $origin = (& git.exe -C $middleware remote get-url origin).Trim()
+    if ($LASTEXITCODE -ne 0 -or $origin -notmatch '^(https://github\.com/|git@github\.com:)fkiller/Snowball_Middleware(\.git)?$') { throw 'Unexpected middleware repository origin.' }
+    $changes = & git.exe -C $middleware status --porcelain --untracked-files=no
+    if ($LASTEXITCODE -ne 0 -or $changes) { throw 'Tracked local changes exist; preserve them before updating.' }
+    Invoke-Checked 'git.exe' @('-C',$middleware,'fetch','origin','main')
+    Invoke-Checked 'git.exe' @('-C',$middleware,'merge','--ff-only','origin/main')
+}
 $arguments = @((Join-Path $middleware 'scripts\setup.mjs'),'--profile',$Profile,'--root',$InstallRoot,'--npm',$npm,'--port',"$Port")
 foreach ($pair in @(@('serial',$Serial),@('bind',$Bind),@('device',$Device),@('mk20-address',$Mk20Address),@('adb',$Adb),@('python',$Python),@('data-dir',$DataDir))) {
     if ($pair[1]) { $arguments += ('--' + $pair[0]); $arguments += $pair[1] }
@@ -96,4 +105,5 @@ foreach ($pair in @(@('serial',$Serial),@('bind',$Bind),@('device',$Device),@('m
 if ($NoStart) { $arguments += '--no-start' }
 if ($NoFlash) { $arguments += '--no-flash' }
 if ($NoShortcut) { $arguments += '--no-shortcut' }
+if ($Update) { $arguments += '--update' }
 Invoke-Checked $node $arguments

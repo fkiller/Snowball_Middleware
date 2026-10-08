@@ -12,7 +12,7 @@ export function parseSetupOptions(args) {
   const values = new Set(['profile', 'root', 'serial', 'bind', 'device', 'mk20-address', 'adb', 'python', 'npm', 'port', 'data-dir']);
   for (let i = 0; i < args.length; i++) {
     const key = args[i].replace(/^--/, '');
-    if (['no-start', 'no-flash', 'no-shortcut'].includes(key) && args[i].startsWith('--')) options[key] = true;
+    if (['no-start', 'no-flash', 'no-shortcut', 'update'].includes(key) && args[i].startsWith('--')) options[key] = true;
     else if (args[i].startsWith('--') && values.has(key) && args[i + 1] && !args[i + 1].startsWith('--')) options[key] = args[++i];
     else throw Error(`Unknown or incomplete option: ${args[i]}`);
   }
