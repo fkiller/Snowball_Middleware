@@ -47,6 +47,8 @@ export async function startMk20Lan({ hostId, name, bind, port = 47772, startRunt
       stop(active);
       const record = { key, deviceId: fields[2], lease: fields[4], address: peer.address, selected: true, seen: now() };
       active = record;
+      // No lease/token or native session content belongs in connection diagnostics.
+      console.log(`MK20 selection received from ${peer.address}; starting local runtime`);
       record.runtime = queue.then(() => record.selected ? startRuntime({ targetAddress: record.address, deviceId: record.deviceId, leaseToken: record.lease, isActive: () => record.selected && !closed }) : undefined).catch(error => {
         console.error('MK20 activation failed:', error.message);
         record.selected=false;
@@ -62,9 +64,10 @@ export async function startMk20Lan({ hostId, name, bind, port = 47772, startRunt
     await new Promise((resolve, reject) => { socket.once('error', reject); socket.bind(port, '0.0.0.0', () => { socket.off('error', reject); resolve(); }); });
     await new Promise((resolve,reject)=>{reply.once('error',reject);reply.bind(0,bind,()=>{reply.off('error',reject);resolve();});});
   } catch(error) {try{socket.close();}catch{}try{reply.close();}catch{}throw error;}
-  // Outbound beacons also allow device replies through Windows' normal
-  // unicast-response policy; no administrator firewall change is made.
+  // Broadcast response exemptions depend on the OS/profile policy. Receiving
+  // an OFFER on MK20 does not prove that its SELECT can reach this socket.
   reply.setBroadcast(true);
+  console.log(`MK20 discovery listening on ${bind}:${reply.address().port}; LAN queries UDP ${port}`);
   const broadcast=bind.split('.').map((octet,i)=>(Number(octet)&Number(nic.netmask.split('.')[i]))|(255^Number(nic.netmask.split('.')[i]))).join('.');
   const beacon=setInterval(()=>{if(!closed&&announce)send(offer,{address:broadcast,port:7701});},2000);
   beacon.unref();if(announce)send(offer,{address:broadcast,port:7701});
