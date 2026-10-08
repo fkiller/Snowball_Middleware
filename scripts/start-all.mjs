@@ -37,6 +37,7 @@ import { reconcileNativeContext } from './native-context.mjs';
 import { dispatchHarnessTurn } from './harness-dispatch.mjs';
 import { listNativeAccess } from './native-access.mjs';
 import { startMk20Lan } from './mk20-lan.mjs';
+import { connectMk20Device } from './mk20-device-binding.mjs';
 process.env.AGY_CLI_DISABLE_AUTO_UPDATE = 'true';
 import { languageManager } from './language-manager.mjs';
 import { chooseLanAddress, privateIpv4 } from './setup-profile.mjs';
@@ -341,27 +342,16 @@ const mk20 = new Mk20LabTransport({
 });
 
 startupCleanup.push(()=>mk20.close());
+let mk20Device;
 let mk20Online = false;
 try {
   await mk20.start();
   mk20Online = true;
   console.log(`  MK20 LAN Transport : READY (${targetAddress}:7701)`);
 
-  // Register MK20 LAN device in DeviceRegistry
-  const lanSource = { pluginId: 'plugin.mk20', instanceId: 'desk-terminal' };
-  const lanGen = devices.beginScan(lanSource);
-  const lanCand = devices.observe(lanSource, lanGen, {
-    nativeDeviceId: `mk20-lan-${targetAddress}:7701`,
-    label: `MK20 Smart Desk Terminal (${targetAddress}:7701)`,
-    transport: 'lan',
-    capabilities: ['button', 'select-session', 'display'],
-    supported: !!mk20Identity,
-    ...(mk20Identity?{verifiedIdentity:mk20Identity}:{}),
-  });
-  devices.finishScan(lanSource, lanGen, 'ready');
-  if (lanCand && mk20Identity) {
-    devices.register(lanCand.candidateId, lanGen);
-  }
+  mk20Device = connectMk20Device(devices, {targetAddress, deviceId});
+  startupCleanup.push(()=>mk20Device.release());
+  console.log(`  MK20 LAN Registry  : ${mk20Device.reconnected ? 'RECONNECTED' : 'REGISTERED'} (revision ${mk20Device.binding.revision})`);
 } catch (err) {
   throw Error('MK20 LAN transport failed: '+err.message);
 }
@@ -1505,6 +1495,8 @@ console.log('====================================================');
 
 return async () => {
   compositionReady=false;mk20Online=false;
+  mk20Device.release();
+  clearInterval(startupHeartbeat);
   clearInterval(timer);
   if(activeAudioCapture)finishVoiceCapture();
   if(closing)voice?.close();

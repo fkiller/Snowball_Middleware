@@ -19,7 +19,9 @@ test('real LAN UDP selection renews, releases, expires and fences stale operatio
   const send=message=>new Promise((resolve,reject)=>peer.send(Buffer.from(message),47773,bind,error=>error?reject(error):resolve()));
   const settle=()=>new Promise(resolve=>setTimeout(resolve,100));
   const id='mk20-aabbccddeeff', a='a'.repeat(32), b='b'.repeat(32);
-  const response=once(peer,'message'); await send(`SNMK1\tDISCOVER\t${id}`);
+  // Other real middleware hosts broadcast on this LAN too. Inspect only the
+  // response from this test's endpoint, not whichever host announces first.
+  const response=(async()=>{for(;;){const message=await once(peer,'message');if(message[1].address===bind)return message;}})(); await send(`SNMK1\tDISCOVER\t${id}`);
   assert.equal((await response)[0].toString(),'SNMK1\tOFFER\thost_test\tActual test transport\t1');
   await send(`SNMK1\tSELECT\t${id}\thost_other\t${a}`); await settle();assert.equal(records.length,0);
   await send(`SNMK1\tSELECT\t${id}\thost_test\t${a}`);await settle();assert.equal(records.length,1);assert.equal(records[0].isActive(),true);
