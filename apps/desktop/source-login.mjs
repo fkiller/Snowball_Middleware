@@ -7,7 +7,9 @@ import {spawnSync} from 'node:child_process';
 // only a signed app bundle there, not the selected source suite.
 export function sourceLogin(app,config,identity){
   if(process.platform==='win32'){
-    const selected={...config,name:'Snowball Middleware '+createHash('sha256').update(identity).digest('hex').slice(0,12),args:config.args.map(x=>/\s/.test(x)?'"'+x+'"':x)};
+    // Electron 44 serializes Windows arguments itself. Adding literal quotes
+    // here would make paths with spaces arrive with quotes inside argv.
+    const selected={...config,name:'Snowball Middleware '+createHash('sha256').update(identity).digest('hex').slice(0,12)};
     // openAtLogin refers to the app's default key. Source suites have their own
     // named entry; Windows' launchItems lists positional arguments separately.
     const positional=config.args.filter(x=>!x.startsWith('--'));

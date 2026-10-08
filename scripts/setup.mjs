@@ -57,7 +57,7 @@ for (const [kind, repository] of Object.entries(harnessRepositories)) {
   plugins.push({ kind, directory, entrySha256: manifest.integrity.entrySha256 });
 }
 const config = { version: 1, desktopVersion: 1, nodeExecutable: process.execPath, profile: options.profile, root, middleware, plugins, commits, port: options.port,
-  ...(options['data-dir'] ? { dataDir: path.resolve(options['data-dir']) } : {}) };
+  ...(options['data-dir'] ? { dataDir: path.resolve(options['data-dir']) } : previousConfig?.dataDir ? {dataDir:previousConfig.dataDir} : {}) };
 if (options.profile !== 'web') {
   const deviceAddress = options.profile === 'mk20' ? options['mk20-address']?.split(':')[0] : options.device;
   config.bind = chooseLanAddress(undefined, options.bind, deviceAddress);
