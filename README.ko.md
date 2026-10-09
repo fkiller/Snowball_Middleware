@@ -27,27 +27,21 @@
 <a id="one-shot-install"></a>
 ## Snowball 한 번에 설치
 
-**Snowball Middleware가 공통 설치와 PC 실행을 담당합니다.** Snowball Control은 MK20 펌웨어·HUD·기기 도구를, Snowball Device · M5Stack은 ESP32 펌웨어와 게이트웨이를 담당합니다. Web UI와 M5Stack에는 Control 체크아웃이 필요 없습니다. 세 Snowball Harness 저장소의 Codex·Antigravity·OpenCode 플러그인은 모든 프로필에 함께 설치됩니다.
+**PC마다 Snowball을 한 번 설치하세요.** 기본 설치에 Web UI, MK20 검색·연결·음성 런타임, M5Stack 검색·게이트웨이, Codex·Antigravity·OpenCode 하네스 플러그인 3종이 모두 포함됩니다. 기기 프로필을 고르거나 USB 기기를 연결할 필요가 없습니다.
 
-Windows PowerShell에서 원하는 구성의 명령 **하나만** 실행하세요.
+Windows PowerShell에서 실행하세요.
 
-| 내 구성 | 함께 설치하는 구성 요소 | 명령 |
-| --- | --- | --- |
-| MK20 | Middleware + MK20 호스트 라이브러리 + 하네스 플러그인 3종 | `& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.ps1'))) -Profile mk20` |
-| M5Stack + FACES | M5Stack 펌웨어/게이트웨이 + Middleware + 하네스 플러그인 3종 | `& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.ps1'))) -Profile m5stack` |
-| Web UI만 | Middleware + 하네스 플러그인 3종 | `& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.ps1'))) -Profile web` |
+```powershell
+& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.ps1')))
+```
 
-설치기는 Node/Git(기기 프로필은 Python 포함) 준비, 저장소 빌드, 격리된 플러그인 프로세스의 실제 초기화 검증, **Start-Snowball.ps1** 실행 파일·바탕화면 바로가기 생성까지 수행합니다. 숨김 네이티브 트레이를 시작하고 실제 API 응답을 확인하면 설치 터미널로 돌아옵니다. 트레이에서 **http://127.0.0.1:8765/**, 상태, 설정, 일시정지/재개, 재시작, 종료, OS 로그인 자동 시작을 제공합니다. 기본 설치 위치는 `%LOCALAPPDATA%\Snowball`이며, 이후 실행 파일은 다운로드 없이 설치된 구성을 다시 시작합니다.
+설치기는 Node/Git/Python과 구성 요소를 준비하고 실제 격리 하네스 워커를 확인한 뒤, 트레이 아이콘이 있는 사용자별 숨김 백그라운드 앱을 시작합니다. 소유 런타임이 응답하면 설치 터미널로 돌아옵니다. 트레이에서 Web UI, 상태, 설정, 일시정지/재개, 재시작, 종료, 로그인 자동 시작을 제공합니다. Web UI는 **http://127.0.0.1:8765/**이며 기본 설치 위치는 `%LOCALAPPDATA%\Snowball`입니다. **Start-Snowball.ps1**은 다운로드 없이 다시 실행합니다. 네이티브 하네스 앱과 로그인은 공급자를 통해 준비하며, 없으면 사용 불가로 표시합니다.
 
-M5Stack은 첫 설치 시 USB로 연결하세요. 플래시 용량 탐지, 기존 전체 플래시 비공개 백업, 펌웨어 업로드, 실제 FACES 응답 확인 후 등록합니다. 독립 MK20은 Wi-Fi에 연결하고, 연결할 각 PC에 이 프로필을 설치하세요. MK20의 K17(Machines)에서 왼쪽 노브를 돌리고 클릭하면 발견된 PC를 페어링·선택합니다. `available`은 발견, `connected`는 실제 화면 응답 확인을 뜻합니다. 선택 후 PC 이름과 `Connecting to PC`를 표시하며 8초 동안 유효한 화면이 없으면 `No PC response`를 표시합니다. K17에서 재시도·전환할 수 있습니다. 기기는 페어링 목록과 마지막 선택을 재부팅 뒤에도 유지하며, 선택한 PC의 하네스·프로젝트·세션을 표시합니다. PC 추가에는 USB·ADB·SD 변경이 필요 없습니다. 최초 펌웨어·Wi-Fi 준비와 이후 펌웨어 유지보수는 별도 기기 작업이며, 문제 발생 시 복원할 수 있도록 SD 이미지 백업을 권장합니다. USB 재연결·부트로더 진입·네이티브 하네스 로그인은 사용자가 수행해야 하며, 네이티브 앱이 없으면 해당 공급자는 사용 불가로 표시합니다.
+기존 설치 업데이트는 같은 `-InstallRoot`에 `-Update`를 추가하고 `-Profile`은 생략하세요. 기존 단일 기기 설치에도 두 어댑터를 준비하며 기기 설정·페어링 키·컨트롤러 상태·음성 캐시·사용자 지정 API 포트·로그인 자동 시작 설정을 보존합니다. 사설 LAN이 없거나 선택이 모호하면 자동 검색은 대기·재시도하고 Web UI는 유지합니다. 필요하면 `-Bind PC의_사설_IP`를 지정하세요.
 
-기존 설치는 같은 `-InstallRoot`에 `-Update`를 추가해 공식 소스를 fast-forward하고 다시 빌드하세요. 상태·페어링·음성 캐시는 보존합니다.
+독립 MK20은 Wi-Fi에 연결한 뒤 K17(Machines)에서 PC를 페어링·선택합니다. PC 추가에 USB·ADB·SD 변경은 필요 없습니다. M5Stack 게이트웨이도 이미 설치돼 있지만, 기존 보안 경계에 따라 미등록 PC에는 최초 USB 등록이 필요하고 여러 PC 전환에는 펌웨어 0.3.0이 필요합니다. 설치 루트의 **Register-M5Stack.ps1**(선택: `-Serial COM번호`)로 재설치·다운로드·플래싱 없이 설치된 도구를 사용해 기존 펌웨어를 확인하고 USB 등록을 준비하세요. 최초 펌웨어 설치·업그레이드가 필요할 때만 `-Flash`를 추가하면 전체 플래시 백업 뒤 업로드합니다. macOS는 **Register-M5Stack.sh**와 선택 옵션 `--serial` / `--flash`를 사용합니다. 실행 중이던 트레이는 재시작하며, 멈춰 있었다면 USB 연결 상태로 실행해 등록을 마칩니다. 설치기에 준비를 함께 요청하는 고급 옵션은 각각 `-PrepareM5Stack -NoFlash`, `-PrepareM5Stack`입니다. 일반 설치와 `-Update`는 USB를 조사하거나 펌웨어를 쓰지 않습니다. 설치기의 `-Serial`과 `-NoFlash`는 `-PrepareM5Stack`과 함께 사용합니다. 등록 뒤 USB를 분리하고 기기의 Machine 목록에서 PC를 선택하세요. 검색만으로 미등록 PC를 자동 등록하지 않습니다.
 
-같은 설치 루트의 기기 설치는 추가 방식입니다. `mk20` 설치 뒤 `-Profile m5stack`을 실행해도 MK20을 유지하고 하나의 트레이/API로 두 어댑터를 실행합니다. PC마다 M5Stack을 USB로 한 번 연결해 등록하세요. 여러 PC 선택에는 펌웨어 0.3.0이 필요하며 설치기가 전체 플래시를 백업하고 업그레이드합니다. 이후 설치에는 `-NoFlash`를 사용할 수 있습니다. 기존에 등록한 PC의 게이트웨이도 업데이트한 뒤 기기의 머신 목록 또는 설정 → 미들웨어 검색에서 PC를 선택하세요. 검색만으로 미등록 PC를 등록하지 않습니다. 프로토콜과 검증 범위는 [중앙 문서](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.ko.md)에 기록합니다.
-
-이미 페어링한 MK20을 다시 선택하면 기존 컨트롤러에 재연결합니다. 해제·시작 실패 시에도 등록과 선택 상태는 보존합니다. 로그의 `MK20 LAN Registry` / `RECONNECTED`는 등록 단계 확인이고, 실제 연결은 기기의 유효한 화면 응답으로 확인합니다.
-
-옵션: `-Update`, `-InstallRoot 경로`, `-Serial COM번호`, `-Bind PC의_사설_IP`, `-Port 8765`, `-NoStart`, `-NoFlash`(M5Stack 기존 펌웨어 확인). 여러 USB 포트나 LAN 어댑터가 있으면 해당 옵션으로 지정하세요. 오류가 나면 완료로 처리하지 않습니다. 원샷 부트스트랩은 현재 **Windows** 대상입니다. Node/Git가 설치된 macOS 개발 환경에서는 같은 부모 폴더의 체크아웃 구성으로 `npm run setup -- --profile web` , `--profile mk20` 또는 `--profile m5stack`을 사용할 수 있습니다. Linux 전체 플러그인 런타임은 아직 지원하지 않습니다.
+옵션: `-Update`, `-InstallRoot 경로`, `-Bind PC의_사설_IP`, `-Port 8765`, `-NoStart`, `-NoShortcut`. `-Profile web|mk20|m5stack`은 개발·진단용 명시적 부분 구성으로 유지하며 일반 설치에서는 필요 없습니다. 같은 루트에 이미 설치된 어댑터는 유지합니다. Node/Git/Python이 준비된 macOS 소스 환경에서는 같은 부모 폴더 체크아웃으로 `npm run setup --`을 실행하며, USB 준비는 `--prepare-m5stack [--no-flash]`로 명시합니다. Linux 전체 워커 런타임은 아직 지원하지 않습니다. 프로토콜·인증·실물 검증 범위는 중앙 명세를 확인하세요.
 
 [공통 아키텍처와 저장소 역할](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.md)
 

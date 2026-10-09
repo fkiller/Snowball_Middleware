@@ -15,7 +15,11 @@ test('each installation includes every harness and only the chosen hardware repo
   assert.deepEqual(repositoriesFor('mk20').filter(r => !web.includes(r)), ['Snowball_Control']);
   assert.deepEqual(repositoriesFor('m5stack').filter(r => !web.includes(r)), ['Snowball_Device_M5Stack']);
   for (const args of [['--profile', 'other'], ['--port', '80'], ['--port', '65536'], ['--serial'], ['--unknown']]) assert.throws(() => parseSetupOptions(args));
-  assert.equal(parseSetupOptions(['--profile', 'm5stack', '--no-flash']).profile, 'm5stack');
+  assert.equal(parseSetupOptions([]).profile,'all');
+  assert.deepEqual(repositoriesFor('all'),repositoriesFor(['mk20','m5stack']));
+  assert.equal(parseSetupOptions(['--profile', 'm5stack', '--prepare-m5stack','--no-flash']).profile, 'm5stack');
+  assert.equal(parseSetupOptions([])['prepare-m5stack'],undefined);
+  for(const args of [['--no-flash'],['--serial','COM7'],['--profile','web','--prepare-m5stack']])assert.throws(()=>parseSetupOptions(args));
 });
 
 test('LAN selection supports all private ranges and refuses ambiguous or public routing', () => {

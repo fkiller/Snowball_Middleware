@@ -9,7 +9,8 @@ import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {createHmac} from 'node:crypto';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {chooseLanAddress} from '../scripts/setup-profile.mjs';
+import {chooseLanAddress,parseSetupOptions} from '../scripts/setup-profile.mjs';
+import {planDevices,planDeviceConfigs} from '../scripts/suite-devices.mjs';
 
 const root=fileURLToPath(new URL('..',import.meta.url)),deviceRoot=process.env.SNOWBALL_M5STACK_ROOT;
 test('real dual-device suite advertises MK20 and signs M5Stack discovery with the same actual host identity',{
@@ -27,7 +28,11 @@ test('real dual-device suite advertises MK20 and signs M5Stack discovery with th
     const directory=path.join(root,'packages/harness-'+kind),exported=await import(pathToFileURL(path.join(directory,'dist/index.js')));
     const manifest=await exported[kind+'Manifest']();plugins.push({kind,directory,entrySha256:manifest.integrity.entrySha256});
   }
-  const config=path.join(temp,'suite.json');fs.writeFileSync(config,JSON.stringify({version:1,profile:'m5stack',port,dataDir:path.join(temp,'state'),plugins,openBrowser:false,deviceProfiles:['mk20','m5stack'],devices:{mk20:{controlRoot:process.env.SNOWBALL_TEST_MK20_COMPOSITION_ROOT??path.join(temp,'absent-control'),python:'python',bind},m5stack:{deviceRoot:m5,python:'python',bind}}}));
+  const options=parseSetupOptions([]),profiles=planDevices(options.profile),devices=planDeviceConfigs(options,undefined,temp);
+  Object.assign(devices.mk20,{controlRoot:process.env.SNOWBALL_TEST_MK20_COMPOSITION_ROOT??path.join(temp,'absent-control'),python:'python',bind,bindExplicit:true});
+  Object.assign(devices.m5stack,{deviceRoot:m5,python:'python',bind,bindExplicit:true});
+  assert.equal(devices.m5stack.serial,undefined);
+  const config=path.join(temp,'suite.json');fs.writeFileSync(config,JSON.stringify({version:1,profile:options.profile,port,dataDir:path.join(temp,'state'),plugins,openBrowser:false,deviceProfiles:profiles,devices}));
   const peer=dgram.createSocket('udp4');await new Promise((resolve,reject)=>{peer.once('error',reject);peer.bind(7701,bind,resolve);});
   let output='',ready=false,mk20ReplyPort,m5Offer;const frames=[];
   peer.on('message',(bytes,remote)=>{if(remote.address!==bind)return;try{const frame=JSON.parse(bytes);if(frame.type==='v2_sync')frames.push(frame);}catch{if(bytes.toString().startsWith('SNMK1\tOFFER\t'))mk20ReplyPort=remote.port;}});

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('web','mk20','m5stack')] [string]$Profile = 'web',
+    [ValidateSet('all','web','mk20','m5stack')] [string]$Profile = 'all',
     [string]$InstallRoot = (Join-Path $env:LOCALAPPDATA 'Snowball'),
     [string]$Serial,
     [string]$Bind,
@@ -12,10 +12,13 @@ param(
     [string]$DataDir,
     [switch]$NoStart,
     [switch]$NoFlash,
+    [switch]$PrepareM5Stack,
     [switch]$NoShortcut,
     [switch]$Update
 )
 $ErrorActionPreference = 'Stop'
+if (($NoFlash -or $Serial) -and -not $PrepareM5Stack) { throw 'USB preparation requires -PrepareM5Stack. Normal installation does not probe or flash devices.' }
+if ($PrepareM5Stack -and $Profile -notin @('all','m5stack')) { throw '-PrepareM5Stack requires the default installation or -Profile m5stack.' }
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $InstallRoot = [IO.Path]::GetFullPath($InstallRoot)
 New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
@@ -98,12 +101,14 @@ if ($Update) {
     Invoke-Checked 'git.exe' @('-C',$middleware,'fetch','origin','main')
     Invoke-Checked 'git.exe' @('-C',$middleware,'merge','--ff-only','origin/main')
 }
-$arguments = @((Join-Path $middleware 'scripts\setup.mjs'),'--profile',$Profile,'--root',$InstallRoot,'--npm',$npm,'--port',"$Port")
+$arguments = @((Join-Path $middleware 'scripts\setup.mjs'),'--profile',$Profile,'--root',$InstallRoot,'--npm',$npm)
+if ($PSBoundParameters.ContainsKey('Port')) { $arguments += @('--port',"$Port") }
 foreach ($pair in @(@('serial',$Serial),@('bind',$Bind),@('device',$Device),@('mk20-address',$Mk20Address),@('adb',$Adb),@('python',$Python),@('data-dir',$DataDir))) {
     if ($pair[1]) { $arguments += ('--' + $pair[0]); $arguments += $pair[1] }
 }
 if ($NoStart) { $arguments += '--no-start' }
 if ($NoFlash) { $arguments += '--no-flash' }
+if ($PrepareM5Stack) { $arguments += '--prepare-m5stack' }
 if ($NoShortcut) { $arguments += '--no-shortcut' }
 if ($Update) { $arguments += '--update' }
 Invoke-Checked $node $arguments

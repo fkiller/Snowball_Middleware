@@ -1512,9 +1512,10 @@ return async () => {
 } catch(error) {compositionReady=false;for(const release of startupCleanup.reverse()){try{await release();}catch{}}throw error;}
 }
 
-let closeDevice = async () => {}, closing = false;
+let closeDevice = async () => {}, closing = false, discoveryRetry;
 const cleanup = async (code = 0) => {
   if (closing) return; closing = true;
+  clearInterval(discoveryRetry);
   clearInterval(bootstrapTimer);
   speechAbort.abort();
   for(const cached of mk20Contexts.values())for(const operation of cached.nativeDispatches.values())operation.abort();
@@ -1530,6 +1531,23 @@ process.on('SIGINT', cleanup);
 process.on('SIGTERM', cleanup);
 process.on('disconnect', cleanup);
 process.on('message', message => { if (message === 'snowball.stop') void cleanup(); });
-try { if (profile === 'mk20') { const bind=chooseLanAddress(undefined,process.env.SNOWBALL_BIND); closeDevice = await startMk20Lan({hostId,name:os.hostname(),bind,startRuntime:startMk20Runtime}); console.log('MK20 discovery ready on LAN; select this machine on MK20 (K17).'); } }
+async function openMk20Discovery() {
+  let bind;
+  try {bind=chooseLanAddress(undefined,process.env.SNOWBALL_BIND);}
+  catch(error) {if(process.env.SNOWBALL_DEVICE_LAN_OPTIONAL==='1'&&!process.env.SNOWBALL_BIND)return false;throw error;}
+  const dispose=await startMk20Lan({hostId,name:os.hostname(),bind,startRuntime:startMk20Runtime});
+  if(closing){await dispose();return true;}
+  closeDevice=dispose;
+  console.log('MK20 discovery ready on LAN; select this machine on MK20 (K17).');
+  return true;
+}
+try { if (profile === 'mk20' && !await openMk20Discovery()) {
+  console.warn('MK20 discovery waiting for an unambiguous private LAN adapter; Web UI remains available. Use --bind if needed.');
+  let starting=false;
+  discoveryRetry=setInterval(async()=>{
+    if(closing||starting)return;starting=true;
+    try{if(await openMk20Discovery())clearInterval(discoveryRetry);}catch(error){console.error(error.message);await cleanup(1);}finally{starting=false;}
+  },5000);
+} }
 catch (error) { console.error(error.message); await cleanup(1); }
 if(process.connected&&!closing)process.send({kind:'runtime-ready',origin:api.origin});

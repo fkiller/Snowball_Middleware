@@ -8,15 +8,19 @@ export const harnessRepositories = {
 };
 
 export function parseSetupOptions(args) {
-  const options = { profile: 'web', port: 8765 };
+  const options = { profile: 'all', port: 8765 };
   const values = new Set(['profile', 'root', 'serial', 'bind', 'device', 'mk20-address', 'adb', 'python', 'npm', 'port', 'data-dir']);
   for (let i = 0; i < args.length; i++) {
     const key = args[i].replace(/^--/, '');
-    if (['no-start', 'no-flash', 'no-shortcut', 'update'].includes(key) && args[i].startsWith('--')) options[key] = true;
+    if (['no-start', 'no-flash', 'no-shortcut', 'update', 'prepare-m5stack'].includes(key) && args[i].startsWith('--')) options[key] = true;
     else if (args[i].startsWith('--') && values.has(key) && args[i + 1] && !args[i + 1].startsWith('--')) options[key] = args[++i];
     else throw Error(`Unknown or incomplete option: ${args[i]}`);
   }
-  if (!['web', 'mk20', 'm5stack'].includes(options.profile)) throw Error('Choose web, mk20 or m5stack');
+  if (!['all', 'web', 'mk20', 'm5stack'].includes(options.profile)) throw Error('Choose all, web, mk20 or m5stack');
+  if (options['prepare-m5stack'] && !['all','m5stack'].includes(options.profile)) throw Error('M5Stack preparation requires all or m5stack');
+  if (options['no-flash'] && !options['prepare-m5stack']) throw Error('--no-flash requires explicit --prepare-m5stack');
+  if (options.serial && !options['prepare-m5stack']) throw Error('--serial requires explicit --prepare-m5stack');
+  options.portExplicit = args.includes('--port');
   options.port = Number(options.port);
   if (!Number.isInteger(options.port) || options.port < 1024 || options.port > 65535) throw Error('Invalid port');
   return options;
@@ -43,6 +47,7 @@ export function chooseLanAddress(interfaces = os.networkInterfaces(), explicit, 
 }
 
 export function repositoriesFor(profile) {
+  if (profile === 'all') return repositoriesFor(['mk20','m5stack']);
   if (Array.isArray(profile)) return [...new Set(['web', ...profile].flatMap(repositoriesFor))];
   if (!['web', 'mk20', 'm5stack'].includes(profile)) throw Error('Unknown profile');
   return ['Snowball_Middleware', ...Object.values(harnessRepositories), ...(profile === 'mk20' ? ['Snowball_Control'] : profile === 'm5stack' ? ['Snowball_Device_M5Stack'] : [])];

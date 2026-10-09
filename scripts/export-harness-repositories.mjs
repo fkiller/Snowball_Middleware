@@ -153,7 +153,7 @@ Standalone harness plugin for **${title}** in the [Snowball Local Control ecosys
 
 ## Install Snowball
 
-[Snowball Middleware's common installer](https://github.com/fkiller/Snowball_Middleware#one-shot-install) installs every harness plugin with your choice of **MK20**, **M5Stack + FACES**, or **Web UI only**. Middleware owns installation and PC runtime; Control owns MK20 hardware, and Device M5Stack owns the ESP32 firmware/gateway. Native provider installation and sign-in remain vendor prerequisites.
+[Snowball Middleware's common installer](https://github.com/fkiller/Snowball_Middleware#one-shot-install) includes **MK20**, **M5Stack + FACES**, **Web UI** and every harness plugin by default, without profile selection or USB. Device firmware and first USB enrollment are separate explicit preparation steps. Middleware owns installation and PC runtime; Control owns MK20 hardware, and Device M5Stack owns the ESP32 firmware/gateway. Native provider installation and sign-in remain vendor prerequisites.
 
 This plugin provides seamless, sandbox-isolated orchestration between the [Snowball Middleware](https://github.com/fkiller/Snowball_Middleware) host and the local \`${provider}\` native execution environment.
 
@@ -215,7 +215,7 @@ This project is licensed under the Apache-2.0 License - see the [LICENSE](LICENS
   const header = readmeContent.slice(0, readmeContent.indexOf('Standalone harness plugin'));
   fs.writeFileSync(path.join(destination, 'README.ko.md'), header + `## Snowball 설치
 
-[Snowball Middleware 공통 설치기](https://github.com/fkiller/Snowball_Middleware#one-shot-install)를 사용하면 MK20, M5Stack + FACES, Web UI 중 원하는 구성과 하네스 플러그인 3종을 함께 설치합니다. Middleware는 PC 실행·설치를, Control은 MK20 기기 코드를, Device M5Stack은 ESP32 펌웨어·게이트웨이를 담당합니다. 네이티브 공급자 앱 설치·로그인은 공급자별 사용자 단계입니다.
+[Snowball Middleware 공통 설치기](https://github.com/fkiller/Snowball_Middleware#one-shot-install)는 프로필 선택·USB 연결 없이 MK20, M5Stack + FACES, Web UI와 하네스 플러그인 3종을 기본으로 함께 설치합니다. 기기 펌웨어와 최초 USB 등록은 별도의 명시적 준비 단계입니다. Middleware는 PC 실행·설치를, Control은 MK20 기기 코드를, Device M5Stack은 ESP32 펌웨어·게이트웨이를 담당합니다. 네이티브 공급자 앱 설치·로그인은 공급자별 사용자 단계입니다.
 
 ## 플러그인 개발
 

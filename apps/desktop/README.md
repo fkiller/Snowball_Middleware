@@ -1,5 +1,7 @@
 # Native tray development launcher
 
+The current complete source installation is the [common installer](../../README.md#one-shot-install): it includes MK20 and M5Stack by default behind one tray/API, with no USB device required during PC setup. Installed `Register-M5Stack.ps1` / `.sh` launchers prepare USB enrollment separately using existing tools. Dated package records below describe earlier reference packages; they do not imply inclusion of the current complete installer. Current design and verification live in the [central architecture](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.md).
+
 Requires Node >=22.12 for development. Install dependencies, build, and download the pinned Electron binary explicitly:
 
 ```text

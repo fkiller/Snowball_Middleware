@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {planDevices,suiteDevices,deviceConfig,suiteRuntime} from '../scripts/suite-devices.mjs';
+import {planDevices,planDeviceConfigs,suiteDevices,deviceConfig,suiteRuntime} from '../scripts/suite-devices.mjs';
 import {repositoriesFor} from '../scripts/setup-profile.mjs';
 
 const interfaces={Ethernet:[{family:'IPv4',internal:false,address:'192.168.1.2',netmask:'255.255.255.0'}]};
@@ -14,6 +14,26 @@ test('adding either device preserves the previous adapter; Web update retains in
   assert.equal(deviceConfig({profile:'mk20',...mk20},'mk20').python,mk20.python);
   assert.throws(()=>suiteDevices({profile:'web',deviceProfiles:['mk20','mk20']}));
   assert.throws(()=>suiteDevices({profile:'web',deviceProfiles:['other']}));
+});
+
+test('normal install and legacy upgrades include all adapters without requiring USB or enrollment',()=>{
+  for(const previous of [undefined,{profile:'web'},{profile:'mk20',...mk20},{profile:'m5stack',...m5}]) {
+    const options={profile:'all'},devices=planDeviceConfigs(options,previous,'C:/Snowball');
+    const profiles=planDevices('all',previous);
+    assert.deepEqual(new Set(profiles),new Set(['mk20','m5stack']));
+    const runtime=suiteRuntime({profile:'all',port:8765,deviceProfiles:profiles,devices},interfaces);
+    assert.ok(runtime.gateway);
+    assert.equal(runtime.env.SNOWBALL_DEVICE_LAN_OPTIONAL,'1');
+    if(previous?.profile==='m5stack')assert.equal(devices.m5stack.serial,'COM7');
+    else assert.equal(devices.m5stack.serial,undefined);
+    if(previous?.profile==='mk20')assert.equal(devices.mk20.python,mk20.python);
+  }
+  const devices=planDeviceConfigs({profile:'all'},{profile:'m5stack',...m5},'C:/Snowball');
+  assert.deepEqual(devices.m5stack,m5);
+  const runtime=suiteRuntime({profile:'all',port:8765,devices,deviceProfiles:['mk20','m5stack']},{},{allowUnavailableLan:true});
+  assert.equal(runtime.gateway,undefined);
+  assert.equal(runtime.gatewayPending,true);
+  assert.throws(()=>planDeviceConfigs({profile:'all',bind:'8.8.8.8'},undefined,'C:/Snowball'));
 });
 test('dual adapters share one backend and keep transport settings and Python runtimes separate',()=>{
   const config={profile:'m5stack',port:8765,deviceProfiles:['mk20','m5stack'],devices:{mk20,m5stack:m5}};

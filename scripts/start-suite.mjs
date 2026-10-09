@@ -9,14 +9,16 @@ const args = process.argv.slice(2);
 if (args.length !== 2 || args[0] !== '--config') throw Error('Usage: start-suite.mjs --config PATH');
 const configFile = path.resolve(args[1]);
 const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
-if (config.version !== 1 || !['web', 'mk20', 'm5stack'].includes(config.profile) || !Number.isInteger(config.port) || config.port < 1024 || config.port > 65535) throw Error('Invalid installed suite');
+if (config.version !== 1 || !['all','web', 'mk20', 'm5stack'].includes(config.profile) || !Number.isInteger(config.port) || config.port < 1024 || config.port > 65535) throw Error('Invalid installed suite');
 const middleware = fileURLToPath(new URL('..', import.meta.url));
 const origin = `http://127.0.0.1:${config.port}`;
-const adapters=suiteRuntime(config);
+const adapters=suiteRuntime(config,undefined,{allowUnavailableLan:config.profile==='all'});
 const children = [], plugins = await loadSuitePlugins(config);
 let stopping = false;
+let gatewayRetry;
 async function stop(code = 0) {
   if (stopping) return; stopping = true;
+  clearInterval(gatewayRetry);
   for (const child of children) {
     if (child.connected) child.send('snowball.stop');
     else child.kill('SIGTERM');
@@ -56,8 +58,8 @@ try {
   });
   const response=await fetch(origin+'/v1/snapshot',{headers:{Origin:origin},signal:AbortSignal.timeout(10000)});
   if(!response.ok)throw Error('Owned middleware snapshot failed (HTTP '+response.status+')');
-  if (adapters.gateway) {
-    const g=adapters.gateway, gateway=launch(g.script,g.args,g.cwd);
+  async function startGateway(g) {
+    const gateway=launch(g.script,g.args,g.cwd);
     await new Promise((resolve,reject)=>{
       const timer=setTimeout(()=>done(Error('M5Stack gateway did not report readiness')),15000);
       const onMessage=message=>{if(message?.kind==='gateway-ready')done();};
@@ -65,6 +67,18 @@ try {
       function done(error){clearTimeout(timer);gateway.off('message',onMessage);gateway.off('exit',onExit);error?reject(error):resolve();}
       gateway.on('message',onMessage);gateway.once('exit',onExit);
     });
+  }
+  if(adapters.gateway)await startGateway(adapters.gateway);
+  else if(adapters.gatewayPending) {
+    console.warn('M5Stack discovery waiting for an unambiguous private LAN adapter; Web UI remains available. Use --bind if needed.');
+    let starting=false;
+    gatewayRetry=setInterval(async()=>{
+      if(stopping||starting)return;
+      const next=suiteRuntime(config,undefined,{allowUnavailableLan:true});
+      if(!next.gateway)return;
+      starting=true;clearInterval(gatewayRetry);
+      try{await startGateway(next.gateway);console.log('M5Stack LAN discovery is ready.');}catch(error){console.error(error.message);await stop(1);}
+    },5000);
   }
   console.log(`Snowball is responding at ${origin}/ — ${adapters.profiles.join(' + ') || 'web'} + Codex + Antigravity + OpenCode plugins`);
   if(process.connected)process.send({kind:'suite-ready',origin});

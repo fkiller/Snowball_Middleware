@@ -11,6 +11,7 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {LocalClient} from '../packages/client-sdk/dist/index.js';
+import {planDeviceConfigs,planDevices} from '../scripts/suite-devices.mjs';
 
 const root=fileURLToPath(new URL('..',import.meta.url));
 let nativeAvailable=false;
@@ -28,7 +29,18 @@ test('installed suite: native tray owns the real runtime after launcher exit and
     const manifest=await module[kind+'Manifest']();plugins.push({kind,directory,entrySha256:manifest.integrity.entrySha256});
   }
   const config=path.join(temp,'suite.json');
-  fs.writeFileSync(config,JSON.stringify({version:1,desktopVersion:1,nodeExecutable:process.execPath,profile:'web',port,dataDir:path.join(temp,'state'),plugins}));
+  let hardware={};
+  const profile=process.env.SNOWBALL_TEST_ALL_DEVICES==='1'?'all':'web';
+  if(profile==='all') {
+    assert.ok(process.env.SNOWBALL_M5STACK_ROOT,'Supply the actual M5Stack source checkout');
+    const devices=planDeviceConfigs({profile},undefined,temp),deviceRoot=path.join(temp,'Snowball_Device_M5Stack');
+    fs.mkdirSync(deviceRoot);
+    for(const dir of ['scripts','src'])fs.cpSync(path.join(process.env.SNOWBALL_M5STACK_ROOT,dir),path.join(deviceRoot,dir),{recursive:true});
+    Object.assign(devices.mk20,{controlRoot:process.env.SNOWBALL_TEST_MK20_COMPOSITION_ROOT??path.join(temp,'absent-control'),python:'python'});
+    devices.m5stack.python='python';
+    hardware={deviceProfiles:planDevices(profile),devices};
+  }
+  fs.writeFileSync(config,JSON.stringify({version:1,desktopVersion:1,nodeExecutable:process.execPath,profile,port,dataDir:path.join(temp,'state'),plugins,...hardware}));
   async function launch(extra=[],file=config,expected=0){
     const child=spawn(process.execPath,[path.join(root,'scripts/start-installed.mjs'),'--config',file,...extra],{cwd:root,env:{...process.env,AGY_CLI_DISABLE_AUTO_UPDATE:'true'},windowsHide:true,stdio:['ignore','pipe','pipe']});
     let output='';for(const stream of [child.stdout,child.stderr])stream.on('data',bytes=>output+=bytes);
