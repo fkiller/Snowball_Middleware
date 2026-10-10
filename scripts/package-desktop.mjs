@@ -19,7 +19,8 @@ function copy(relative,destination=relative){
  fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(source,target);
  inventory.push({path:destination.replaceAll('\\','/'),sha256:createHash('sha256').update(fs.readFileSync(target)).digest('hex')});
 }
-for(const name of ['main.mjs','core-worker.mjs','presentation.mjs','codex-connections.mjs','windows-device-presence.mjs','source-login.mjs'])copy('apps/desktop/'+name);
+for(const name of ['main.mjs','core-worker.mjs','presentation.mjs','codex-connections.mjs','windows-device-presence.mjs','source-login.mjs','m5stack-setup.mjs','m5stack-preload.cjs','m5stack-setup.html','m5stack-setup.css','m5stack-setup.js'])copy('apps/desktop/'+name);
+for(const name of ['suite-devices.mjs','setup-profile.mjs'])copy('scripts/'+name);
 for(const name of ['runtime.mjs','controller-store.mjs','codex-plugin.mjs','opencode-owned.mjs','settings-store.mjs','private-state.mjs','native-picker.mjs','mk20-lan.mjs','index.html','app.js','style.css'])copy('apps/supervisor/'+name);
 // Reviewed Codex control and explicitly configured OpenCode observation are
 // bundled. No optional native drivers, account homes or runtime state.

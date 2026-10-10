@@ -16,6 +16,14 @@ const adapters=suiteRuntime(config,undefined,{allowUnavailableLan:config.profile
 const children = [], plugins = await loadSuitePlugins(config);
 let stopping = false;
 let gatewayRetry;
+let activeGateway;
+const usbReservations=new Set();
+process.on('message',message=>{
+  if(message?.kind!=='m5-usb-control'||!Number.isSafeInteger(message.id)||!['release','resume'].includes(message.action))return;
+  if(message.action==='release')usbReservations.add(message.port);else usbReservations.delete(message.port);
+  if(activeGateway?.connected)activeGateway.send(message);
+  else process.send?.({kind:'m5-usb-result',id:message.id,ok:true});
+});
 async function stop(code = 0) {
   if (stopping) return; stopping = true;
   clearInterval(gatewayRetry);
@@ -59,7 +67,10 @@ try {
   const response=await fetch(origin+'/v1/snapshot',{headers:{Origin:origin},signal:AbortSignal.timeout(10000)});
   if(!response.ok)throw Error('Owned middleware snapshot failed (HTTP '+response.status+')');
   async function startGateway(g) {
-    const gateway=launch(g.script,g.args,g.cwd);
+    const serialIndex=g.args.indexOf('--serial');
+    const gateway=launch(g.script,g.args,g.cwd,{SNOWBALL_USB_SUSPENDED:serialIndex>=0&&usbReservations.has(g.args[serialIndex+1])?'1':'0'});
+    activeGateway=gateway;
+    gateway.on('message',message=>{if(message?.kind==='m5-usb-result'&&process.connected)process.send(message);});
     await new Promise((resolve,reject)=>{
       const timer=setTimeout(()=>done(Error('M5Stack gateway did not report readiness')),15000);
       const onMessage=message=>{if(message?.kind==='gateway-ready')done();};

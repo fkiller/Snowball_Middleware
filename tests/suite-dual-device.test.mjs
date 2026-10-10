@@ -41,6 +41,11 @@ test('real dual-device suite advertises MK20 and signs M5Stack discovery with th
   t.after(async()=>{peer.close();if(child.connected)child.send('snowball.stop');const timer=setTimeout(()=>child.kill(),10000);await exited;clearTimeout(timer);assert.equal(path.dirname(temp),path.resolve(os.tmpdir()));fs.rmSync(temp,{recursive:true,force:true});});
   const deadline=Date.now()+90000;while(!ready&&child.exitCode===null&&Date.now()<deadline)await new Promise(r=>setTimeout(r,100));
   assert.ok(ready,output);
+  for(const [id,action]of [[1,'release'],[2,'resume']]){
+    const reply=new Promise((resolve,reject)=>{const timer=setTimeout(()=>{child.off('message',onMessage);reject(Error('usb_coordination_timeout'));},5000);function onMessage(message){if(message.kind==='m5-usb-result'&&message.id===id){clearTimeout(timer);child.off('message',onMessage);resolve(message);}}child.on('message',onMessage);});
+    child.send({kind:'m5-usb-control',id,action,port:'COM999'});
+    assert.equal((await reply).ok,true,'native USB coordination leaves the actual suite running');
+  }
   const origin=`http://127.0.0.1:${port}`,snapshot=await (await fetch(origin+'/v1/snapshot',{headers:{Origin:origin}})).json();
   assert.equal(snapshot.hostId,JSON.parse(fs.readFileSync(path.join(temp,'state','host.v1.json'))).hostId);
   async function query(bytes,port,match){return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{peer.off('message',receive);reject(Error('discovery_timeout'));},10000);function receive(bytes,remote){if(remote.address!==bind)return;const result=match(bytes.toString());if(result){clearTimeout(timer);peer.off('message',receive);resolve(result);}}peer.on('message',receive);peer.send(Buffer.from(bytes),port,bind);});}

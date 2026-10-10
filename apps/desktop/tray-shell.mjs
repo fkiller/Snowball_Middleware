@@ -2,8 +2,8 @@ import { EventEmitter } from 'node:events';
 
 /**
  * Tray-only desktop shell for Snowball Middleware.
- * Never creates a native main window; all configuration and supervision
- * happens in the user's default browser via same-origin loopback API.
+ * No permanent native main window. Supervisor uses the same-origin loopback
+ * browser; an attached M5Stack may open the dedicated native setup utility.
  */
 export class TrayShell extends EventEmitter {
   /** Explicitly enforces that no native main window is created on startup. */
