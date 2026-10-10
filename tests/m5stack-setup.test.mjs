@@ -5,6 +5,9 @@ import path from 'node:path';
 import os from 'node:os';
 import {firmwareRelation,validUsbPort,publicDevice,M5StackSetup} from '../apps/desktop/m5stack-setup.mjs';
 
+
+import {guardPreparation} from './helpers/preparation-fixture.mjs';
+
 test('firmware comparison distinguishes upgrades, current builds and unsafe downgrades',()=>{
   assert.equal(firmwareRelation('0.4.0','0.5.0'),'older');assert.equal(firmwareRelation('0.5.0','0.5.0'),'current');
   assert.equal(firmwareRelation('0.10.0','0.5.0'),'newer');assert.equal(firmwareRelation(null,'0.5.0'),'unknown');
@@ -19,7 +22,7 @@ test('USB status exports firmware/network state without any device secrets',()=>
 test('setup rejects unapproved writes and saved-network migration before launching any helper',async t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-usb-review-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
-  fs.mkdirSync(path.join(root,'firmware'));fs.writeFileSync(path.join(root,'firmware/release.json'),JSON.stringify({version:'0.5.0',board:'m5stack-core-esp32'}));
+  fs.mkdirSync(path.join(root,'firmware'));guardPreparation(root);
   const setup=new M5StackSetup({device:{deviceRoot:root,python:path.join(root,'never-execute')},backupDirectory:root});
   setup.records.set('COM7',{port:'COM7',online:true,hello:{firmware:'0.4.0',wifiConfigured:true,usbSetup:true}});
   await assert.rejects(setup.action({action:'install',port:'COM7',version:'0.5.0',confirmBoard:false}),/review_required/);
@@ -47,7 +50,7 @@ test('a failed helper protocol terminates its real owned descendant before UART 
   let descendant;
   t.after(()=>{if(descendant)try{process.kill(descendant);}catch{}assert.equal(path.dirname(root),path.resolve(os.tmpdir()));fs.rmSync(root,{recursive:true,force:true});});
   fs.mkdirSync(path.join(root,'firmware'));fs.mkdirSync(path.join(root,'scripts'));
-  fs.writeFileSync(path.join(root,'firmware/release.json'),JSON.stringify({version:'0.5.0',board:'m5stack-core-esp32'}));
+  guardPreparation(root);
   // Exercise real OS process cleanup, not a device or an update success.
   fs.writeFileSync(path.join(root,'scripts/usb_setup.py'),`import subprocess,sys,time\nfrom pathlib import Path\nchild=subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)'])\nPath(${JSON.stringify(path.join(root,'descendant.pid'))}).write_text(str(child.pid))\nprint('invalid-protocol',flush=True)\ntime.sleep(60)\n`);
   const setup=new M5StackSetup({device:{deviceRoot:root,python:process.env.SNOWBALL_M5_PYTHON},backupDirectory:root});

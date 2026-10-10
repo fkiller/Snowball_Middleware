@@ -16,13 +16,18 @@ const adapters=suiteRuntime(config,undefined,{allowUnavailableLan:config.profile
 const children = [], plugins = await loadSuitePlugins(config);
 let stopping = false;
 let gatewayRetry;
-let activeGateway;
+const deviceOwners=new Map();
 const usbReservations=new Set();
 process.on('message',message=>{
-  if(message?.kind!=='m5-usb-control'||!Number.isSafeInteger(message.id)||!['release','resume'].includes(message.action))return;
-  if(message.action==='release')usbReservations.add(message.port);else usbReservations.delete(message.port);
-  if(activeGateway?.connected)activeGateway.send(message);
-  else process.send?.({kind:'m5-usb-result',id:message.id,ok:true});
+  if(!['m5-usb-control','device-usb-control'].includes(message?.kind)||!Number.isSafeInteger(message.id)||!['release','resume'].includes(message.action))return;
+  const profile=message.kind==='m5-usb-control'?'m5stack':message.profile;
+  const resultKind=message.kind==='m5-usb-control'?'m5-usb-result':'device-usb-result';
+  if(profile==='mk20'||typeof profile!=='string'||!(config.devices?.[profile]||config.profile===profile)){process.send?.({kind:resultKind,id:message.id,ok:false});return;}
+  const key=profile+'\0'+message.port;
+  if(message.action==='release')usbReservations.add(key);else usbReservations.delete(key);
+  const owner=deviceOwners.get(profile);
+  if(owner?.connected)owner.send(message);
+  else process.send?.({kind:resultKind,id:message.id,ok:true});
 });
 async function stop(code = 0) {
   if (stopping) return; stopping = true;
@@ -68,9 +73,9 @@ try {
   if(!response.ok)throw Error('Owned middleware snapshot failed (HTTP '+response.status+')');
   async function startGateway(g) {
     const serialIndex=g.args.indexOf('--serial');
-    const gateway=launch(g.script,g.args,g.cwd,{SNOWBALL_USB_SUSPENDED:serialIndex>=0&&usbReservations.has(g.args[serialIndex+1])?'1':'0'});
-    activeGateway=gateway;
-    gateway.on('message',message=>{if(message?.kind==='m5-usb-result'&&process.connected)process.send(message);});
+    const gateway=launch(g.script,g.args,g.cwd,{SNOWBALL_USB_SUSPENDED:serialIndex>=0&&usbReservations.has('m5stack\0'+g.args[serialIndex+1])?'1':'0'});
+    deviceOwners.set('m5stack',gateway);
+    gateway.on('message',message=>{if(['m5-usb-result','device-usb-result'].includes(message?.kind)&&process.connected)process.send(message);});
     await new Promise((resolve,reject)=>{
       const timer=setTimeout(()=>done(Error('M5Stack gateway did not report readiness')),15000);
       const onMessage=message=>{if(message?.kind==='gateway-ready')done();};

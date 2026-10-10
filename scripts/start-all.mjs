@@ -1535,7 +1535,9 @@ async function openMk20Discovery() {
   let bind;
   try {bind=chooseLanAddress(undefined,process.env.SNOWBALL_BIND);}
   catch(error) {if(process.env.SNOWBALL_DEVICE_LAN_OPTIONAL==='1'&&!process.env.SNOWBALL_BIND)return false;throw error;}
-  const dispose=await startMk20Lan({hostId,name:os.hostname(),bind,startRuntime:startMk20Runtime});
+  const discoveryPort=Number(process.env.SNOWBALL_MK20_DISCOVERY_PORT??47772);
+  if(!Number.isInteger(discoveryPort)||discoveryPort<1024||discoveryPort>65535)throw Error('invalid_mk20_discovery_port');
+  const dispose=await startMk20Lan({hostId,name:os.hostname(),bind,port:discoveryPort,announce:process.env.SNOWBALL_MK20_DISCOVERY_ANNOUNCE!=='0',startRuntime:startMk20Runtime});
   if(closing){await dispose();return true;}
   closeDevice=dispose;
   console.log('MK20 discovery ready on LAN; select this machine on MK20 (K17).');

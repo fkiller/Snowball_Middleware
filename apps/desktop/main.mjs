@@ -10,8 +10,9 @@ import { inspectCodexSelection } from './codex-connections.mjs';
 
 import { labels, AttentionNotifications } from './presentation.mjs';
 import {sourceLogin} from './source-login.mjs';
-import {deviceConfig} from '../../scripts/suite-devices.mjs';
-import {M5StackSetup,firmwareRelation} from './m5stack-setup.mjs';
+import {installedDevicePreparations} from '../../scripts/device-preparation.mjs';
+import {DeviceSetupHub} from './device-setup-hub.mjs';
+import {firmwareRelation} from './device-setup.mjs';
 
 try {
 const args=process.argv.slice(app.isPackaged?1:2);const smoke=args.includes('--smoke-test');
@@ -29,38 +30,39 @@ const lock=app.requestSingleInstanceLock();
 if(!lock){process.send?.({kind:'desktop-already-running'});app.quit();}else{
 if(marker){fs.writeFileSync(marker+'.tmp',JSON.stringify({version:1,pid:process.pid,origin:`http://127.0.0.1:${installed.port}`,suiteConfig,status:'starting'})+'\n',{mode:0o600});fs.renameSync(marker+'.tmp',marker);}
 let tray,worker,client,state,origin,stopping=false,startupFailed=false,stopPromise,poll,notification,enrollmentBusy=false,savedConnectionWarning=false;
-let m5Setup,m5Window,m5Sequence=0;const m5Pending=new Map();
-const m5Url=pathToFileURL(fileURLToPath(new URL('./m5stack-setup.html',import.meta.url))).href;
-function setupState(){return {...m5Setup.view(),language:state?.settings?.language??'ko'};}
-function setupSender(event){return m5Window&&!m5Window.isDestroyed()&&event.sender===m5Window.webContents&&event.senderFrame===m5Window.webContents.mainFrame&&event.senderFrame.url===m5Url;}
-ipcMain.handle('m5-setup-snapshot',event=>{if(!m5Setup||!setupSender(event))throw Error('USB setup unavailable');return setupState();});
-ipcMain.handle('m5-setup-action',async(event,request)=>{if(!m5Setup||!setupSender(event))throw Error('USB setup unavailable');return await m5Setup.action(request);});
-async function openM5Setup(){
-  if(!m5Setup||stopping)return;
-  if(m5Window&&!m5Window.isDestroyed()){m5Window.show();m5Window.focus();return;}
-  m5Window=new BrowserWindow({width:1000,height:880,minWidth:760,minHeight:650,show:false,title:'Snowball · M5Stack',backgroundColor:'#10141b',autoHideMenuBar:true,
-    webPreferences:{preload:fileURLToPath(new URL('./m5stack-preload.cjs',import.meta.url)),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
-  m5Window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
-  m5Window.webContents.on('will-navigate',(event,url)=>{if(url!==m5Url)event.preventDefault();});
-  m5Window.once('closed',()=>{m5Window=undefined;});
-  await m5Window.loadURL(m5Url);m5Window.show();
+let deviceSetup,setupWindow,activeSetupProfile,setupSequence=0;const setupPending=new Map();
+const setupUrl=pathToFileURL(fileURLToPath(new URL('./device-setup.html',import.meta.url))).href;
+function setupState(){return {...deviceSetup.view(),selectedProfile:activeSetupProfile,language:state?.settings?.language??'ko'};}
+function setupSender(event){return setupWindow&&!setupWindow.isDestroyed()&&event.sender===setupWindow.webContents&&event.senderFrame===setupWindow.webContents.mainFrame&&event.senderFrame.url===setupUrl;}
+ipcMain.handle('device-setup-snapshot',event=>{if(!deviceSetup||!setupSender(event))throw Error('USB setup unavailable');return setupState();});
+ipcMain.handle('device-setup-action',async(event,request)=>{if(!deviceSetup||!setupSender(event))throw Error('USB setup unavailable');return await deviceSetup.action(request);});
+async function openDeviceSetup(profile){
+  if(profile&&deviceSetup?.setups.has(profile))activeSetupProfile=profile;
+  if(!deviceSetup||stopping)return;
+  if(setupWindow&&!setupWindow.isDestroyed()){setupWindow.webContents.send('device-setup-state',setupState());setupWindow.show();setupWindow.focus();return;}
+  setupWindow=new BrowserWindow({width:1000,height:880,minWidth:760,minHeight:650,show:false,title:'Snowball · Device setup',backgroundColor:'#10141b',autoHideMenuBar:true,
+    webPreferences:{preload:fileURLToPath(new URL('./device-setup-preload.cjs',import.meta.url)),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
+  setupWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+  setupWindow.webContents.on('will-navigate',(event,url)=>{if(url!==setupUrl)event.preventDefault();});
+  setupWindow.once('closed',()=>{setupWindow=undefined;});
+  await setupWindow.loadURL(setupUrl);setupWindow.show();
 }
-function maintainUart(action,port){
+function maintainUart(profile,action,port){
   return new Promise((resolve,reject)=>{
-    const id=++m5Sequence,timer=setTimeout(()=>{m5Pending.delete(id);reject(Error('usb_release_unconfirmed'));},10000);
-    m5Pending.set(id,{resolve,reject,timer});worker?.postMessage({kind:'m5-usb-control',id,action,port});
+    const id=++setupSequence,timer=setTimeout(()=>{setupPending.delete(id);reject(Error('usb_release_unconfirmed'));},10000);
+    setupPending.set(id,{resolve,reject,timer});worker?.postMessage({kind:'device-usb-control',id,profile,action,port});
   });
 }
-function startM5Setup(){
-  if(!suiteConfig||smoke||m5Setup)return;
-  const device=deviceConfig(installed,'m5stack');if(!device)return;
+function startDeviceSetup(){
+  if(!suiteConfig||smoke||deviceSetup)return;
   try{
+    const adapters=installedDevicePreparations(installed);if(!adapters.length)return;
     const backupDirectory=ensurePrivateStateDirectory(path.join(dataDir,'firmware-backups'));
-    m5Setup=new M5StackSetup({device,backupDirectory,uart:maintainUart});
-    m5Setup.on('change',()=>{if(m5Window&&!m5Window.isDestroyed())m5Window.webContents.send('m5-setup-state',setupState());updateMenu();});
-    m5Setup.on('attached',record=>{if(!record.hello||firmwareRelation(record.hello.firmware,m5Setup.release.version)==='older'||record.hello.wifiConfigured===false)void openM5Setup().catch(()=>{});});
-    m5Setup.start();updateMenu();
-  }catch{console.warn('M5Stack USB setup unavailable; update the installed device support. LAN control continues.');}
+    deviceSetup=new DeviceSetupHub({adapters,backupDirectory,uart:maintainUart});
+    deviceSetup.on('change',()=>{if(setupWindow&&!setupWindow.isDestroyed())setupWindow.webContents.send('device-setup-state',setupState());updateMenu();});
+    deviceSetup.on('attached',({profile,record})=>{const setup=deviceSetup.setups.get(profile);if(!record.hello||firmwareRelation(record.hello.firmware,setup.release.version)==='older'||record.hello.wifiConfigured===false)void openDeviceSetup(profile).catch(()=>{});});
+    deviceSetup.start();updateMenu();
+  }catch{console.warn('Device USB setup unavailable; update the installed device support. LAN control continues.');}
 }
 const attentionNotifications=new AttentionNotifications();
 const launchArgs=[...(app.isPackaged?[]:[fileURLToPath(import.meta.url)]),...args.filter(a=>!['--smoke-test','--register-autostart','--stop'].includes(a))];
@@ -81,13 +83,13 @@ function updateMenu(){
   tray.setContextMenu(Menu.buildFromTemplate([
     {label:'Snowball · '+status,enabled:false},{type:'separator'},
     {label:l.open,enabled:!!client,click:()=>void open()},
-    ...(suiteConfig?[{label:state?.settings?.language==='en'?'M5Stack setup…':'M5Stack 설정…',enabled:!!m5Setup,click:()=>void openM5Setup()}]:[]),
+    ...(suiteConfig?[{label:state?.settings?.language==='en'?'Device setup…':'기기 설정…',enabled:!!deviceSetup,click:()=>void openDeviceSetup()}]:[]),
     ...(!suiteConfig?[{label:l.connectCodex,enabled:!!client&&!smoke&&!enrollmentBusy&&!argument('--codex-control-config'),click:()=>{enrollmentBusy=true;updateMenu();worker?.postMessage({kind:'enroll-codex'});}}]:[]),
     {label:paused?l.resume:l.pause,enabled:!!client,click:async()=>{try{await client.updateSettings(state.settings.revision,{controlPaused:!paused});await refresh();}catch{await refresh();}}},
     {label:l.autostart,type:'checkbox',checked:getAutostart(),enabled:!!client&&!smoke,click:async item=>{try{await client.updateSettings(state.settings.revision,{autostart:item.checked});}catch{}await refresh();}},
     {type:'separator'},{label:l.settings,enabled:!!client,click:()=>void open(true)},
     {label:l.diagnostics,click:()=>void dialog.showMessageBox({type:'info',title:'Snowball',message:l.state,detail:JSON.stringify({origin:origin??null,connectedHarnesses:state?.connectedHarnesses??[],savedConnectionWarning,devices:state?.devices?.length??0,mainWindows:BrowserWindow.getAllWindows().length},null,2)})},
-    {label:state?.settings?.language==='en'?'Restart middleware':'미들웨어 재시작',enabled:!stopping&&!m5Setup?.job,click:async()=>{app.relaunch({args:process.argv.slice(1).filter(x=>!['--register-autostart','--stop'].includes(x))});await stop();}},
+    {label:state?.settings?.language==='en'?'Restart middleware':'미들웨어 재시작',enabled:!stopping&&!deviceSetup?.job,click:async()=>{app.relaunch({args:process.argv.slice(1).filter(x=>!['--register-autostart','--stop'].includes(x))});await stop();}},
     {type:'separator'},{label:l.quit,click:()=>void stop()}
   ]));
 }
@@ -104,10 +106,10 @@ async function chooseCodex(){
   return review.response===0?launch:null;
 }
 async function stop(){
-  if(m5Setup?.job&&!stopping){await dialog.showMessageBox({type:'info',title:'Snowball · M5Stack',message:state?.settings?.language==='en'?'Wait for the device operation to finish before quitting.':'기기 작업이 끝난 뒤 미들웨어를 종료할 수 있습니다.'});return;}
+  if(deviceSetup?.job&&!stopping){await dialog.showMessageBox({type:'info',title:'Snowball · Device setup',message:state?.settings?.language==='en'?'Wait for the device operation to finish before quitting.':'기기 작업이 끝난 뒤 미들웨어를 종료할 수 있습니다.'});return;}
   if(stopPromise)return stopPromise;stopping=true;clearInterval(poll);
   stopPromise=(async()=>{
-    await m5Setup?.close();m5Window?.destroy();
+    await deviceSetup?.close();setupWindow?.destroy();
     if(worker){const current=worker;await new Promise(resolve=>{const timer=setTimeout(()=>{current.kill();resolve();},7000);current.once('exit',()=>{clearTimeout(timer);resolve();});current.postMessage({kind:'stop'});});worker=undefined;}
     notification?.close();tray?.destroy();tray=undefined;
     if(temporary)try{fs.rmSync(temporary,{recursive:true,force:true,maxRetries:5,retryDelay:100});}catch{}
@@ -125,8 +127,8 @@ app.dock?.hide();tray=new Tray(drawIcon());tray.on('double-click',()=>void open(
 worker=utilityProcess.fork(fileURLToPath(new URL(suiteConfig?'./suite-worker.mjs':'./core-worker.mjs',import.meta.url)),[],{serviceName:'Snowball local core',stdio:'pipe'});
 if(suiteConfig){for(const stream of [worker.stdout,worker.stderr])stream?.on('data',bytes=>process.stdout.write(bytes));}else{worker.stdout?.resume();worker.stderr?.resume();}
 worker.on('message',async message=>{
-  if(message?.kind==='m5-usb-result'){
-    const call=m5Pending.get(message.id);if(call){m5Pending.delete(message.id);clearTimeout(call.timer);message.ok?call.resolve():call.reject(Error('usb_release_unconfirmed'));}
+  if(message?.kind==='device-usb-result'){
+    const call=setupPending.get(message.id);if(call){setupPending.delete(message.id);clearTimeout(call.timer);message.ok?call.resolve():call.reject(Error('usb_release_unconfirmed'));}
   }else if(message?.kind==='native'){
     try{
       let value;
@@ -151,7 +153,7 @@ worker.on('message',async message=>{
       if(!client)throw Error('Native runtime snapshot unavailable');
       if(marker){fs.writeFileSync(marker+'.tmp',JSON.stringify({version:1,pid:process.pid,origin,suiteConfig})+'\n',{mode:0o600});fs.renameSync(marker+'.tmp',marker);}
       process.send?.({kind:'desktop-ready',origin});
-      startM5Setup();
+      startDeviceSetup();
       if(smoke){
         if(!client||state.accessMode!=='local-no-auth'||BrowserWindow.getAllWindows().length!==0||!state.desktopCapabilities?.tray)throw new Error('Tray smoke failed');
         await client.updateSettings(state.settings.revision,{controlPaused:true});await refresh();if(!state.settings.controlPaused)throw new Error('Pause failed');
