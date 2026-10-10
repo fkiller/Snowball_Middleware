@@ -14,7 +14,7 @@ export function readPreparation(device){
   if(!path.isAbsolute(device?.deviceRoot??'')||!path.isAbsolute(device?.python??''))throw Error('absolute_device_paths_required');
   const root=fs.realpathSync(device.deviceRoot),descriptorFile=inside(root,'firmware/setup.json');
   const descriptor=JSON.parse(fs.readFileSync(descriptorFile,'utf8'));
-  if(descriptor.version!==1||!/^[-a-z0-9]{1,64}$/.test(descriptor.id??'')||descriptor.id==='mk20'||typeof descriptor.name!=='string'||descriptor.name.length>80)throw Error('invalid_preparation_descriptor');
+  if(descriptor.version!==1||!/^[-a-z0-9]{1,64}$/.test(descriptor.id??'')||typeof descriptor.name!=='string'||descriptor.name.length>80)throw Error('invalid_preparation_descriptor');
   if(!/^[a-z0-9-]{1,32}$/.test(descriptor.identity?.prefix??'')||![undefined,12,16,24,32,64].includes(descriptor.identity.hexLength))throw Error('invalid_preparation_identity');
   for(const key of ['fullBackup','preserveSettings','verifySettings','reboot'])if(descriptor.capabilities?.[key]!==true)throw Error('required_preparation_guarantee_missing');
   if(typeof descriptor.capabilities.wifiImport!=='boolean')throw Error('invalid_preparation_descriptor');
@@ -36,7 +36,9 @@ export function readPreparation(device){
   return {descriptor,release,bridge,root,sha256:digest(JSON.stringify(hashes))};
 }
 
-function candidates(config){return Object.entries(config.devices??(config.profile&&config.deviceRoot?{[config.profile]:config}:{})).filter(([profile,device])=>profile!=='mk20'&&device?.deviceRoot);}
+// Eligibility depends on a reviewed preparation adapter, never on the model name.
+// A runtime-only entry (currently MK20's controlRoot) does not claim updater support.
+function candidates(config){return Object.entries(config.devices??(config.profile&&config.deviceRoot?{[config.profile]:config}:{})).filter(([,device])=>device?.deviceRoot);}
 /** Called only by setup after the installed repositories have been reviewed. */
 export function approveDevicePreparations(config){
   return candidates(config).map(([profile,device])=>{
@@ -48,7 +50,7 @@ export function installedDevicePreparations(config){
   const approvals=config.devicePreparations??[],seen=new Set();
   if(!Array.isArray(approvals))throw Error('invalid_preparation_approval');
   return approvals.map(approval=>{
-    if(!approval||approval.profile==='mk20'||seen.has(approval.profile))throw Error('invalid_preparation_approval');
+    if(!approval||!/^[-a-z0-9]{1,64}$/.test(approval.profile??'')||seen.has(approval.profile))throw Error('invalid_preparation_approval');
     seen.add(approval.profile);const device=candidates(config).find(([profile])=>profile===approval.profile)?.[1];
     if(!device)throw Error('invalid_preparation_approval');
     const source=readPreparation(device);

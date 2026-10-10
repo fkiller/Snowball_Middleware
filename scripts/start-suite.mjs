@@ -17,12 +17,15 @@ const children = [], plugins = await loadSuitePlugins(config);
 let stopping = false;
 let gatewayRetry;
 const deviceOwners=new Map();
+// Only runtimes implementing the owned USB handoff may acknowledge release.
+// A LAN-only runtime cannot claim to have released a maintenance transport.
+const usbProfiles=new Set(adapters.gateway||adapters.gatewayPending?['m5stack']:[]);
 const usbReservations=new Set();
 process.on('message',message=>{
   if(!['m5-usb-control','device-usb-control'].includes(message?.kind)||!Number.isSafeInteger(message.id)||!['release','resume'].includes(message.action))return;
   const profile=message.kind==='m5-usb-control'?'m5stack':message.profile;
   const resultKind=message.kind==='m5-usb-control'?'m5-usb-result':'device-usb-result';
-  if(profile==='mk20'||typeof profile!=='string'||!(config.devices?.[profile]||config.profile===profile)){process.send?.({kind:resultKind,id:message.id,ok:false});return;}
+  if(typeof profile!=='string'||!usbProfiles.has(profile)||!(config.devices?.[profile]||config.profile===profile)){process.send?.({kind:resultKind,id:message.id,ok:false});return;}
   const key=profile+'\0'+message.port;
   if(message.action==='release')usbReservations.add(key);else usbReservations.delete(key);
   const owner=deviceOwners.get(profile);

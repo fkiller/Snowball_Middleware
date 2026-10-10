@@ -45,6 +45,8 @@ test('real dual-device suite advertises MK20 and signs M5Stack discovery with th
   t.after(async()=>{peer.close();if(child.connected)child.send('snowball.stop');const timer=setTimeout(()=>child.kill(),10000);await exited;clearTimeout(timer);assert.equal(path.dirname(temp),path.resolve(os.tmpdir()));fs.rmSync(temp,{recursive:true,force:true});});
   const deadline=Date.now()+90000;while(!ready&&child.exitCode===null&&Date.now()<deadline)await new Promise(r=>setTimeout(r,100));
   assert.ok(ready,output);
+  // MK20 is in the common journey, but its current LAN runtime owns no USB
+  // maintenance transport. Do not acknowledge a handoff that was not implemented.
   for(const [id,action,kind,profile,ok]of [[1,'release','m5-usb-control',undefined,true],[2,'resume','m5-usb-control',undefined,true],[3,'release','device-usb-control','m5stack',true],[4,'resume','device-usb-control','m5stack',true],[5,'release','device-usb-control','mk20',false],[6,'release','device-usb-control','unregistered',false]]){
     const resultKind=kind==='m5-usb-control'?'m5-usb-result':'device-usb-result';
     const reply=new Promise((resolve,reject)=>{const timer=setTimeout(()=>{child.off('message',onMessage);reject(Error('usb_coordination_timeout'));},5000);function onMessage(message){if(message.kind===resultKind&&message.id===id){clearTimeout(timer);child.off('message',onMessage);resolve(message);}}child.on('message',onMessage);});

@@ -6,7 +6,7 @@ export class DeviceSetupHub extends EventEmitter {
   constructor({adapters,backupDirectory,uart=async()=>{}}){
     super();this.setups=new Map();
     for(const {profile,device} of adapters){
-      if(profile==='mk20'||this.setups.has(profile))throw Error('invalid_preparation_profile');
+      if(!/^[-a-z0-9]{1,64}$/.test(profile??'')||this.setups.has(profile))throw Error('invalid_preparation_profile');
       const setup=new DeviceSetup({device,profile,backupDirectory,uart:(action,port)=>uart(profile,action,port)});
       this.setups.set(profile,setup);
       setup.on('change',()=>this.emit('change',this.view()));

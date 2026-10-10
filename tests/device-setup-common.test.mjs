@@ -7,22 +7,29 @@ import {readPreparation,approveDevicePreparations,installedDevicePreparations} f
 import {DeviceSetupHub} from '../apps/desktop/device-setup-hub.mjs';
 import {guardPreparation} from './helpers/preparation-fixture.mjs';
 
-test('installed preparation registration is independent of model, excludes MK20 and pins the actual helper bytes',async t=>{
+test('installed preparation registration includes MK20 under the same guarantees and pins the actual helper bytes',async t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-preparation-contract-'));
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const devices={};
-  for(const profile of ['guard-one','guard-two']){
+  for(const profile of ['guard-one','guard-two','mk20']){
     const deviceRoot=path.join(root,profile);guardPreparation(deviceRoot,profile,profile+'-');
     devices[profile]={deviceRoot,python:path.join(root,'never-execute')};
   }
-  // MK20 stays on its existing maintenance path and must never be auto-enrolled here.
-  devices.mk20={deviceRoot:path.join(root,'absent-mk20'),python:path.join(root,'never-execute')};
+  // Metadata admission only: no fixture executes or represents a working MK20 updater.
+  devices['runtime-only']={controlRoot:path.join(root,'absent-control'),python:path.join(root,'never-execute')};
   const config={devices};config.devicePreparations=approveDevicePreparations(config);
-  assert.equal(config.devicePreparations.length,2);
+  assert.equal(config.devicePreparations.length,3);
   const adapters=installedDevicePreparations(config);
   const hub=new DeviceSetupHub({adapters,backupDirectory:root});
-  assert.deepEqual(hub.view().profiles.map(p=>p.profile),['guard-one','guard-two']);
+  assert.deepEqual(hub.view().profiles.map(p=>p.profile),['guard-one','guard-two','mk20']);
   assert.equal([...hub.setups.values()].every(s=>s.children.size===0),true);
+  const single={profile:'mk20',...devices.mk20};
+  single.devicePreparations=approveDevicePreparations(single);
+  assert.equal(installedDevicePreparations(single)[0].profile,'mk20');
+  const approved=config.devicePreparations;
+  config.devicePreparations=[approved[2],approved[2]];
+  assert.throws(()=>installedDevicePreparations(config),/invalid_preparation_approval/);
+  config.devicePreparations=approved;
   fs.appendFileSync(path.join(devices['guard-two'].deviceRoot,'scripts/usb_setup.py'),'# changed after approval\n');
   assert.throws(()=>installedDevicePreparations(config),/installed_preparation_changed/);
   await hub.close();
@@ -34,7 +41,7 @@ test('missing backup guarantees, visual guidance and out-of-root helper paths re
   t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const device={deviceRoot:root,python:path.join(root,'never-execute')};
   for(const key of ['fullBackup','preserveSettings','verifySettings','reboot']){
-    const descriptor=guardPreparation(root);descriptor.capabilities[key]=false;
+    const descriptor=guardPreparation(root,'mk20','mk20-');descriptor.capabilities[key]=false;
     fs.writeFileSync(path.join(root,'firmware/setup.json'),JSON.stringify(descriptor));
     assert.throws(()=>readPreparation(device),/required_preparation_guarantee_missing/);
   }
