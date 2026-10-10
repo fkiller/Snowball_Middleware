@@ -115,5 +115,5 @@ if (process.platform === 'win32') {
 console.log(`Installed Snowball (${options.profile}) with all three verified harness plugins. Launcher: ${root}`);
 console.log(`Enabled device adapters: ${deviceProfiles.join(', ') || 'none (Web UI only)'}. Existing adapters and state are preserved.`);
 console.log('Native Codex / Antigravity / OpenCode applications and their sign-in remain owned by their vendors. Missing native apps are shown as unavailable.');
-if(deviceProfiles.includes('m5stack')&&!config.devices.m5stack.serial)console.log('M5Stack discovery is installed. An unknown PC requires one explicit USB enrollment; use -PrepareM5Stack -NoFlash for existing Snowball 0.3.0 firmware, or -PrepareM5Stack to back up and upload firmware.');
+if(deviceProfiles.includes('m5stack'))console.log('M5Stack LAN discovery is ready when the gateway starts. With firmware 0.4.0, choose a discovered PC on the device to pair over Wi-Fi; no USB registration script is required. Older firmware needs one device upgrade.');
 if (!options['no-start']) run(process.execPath, [launchScript, '--config', configFile,...(previouslyInstalledTray?[]:['--register-autostart'])], middleware);

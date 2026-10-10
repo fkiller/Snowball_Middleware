@@ -7,7 +7,7 @@ import net from 'node:net';
 import dgram from 'node:dgram';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
-import {createHmac} from 'node:crypto';
+import {createHmac,createECDH,createHash,createDecipheriv} from 'node:crypto';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {chooseLanAddress,parseSetupOptions} from '../scripts/setup-profile.mjs';
 import {planDevices,planDeviceConfigs} from '../scripts/suite-devices.mjs';
@@ -20,8 +20,7 @@ test('real dual-device suite advertises MK20 and signs M5Stack discovery with th
   const m5=path.join(temp,'m5');fs.mkdirSync(m5);
   for(const directory of ['scripts','src'])fs.cpSync(path.join(deviceRoot,directory),path.join(m5,directory),{recursive:true});
   fs.mkdirSync(path.join(m5,'.local'));
-  const key='e'.repeat(64);fs.writeFileSync(path.join(m5,'.local','pairing.key'),key,{mode:0o600});
-  fs.writeFileSync(path.join(m5,'.local','device.json'),JSON.stringify({deviceId:'m5-001122334455'}));
+  let key='e'.repeat(64);fs.writeFileSync(path.join(m5,'.local','pairing.key'),key,{mode:0o600});
   const portProbe=net.createServer();await new Promise(resolve=>portProbe.listen(0,'127.0.0.1',resolve));const port=portProbe.address().port;await new Promise(resolve=>portProbe.close(resolve));
   const bind=chooseLanAddress(),plugins=[];
   for(const kind of ['codex','antigravity','opencode']){
@@ -47,6 +46,27 @@ test('real dual-device suite advertises MK20 and signs M5Stack discovery with th
   async function query(bytes,port,match){return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{peer.off('message',receive);reject(Error('discovery_timeout'));},10000);function receive(bytes,remote){if(remote.address!==bind)return;const result=match(bytes.toString());if(result){clearTimeout(timer);peer.off('message',receive);resolve(result);}}peer.on('message',receive);peer.send(Buffer.from(bytes),port,bind);});}
   const mk20=await query('SNMK1\tDISCOVER\tmk20-aabbccddeeff',47772,text=>text.startsWith('SNMK1\tOFFER\t')?text.split('\t'):null);
   assert.equal(mk20[2],snapshot.hostId);
+  // A fresh middleware must be discoverable before USB or a device record exists.
+  const onboardingNonce='a'.repeat(16),deviceId='m5-001122334455';
+  const offer=await query(JSON.stringify({type:'snowball.discover',version:3,nonce:onboardingNonce,deviceId}),47770,text=>{try{const o=JSON.parse(text);return o.version===3&&o.nonce===onboardingNonce?o:null;}catch{return null;}});
+  assert.equal(offer.hostId,snapshot.hostId);assert.equal(offer.pairable,true);
+  assert.equal(fs.existsSync(path.join(m5,'.local','device.json')),false,'discovery is not enrollment');
+  const exchange=createECDH('prime256v1');exchange.generateKeys();
+  const pairing={hostId:offer.hostId,deviceId,nonce:onboardingNonce,ticket:offer.ticket,publicKey:exchange.getPublicKey('hex','uncompressed')};
+  const aad=`snowball.pair.v3\n${offer.hostId}\n${deviceId}\n${onboardingNonce}\n${offer.ticket}\n${offer.epoch}\n${offer.publicKey}\n${pairing.publicKey}`;
+  async function pair(route,body){return fetch(`http://${bind}:47771${route}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(10000)});}
+  const encrypted=await pair('/pair',pairing);assert.equal(encrypted.status,200);const wrapped=await encrypted.json();
+  const secret=createHash('sha256').update(exchange.computeSecret(Buffer.from(offer.publicKey,'hex'))).update(aad).digest();
+  const decipher=createDecipheriv('aes-256-gcm',secret,Buffer.from(wrapped.iv,'hex'));decipher.setAAD(Buffer.from(aad));decipher.setAuthTag(Buffer.from(wrapped.tag,'hex'));
+  key=Buffer.concat([decipher.update(Buffer.from(wrapped.ciphertext,'hex')),decipher.final()]).toString();assert.match(key,/^[a-f0-9]{64}$/);
+  assert.equal(fs.existsSync(path.join(m5,'.local','device.json')),false,'encrypted exchange still does not grant control');
+  const confirmation={...pairing,mac:createHmac('sha256',key).update('pair-confirm\n'+aad).digest('hex')};
+  const accepted=await pair('/pair/confirm',confirmation);assert.equal(accepted.status,200);
+  assert.equal((await accepted.json()).mac,createHmac('sha256',key).update('pair-accepted\n'+aad).digest('hex'));
+  assert.equal(JSON.parse(fs.readFileSync(path.join(m5,'.local','device.json'))).deviceId,deviceId);
+  assert.equal((await pair('/pair/confirm',confirmation)).status,200,'lost receipt is recoverable');
+  assert.equal((await pair('/pair',pairing)).status,403,'an enrolled key is never given to another unauthenticated exchange');
+  assert.equal((await pair('/pair/confirm',{...confirmation,deviceId:'m5-001122334456'})).status,403);
   const nonce='c'.repeat(16),sign=value=>createHmac('sha256',key).update(value).digest('hex');
   for(const version of [1,2]){
     const offer=await query(JSON.stringify({type:'snowball.discover',nonce,...(version===2?{version}: {})}),47770,text=>{try{const o=JSON.parse(text);return o.nonce===nonce?o:null;}catch{return null;}});
