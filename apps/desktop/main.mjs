@@ -60,7 +60,7 @@ function startDeviceSetup(){
     const backupDirectory=ensurePrivateStateDirectory(path.join(dataDir,'firmware-backups'));
     deviceSetup=new DeviceSetupHub({adapters,backupDirectory,uart:maintainUart});
     deviceSetup.on('change',()=>{if(setupWindow&&!setupWindow.isDestroyed())setupWindow.webContents.send('device-setup-state',setupState());updateMenu();});
-    deviceSetup.on('attached',({profile,record})=>{const setup=deviceSetup.setups.get(profile);if(!record.hello||firmwareRelation(record.hello.firmware,setup.release.version)==='older'||record.hello.wifiConfigured===false)void openDeviceSetup(profile).catch(()=>{});});
+    deviceSetup.on('attached',({profile,record})=>{const setup=deviceSetup.setups.get(profile);if(setup.descriptor.version===2||!record.hello||firmwareRelation(record.hello.firmware,setup.release.version)==='older'||record.hello.wifiConfigured===false)void openDeviceSetup(profile).catch(()=>{});});
     deviceSetup.start();updateMenu();
   }catch{console.warn('Device USB setup unavailable; update the installed device support. LAN control continues.');}
 }

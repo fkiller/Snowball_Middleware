@@ -4,11 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {DeviceSetupHub} from '../apps/desktop/device-setup-hub.mjs';
-const [deviceRoot,python,output]=process.argv.slice(2);
+const [deviceRoot,python,output,mk20Root,mk20Python]=process.argv.slice(2);
 if(![deviceRoot,python,output].every(value=>value&&path.isAbsolute(value)))throw Error('Supply absolute device root, Python, and output directory');
 void app.whenReady().then(async()=>{let setup,window;
 try{
-  setup=new DeviceSetupHub({adapters:[{profile:'m5stack',device:{deviceRoot,python}}],backupDirectory:output});
+  fs.mkdirSync(output,{recursive:true});
+  const adapters=[{profile:'m5stack',device:{deviceRoot,python}},...(mk20Root&&mk20Python?[{profile:'mk20',device:{deviceRoot:mk20Root,python:mk20Python}}]:[])];
+  setup=new DeviceSetupHub({adapters,backupDirectory:output});
   await setup.scan();
   const view=()=>({...setup.view(),language:'ko'});
   ipcMain.handle('device-setup-snapshot',()=>view());
@@ -27,6 +29,18 @@ try{
     await new Promise(resolve=>setTimeout(resolve,150));
     fs.writeFileSync(path.join(output,language+'-guide.png'),(await window.webContents.capturePage()).toPNG());
     await window.webContents.executeJavaScript('window.scrollTo(0,0)');
+  }
+  if(mk20Root){
+    for(const language of ['ko','en']){
+      await window.webContents.executeJavaScript(`document.getElementById('profile').value='mk20';document.getElementById('profile').dispatchEvent(new Event('change'));document.getElementById('language').value='${language}';document.getElementById('language').dispatchEvent(new Event('change'));`);
+      await new Promise(resolve=>setTimeout(resolve,800));
+      const text=await window.webContents.executeJavaScript('document.body.innerText');
+      if(!text.includes('MK20')||!text.includes(setup.setups.get('mk20').release.version)||!text.includes('QMK'))throw Error('MK20 setup UI did not render');
+      fs.writeFileSync(path.join(output,'mk20-'+language+'.png'),(await window.webContents.capturePage()).toPNG());
+      await window.webContents.executeJavaScript('window.scrollTo(0,document.body.scrollHeight)');
+      fs.writeFileSync(path.join(output,'mk20-'+language+'-guide.png'),(await window.webContents.capturePage()).toPNG());
+      await window.webContents.executeJavaScript('window.scrollTo(0,0)');
+    }
   }
   console.log(JSON.stringify({test:'m5stack-native-setup',firmware:setup.setups.get('m5stack').release.version,actualUsbCandidates:setup.setups.get('m5stack').records.size,languages:['ko','en'],flashed:false,secretRead:false}));
 }catch(error){console.error(error.message);process.exitCode=1;}

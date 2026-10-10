@@ -82,8 +82,9 @@ for(const profile of deviceProfiles) {
     const control = device.controlRoot;
     npmRun(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], path.join(control, 'host'));
     npmRun(['run', 'build'], path.join(control, 'host'));
-    console.log('MK20 joins over Wi-Fi. Select this middleware on the device (K17); USB/ADB deployment is a separate maintenance action.');
+    console.log('MK20 joins over Wi-Fi: select this middleware with K17. The tray Device setup handles QMK/SD preparation; ADB is debug-only.');
     if (!fs.existsSync(device.python)) run(python, ['-m', 'venv', path.dirname(path.dirname(device.python))]);
+    run(device.python, ['-m', 'pip', 'install', '-r', path.join(control, 'hardware/mk20/requirements-setup.txt')]);
     run(device.python, [path.join(middleware, 'scripts/ensure_stt_runtime.py'), '--install', '--python', device.python]);
     run(device.python, [path.join(control, 'scripts/ensure_tts_runtime.py'), '--ensure']);
   }

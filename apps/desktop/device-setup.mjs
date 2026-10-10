@@ -37,8 +37,8 @@ export class DeviceSetup extends EventEmitter {
     return new Promise((resolve,reject)=>{
       if(this.closed)throw Error('usb_setup_closed');
       if(readPreparation(this.device).sha256!==this.source.sha256)throw Error('installed_preparation_changed');
-      const argv=[this.source.bridge,'--command',command,...(port?['--port',port]:[]),...(command==='install'?['--backup-dir',this.backupDirectory]:[])];
-      const child=spawn(this.device.python,argv,{cwd:this.device.deviceRoot,windowsHide:true,shell:false,detached:process.platform!=='win32',env:{...process.env,AGY_CLI_DISABLE_AUTO_UPDATE:'true',PYTHONIOENCODING:'utf-8'},stdio:['pipe','pipe','pipe']});
+      const argv=[this.source.bridge,'--command',command,...(port?['--port',port]:[]),...(command==='install'||this.descriptor.version===2?['--backup-dir',this.backupDirectory]:[])];
+      const child=spawn(this.device.python,argv,{cwd:this.device.deviceRoot,windowsHide:true,shell:false,detached:process.platform!=='win32',env:{...process.env,AGY_CLI_DISABLE_AUTO_UPDATE:'true',PYTHONIOENCODING:'utf-8',...(this.source.sharedHelper?{SNOWBALL_SETUP_OS_WIFI:this.source.sharedHelper.path,SNOWBALL_SETUP_OS_WIFI_SHA256:this.source.sharedHelper.sha256}:{})},stdio:['pipe','pipe','pipe']});
       this.children.add(child);let buffer='',last,failure,bytes=0,termination;
       const terminate=()=>{
         if(termination||!child.pid)return termination;
