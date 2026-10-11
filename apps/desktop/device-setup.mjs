@@ -12,6 +12,11 @@ export function firmwareRelation(installed, available) {
   for(let i=0;i<3;i++)if(a[i]!==b[i])return a[i]<b[i]?'older':'newer';return 'current';
 }
 export const validUsbPort=value=>typeof value==='string'&&/^(?:COM[1-9][0-9]*|\/dev\/(?:tty|cu\.)[a-zA-Z0-9._-]+)$/.test(value);
+export function readBackupProgress(event,previous){
+  if(!Number.isSafeInteger(event.bytes)||event.bytes<=0||!Number.isSafeInteger(event.completedBytes)||event.completedBytes<0||event.completedBytes>event.bytes||!Number.isSafeInteger(event.elapsedSeconds)||event.elapsedSeconds<0)return previous;
+  if(previous&&(event.bytes!==previous.bytes||event.completedBytes<previous.completedBytes||event.elapsedSeconds<previous.elapsedSeconds))return previous;
+  return {bytes:event.bytes,completedBytes:event.completedBytes,elapsedSeconds:event.elapsedSeconds};
+}
 export const publicDevice=(hello,identity)=>{
   const id=hello?.deviceId,suffix=typeof id==='string'&&id.startsWith(identity.prefix)?id.slice(identity.prefix.length):'';
   if(!suffix||!(identity.hexLength?new RegExp('^[a-f0-9]{'+identity.hexLength+'}$').test(suffix):/^[a-zA-Z0-9._-]{1,96}$/.test(suffix))||!/^\d+\.\d+\.\d+$/.test(hello?.firmware??''))throw Error('invalid_device_response');
@@ -116,14 +121,16 @@ export class DeviceSetup extends EventEmitter {
     }else if(request.action==='migrate'){
       if(record.hello?.usbSetup!==true||record.hello?.wifiConfigured!==false||typeof request.ssid!=='string'||request.ssid!==this.network?.ssid||this.network.enterprise)throw Error('wifi_review_required');
     }else throw Error('invalid_setup_action');
-    record.code=null;record.phase=request.action==='install'?'identify':'wifi';
+    record.code=null;record.phase=request.action==='install'?'identify':'wifi';delete record.backupProgress;
     const completed=new Set();
     const job=(async()=>{
       try{
         await this.withUart(record.port,async()=>{
         const result=await this.run(request.action,record.port,{version:request.version,confirmBoard:request.confirmBoard,deviceId:record.hello?.deviceId,usbIdentity:record.usbIdentity,ssid:request.ssid},event=>{
           if(event.event==='progress'&&['identify','backup','backup-verified','build','flash','verify-settings','verify-nvs','reboot'].includes(event.phase)){
-            completed.add(event.phase);record.phase=event.phase;if(event.backup&&path.dirname(event.backup)===this.backupDirectory&&event.backup.endsWith('.bin'))record.backup=event.backup;this.changed();
+            completed.add(event.phase);record.phase=event.phase;if(event.backup&&path.dirname(event.backup)===this.backupDirectory&&event.backup.endsWith('.bin'))record.backup=event.backup;
+            if(event.phase==='backup')record.backupProgress=readBackupProgress(event,record.backupProgress);
+            this.changed();
           }
         });
         if(result.event!=='device')throw Error('invalid_device_response');

@@ -6,6 +6,15 @@ import os from 'node:os';
 import {readPreparation,approveDevicePreparations,installedDevicePreparations} from '../scripts/device-preparation.mjs';
 import {DeviceSetupHub} from '../apps/desktop/device-setup-hub.mjs';
 import {guardPreparation} from './helpers/preparation-fixture.mjs';
+import {readBackupProgress} from '../apps/desktop/device-setup.mjs';
+
+test('backup counters reject malformed, changed-capacity and regressing native progress without exporting raw tool output',()=>{
+  const first=readBackupProgress({bytes:16777216,completedBytes:8388608,elapsedSeconds:200,password:'never export',raw:'private diagnostic'});
+  assert.deepEqual(first,{bytes:16777216,completedBytes:8388608,elapsedSeconds:200});
+  for(const extra of [{bytes:0},{bytes:4194304},{completedBytes:-1},{completedBytes:16777217},{completedBytes:1},{elapsedSeconds:199},{elapsedSeconds:NaN},{bytes:Infinity}])assert.equal(readBackupProgress({...first,...extra},first),first);
+  assert.equal(readBackupProgress({bytes:16777216}),undefined,'older helpers remain usable without invented counters');
+  assert.deepEqual(readBackupProgress({bytes:16777216,completedBytes:16777216,elapsedSeconds:400},first),{bytes:16777216,completedBytes:16777216,elapsedSeconds:400});
+});
 
 test('installed preparation registration includes MK20 under the same guarantees and pins the actual helper bytes',async t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-preparation-contract-'));

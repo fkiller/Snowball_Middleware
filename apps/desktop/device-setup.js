@@ -7,6 +7,16 @@ const failureText={ko:{backup_incomplete:'전체 백업이 완료되지 않아 �
 const $=id=>document.getElementById(id);let language='ko',snapshot={devices:[],release:{version:'…',changes:{}}},hubState={profiles:[]},selectedProfile,lastRequestedProfile,error='',refreshPending=false;const approved=new Set(),declinedWifi=new Set(),manualNetworks=new Map();
 function element(tag,text,className){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(className)el.className=className;return el;}
 function relation(a,b){const x=String(a??'').split('.').map(Number),y=String(b??'').split('.').map(Number);if(x.length!==3||x.some(Number.isNaN))return 'unknown';for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]<y[i]?'older':'newer';return 'current';}
+function backupProgressView(device){
+  const box=element('div'),ko=language==='ko',value=device.backupProgress;
+  if(value){
+    const bar=element('progress');bar.max=value.bytes;bar.value=value.completedBytes;bar.setAttribute('aria-label',ko?'전체 플래시 읽기 진행률':'Full flash read progress');box.append(bar);
+    const percent=Math.floor(value.completedBytes*100/value.bytes),mib=bytes=>(bytes/1048576).toFixed(1),minutes=Math.floor(value.elapsedSeconds/60),seconds=String(value.elapsedSeconds%60).padStart(2,'0');
+    box.append(element('p',`${percent}% · ${mib(value.completedBytes)} / ${mib(value.bytes)} MiB · ${minutes}:${seconds}`));
+  }
+  box.append(element('p',ko?'USB로 전체 플래시를 읽고 있습니다. 16MB 기기는 수분 걸릴 수 있으며, 파일은 읽기가 끝난 뒤 생성됩니다. 읽기 100% 이후 크기·해시 검증까지 완료해야 백업이 확인됩니다. USB 연결을 유지하세요.':'Reading the entire flash over USB. A 16MB device can take several minutes; the file is created after reading finishes. After the read reaches 100%, size and hash checks must finish before the backup is verified. Keep USB connected.','muted'));
+  return box;
+}
 function actionFailure(cause){
   // Electron adds an IPC prefix. Match only known codes; never display raw paths or secrets.
   const codes={
@@ -67,7 +77,7 @@ function render(){
     }
     if(snapshot.capabilities?.wifiImport&&device.hello?.usbSetup===true&&device.hello.wifiConfigured===false){const migrate=element('button',t.migrate);migrate.disabled=!snapshot.network||snapshot.network.enterprise||snapshot.busy||!device.online;migrate.addEventListener('click',()=>action({action:'migrate',port:device.port,ssid:snapshot.network.ssid}));actions.append(migrate);}
     card.append(actions);
-    if(!['ready',undefined].includes(device.phase)){const progress=element('div',undefined,'progress');progress.setAttribute('role','status');progress.append(element('p',t.phase[device.phase]??device.phase));if(device.phase==='failed')progress.append(element('p',`${failureText[language][device.code]??t.failed} (${device.code??'usb_operation_failed'})`,'error'));if(device.backup)progress.append(element('p',`${t.backup}: ${device.backup}`,'muted'));card.append(progress);}
+    if(!['ready',undefined].includes(device.phase)){const progress=element('div',undefined,'progress');progress.setAttribute('role','status');progress.append(element('p',t.phase[device.phase]??device.phase));if(device.phase==='backup')progress.append(backupProgressView(device));if(device.phase==='failed')progress.append(element('p',`${failureText[language][device.code]??t.failed} (${device.code??'usb_operation_failed'})`,'error'));if(device.backup)progress.append(element('p',`${t.backup}: ${device.backup}`,'muted'));card.append(progress);}
     return card;
   });$('devices').replaceChildren(...(cards.length?cards:[element('p',t.empty,'muted')]));
 }
