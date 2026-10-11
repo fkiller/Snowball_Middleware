@@ -12,6 +12,13 @@ function render(){
   const base=ui[language],p=snapshot.presentation?.[language],t={...base,usb:snapshot.contract===2?(language==='ko'?'연결된 기기 / 저장 매체':'Connected devices / storage'):base.usb,journey:p?.journey??base.journey,empty:p?.connection??'',confirm:p?.confirmation??'',steps:p?.steps??[],faces:p?.note??''};
   $('profile-label').textContent=language==='ko'?'기기 종류':'Device type';
   $('profile').replaceChildren(...hubState.profiles.map(profile=>{const option=element('option',profile.name);option.value=profile.profile;return option;}));$('profile').value=selectedProfile??'';
+  $('detected-profiles').replaceChildren(...hubState.profiles.filter(p=>p.devices.some(d=>d.online||d.phase==='awaiting-device')).map(profile=>{
+    const devices=profile.devices.filter(d=>d.online||d.phase==='awaiting-device');
+    const needsReview=devices.some(d=>d.imageMatch===false||!['current','newer'].includes(relation(d.hello?.firmware??d.currentVersion,profile.release.components?.[d.component]?.version??profile.release.version)));
+    const label=profile.name+' · '+(language==='ko'?(needsReview?'업데이트 확인':'연결됨'):(needsReview?'Review update':'Detected'));
+    const button=element('button',label,'secondary');button.setAttribute('aria-pressed',String(profile.profile===selectedProfile));
+    button.addEventListener('click',()=>{$('profile').value=profile.profile;$('profile').dispatchEvent(new Event('change'));});return button;
+  }));
   $('wifi-section').hidden=!snapshot.capabilities?.wifiImport;renderDiagram(p?.diagram);document.documentElement.lang=language;$('heading').textContent=t.heading;$('subtitle').textContent=t.subtitle;
   for(const [id,value]of Object.entries({'usb-title':t.usb,refresh:t.refresh,'release-title':`${t.release} · ${snapshot.release.version}`,'scope':t.scope,'wifi-title':t.wifi,'read-wifi':t.readWifi,'wifi-boundary':t.wifiBoundary,'guide-title':t.guide,'guide-caption':t.caption,'faces-note':t.faces}))$(id).textContent=value;
   $('journey').replaceChildren(...t.journey.map(s=>element('span',s)));$('changes').replaceChildren(...(snapshot.release.changes[language]??[]).map(s=>element('li',s)));
@@ -44,6 +51,7 @@ function render(){
 function componentCard(device,t){
   const ko=language==='ko',key=selectedProfile+device.port,component=snapshot.release.components[device.component];
   const card=element('article',undefined,'device');card.append(element('strong',device.label));
+  if(device.transport==='lan')card.append(element('p',ko?'같은 네트워크의 기기 검색 신호를 받았습니다. USB 연결과 별도의 관찰이며, 이전 펌웨어가 버전을 응답하지 않으면 미확인으로 표시합니다. 아래 준비 안내에서 업데이트를 이어갑니다.':'Received device discovery on this LAN. This observation is separate from USB; older firmware without a version response stays Unknown. Continue with the preparation guide below.','muted'));
   const versions=element('div',undefined,'versions');
   for(const [label,version]of [[t.current,device.currentVersion??t.unknown],[t.available,component?.version??t.unknown]]){if(versions.childElementCount)versions.append(element('span','→','arrow'));const box=element('div',undefined,'version');box.append(element('small',label),element('strong',version));versions.append(box);}card.append(versions);
   const guidance={
@@ -53,7 +61,8 @@ function componentCard(device,t){
     'return-card':ko?'안전하게 카드를 분리해 MK20에 돌려 넣고 전원을 연결하세요. 부팅 확인은 실제 실행 중인 버전·해시를 LAN에서 확인합니다.':'Safely remove the card, return it to MK20 and power it on. Check boot verifies actual running version/hashes over LAN.'
   };if(guidance[device.nextStep])card.append(element('p',guidance[device.nextStep]));
   if(device.wifiConfigured===true)card.append(element('p',t.saved));
-  const status=relation(device.currentVersion,component?.version);
+  const status=device.imageMatch===false?'unknown':relation(device.currentVersion,component?.version);
+  if(device.imageMatch===false)card.append(element('p',ko?'응답 버전은 같지만 실행 이미지가 제공 빌드와 다릅니다. 업데이트 확인이 필요합니다.':'Reported version matches, but running images differ from the included build. Review the update.','muted'));
   if(status==='current'||status==='newer')card.append(element('p',status==='current'?t.latest:t.newer,'muted'));
   if(device.writable&&device.online&&device.phase!=='awaiting-device'&&status!=='newer'){
     const check=element('label',undefined,'check'),confirm=element('input');confirm.type='checkbox';confirm.checked=approved.has(key);confirm.disabled=snapshot.busy;check.append(confirm,element('span',t.confirm));card.append(check);

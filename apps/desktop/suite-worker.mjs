@@ -21,6 +21,7 @@ process.parentPort.on('message',({data})=>{
     child.on('message',message=>{
       if(message?.kind==='suite-ready')send({kind:'ready',origin:message.origin});
       else if(message?.kind==='native')send(message);
+      else if(message?.kind==='device-observed')send(message);
       else if(['m5-usb-result','device-usb-result'].includes(message?.kind))send(message);
     });
     child.on('error',()=>{send({kind:'failed',code:'suite_process_failed'});process.exitCode=1;});

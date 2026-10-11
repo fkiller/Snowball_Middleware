@@ -36,10 +36,10 @@ function setupState(){return {...deviceSetup.view(),selectedProfile:activeSetupP
 function setupSender(event){return setupWindow&&!setupWindow.isDestroyed()&&event.sender===setupWindow.webContents&&event.senderFrame===setupWindow.webContents.mainFrame&&event.senderFrame.url===setupUrl;}
 ipcMain.handle('device-setup-snapshot',event=>{if(!deviceSetup||!setupSender(event))throw Error('USB setup unavailable');return setupState();});
 ipcMain.handle('device-setup-action',async(event,request)=>{if(!deviceSetup||!setupSender(event))throw Error('USB setup unavailable');return await deviceSetup.action(request);});
-async function openDeviceSetup(profile){
-  if(profile&&deviceSetup?.setups.has(profile))activeSetupProfile=profile;
+async function openDeviceSetup(profile,automatic=false){
+  if(profile&&deviceSetup?.setups.has(profile)&&(!automatic||!setupWindow||setupWindow.isDestroyed()||!setupWindow.isVisible()))activeSetupProfile=profile;
   if(!deviceSetup||stopping)return;
-  if(setupWindow&&!setupWindow.isDestroyed()){setupWindow.webContents.send('device-setup-state',setupState());setupWindow.show();setupWindow.focus();return;}
+  if(setupWindow&&!setupWindow.isDestroyed()){setupWindow.webContents.send('device-setup-state',setupState());if(!automatic||!setupWindow.isVisible()){setupWindow.show();setupWindow.focus();}return;}
   setupWindow=new BrowserWindow({width:1000,height:880,minWidth:760,minHeight:650,show:false,title:'Snowball · Device setup',backgroundColor:'#10141b',autoHideMenuBar:true,
     webPreferences:{preload:fileURLToPath(new URL('./device-setup-preload.cjs',import.meta.url)),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true}});
   setupWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
@@ -60,7 +60,12 @@ function startDeviceSetup(){
     const backupDirectory=ensurePrivateStateDirectory(path.join(dataDir,'firmware-backups'));
     deviceSetup=new DeviceSetupHub({adapters,backupDirectory,uart:maintainUart});
     deviceSetup.on('change',()=>{if(setupWindow&&!setupWindow.isDestroyed())setupWindow.webContents.send('device-setup-state',setupState());updateMenu();});
-    deviceSetup.on('attached',({profile,record})=>{const setup=deviceSetup.setups.get(profile);if(setup.descriptor.version===2||!record.hello||firmwareRelation(record.hello.firmware,setup.release.version)==='older'||record.hello.wifiConfigured===false)void openDeviceSetup(profile).catch(()=>{});});
+    deviceSetup.on('attached',({profile,record})=>{
+      const setup=deviceSetup.setups.get(profile);
+      const needsReview=setup.descriptor.version===2?!record.currentVersion||record.pending||record.imageMatch===false||firmwareRelation(record.currentVersion,setup.release.components[record.component]?.version)==='older'||record.wifiConfigured===false:!record.hello||firmwareRelation(record.hello.firmware,setup.release.version)==='older'||record.hello.wifiConfigured===false;
+      console.log(`Device preparation observed: ${profile} / ${record.transport??'usb/storage'} / version=${record.hello?.firmware??record.currentVersion??'unknown'} / review=${needsReview}`);
+      if(needsReview)void openDeviceSetup(profile,true).then(()=>console.log(`Device preparation window ready: ${profile}`)).catch(()=>console.warn(`Device preparation window unavailable: ${profile}`));
+    });
     deviceSetup.start();updateMenu();
   }catch{console.warn('Device USB setup unavailable; update the installed device support. LAN control continues.');}
 }
@@ -127,7 +132,9 @@ app.dock?.hide();tray=new Tray(drawIcon());tray.on('double-click',()=>void open(
 worker=utilityProcess.fork(fileURLToPath(new URL(suiteConfig?'./suite-worker.mjs':'./core-worker.mjs',import.meta.url)),[],{serviceName:'Snowball local core',stdio:'pipe'});
 if(suiteConfig){for(const stream of [worker.stdout,worker.stderr])stream?.on('data',bytes=>process.stdout.write(bytes));}else{worker.stdout?.resume();worker.stderr?.resume();}
 worker.on('message',async message=>{
-  if(message?.kind==='device-usb-result'){
+  if(message?.kind==='device-observed'){
+    deviceSetup?.observe(message);
+  }else if(message?.kind==='device-usb-result'){
     const call=setupPending.get(message.id);if(call){setupPending.delete(message.id);clearTimeout(call.timer);message.ok?call.resolve():call.reject(Error('usb_release_unconfirmed'));}
   }else if(message?.kind==='native'){
     try{

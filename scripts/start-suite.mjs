@@ -52,7 +52,7 @@ process.on('disconnect', () => void stop());
 function launch(script, args, cwd, env = {}) {
   const child = spawn(process.execPath, [script, ...args], { cwd, env: { ...process.env, ...env }, windowsHide: true, shell: false, stdio: ['pipe', 'inherit', 'inherit', 'ipc'] });
   children.push(child);
-  child.on('message',message=>{if(message?.kind==='native'&&process.connected)process.send(message);});
+  child.on('message',message=>{if(['native','device-observed'].includes(message?.kind)&&process.connected)process.send(message);});
   child.once('error', error => { console.error(error.message); void stop(1); });
   child.once('exit', code => { if (!stopping) { console.error(`Snowball process exited (${code})`); void stop(code || 1); } });
   return child;

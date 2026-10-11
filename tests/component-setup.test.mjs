@@ -18,6 +18,12 @@ test('legacy MK20 controlRoot enrolls its concrete component adapter without USB
   const setup=hub.setups.get('mk20');assert.ok(setup instanceof ComponentSetup);assert.deepEqual(setup.view().components,['qmk','runtime']);
   assert.equal(setup.source.sharedHelper.sha256,createHash('sha256').update(fs.readFileSync(setup.source.sharedHelper.path)).digest('hex'));
   assert.equal(setup.children.size,0);
+  setup.job=Promise.resolve();
+  hub.observe({profile:'mk20',deviceId:'mk20-aabbccddeeff',address:'8.8.8.8'});
+  assert.equal(setup.observations,undefined);
+  hub.observe({profile:'mk20',deviceId:'mk20-aabbccddeeff',address:'192.168.1.2'});
+  assert.equal(setup.observations.size,1);assert.equal(setup.children.size,0);assert.equal(setup.records.size,0);
+  setup.job=null;
   const port='t-'+'a'.repeat(32);setup.records.set(port,{port,online:true,writable:true,component:'runtime',currentVersion:null,wifiConfigured:true});
   await assert.rejects(setup.action({action:'install',port,version:setup.release.version,confirmBoard:false}),/review_required/);
   await assert.rejects(setup.action({action:'install',port,version:setup.release.version,confirmBoard:true,network:{ssid:'network',password:'never-used'}}),/review_required/);

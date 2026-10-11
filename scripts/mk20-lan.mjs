@@ -4,7 +4,7 @@ import { privateIpv4 } from './setup-profile.mjs';
 
 // Device initiated discovery and selection. This dedicated Preview endpoint
 // never exposes the loopback Supervisor API, paths or arbitrary commands.
-export async function startMk20Lan({ hostId, name, bind, port = 47772, startRuntime, now = Date.now, announce = true }) {
+export async function startMk20Lan({ hostId, name, bind, port = 47772, startRuntime, onObserved = () => {}, now = Date.now, announce = true }) {
   if (!privateIpv4(bind)) throw Error('MK20 discovery needs a private LAN bind address');
   const socket = dgram.createSocket('udp4');
   const reply = dgram.createSocket('udp4');
@@ -13,6 +13,14 @@ export async function startMk20Lan({ hostId, name, bind, port = 47772, startRunt
   const onLink=address=>address.split('.').every((octet,i)=>(Number(octet)&Number(nic.netmask.split('.')[i]))===(Number(bind.split('.')[i])&Number(nic.netmask.split('.')[i])));
   let active, closed = false, queue = Promise.resolve();
   const windows = new Map();
+  const observations = new Map();
+  const observe=(deviceId,address)=>{
+    const key=deviceId+'/'+address,previous=observations.get(key);
+    if(previous!==undefined&&now()-previous<2000)return;
+    observations.set(key,now());if(observations.size>64)observations.delete(observations.keys().next().value);
+    // Read-only presence. This never pairs, selects, dispatches or proves USB identity.
+    try{onObserved({deviceId,address});}catch{}
+  };
   const disposals=new Set();
   const retired = new Set();
   const send = (value, peer) => reply.send(Buffer.from(value), peer.port, peer.address, () => {});
@@ -36,8 +44,10 @@ export async function startMk20Lan({ hostId, name, bind, port = 47772, startRunt
     const fields = bytes.toString('ascii').split('\t');
     if (fields[0] !== 'SNMK1' || !/^mk20-[a-f0-9]{12}$/.test(fields[2] ?? '')) return;
     if (fields[1] === 'DISCOVER' && fields.length === 3) {
+      observe(fields[2],peer.address);
       send(offer, peer);
     } else if (fields[1] === 'SELECT' && fields.length === 5 && fields[3] === hostId && /^[a-f0-9]{32}$/.test(fields[4])) {
+      observe(fields[2],peer.address);
       const key = fields[2] + '/' + fields[4] + '/' + peer.address;
       if(retired.has(key))return;
       if (active?.key === key) { active.seen = now(); return; }

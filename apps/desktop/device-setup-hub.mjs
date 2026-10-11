@@ -17,6 +17,11 @@ export class DeviceSetupHub extends EventEmitter {
     }
   }
   get job(){return [...this.setups.values()].find(s=>s.job)?.job;}
+  observe(observation){
+    const setup=this.setups.get(observation?.profile);
+    if(this.closed||!(setup instanceof ComponentSetup))return;
+    if(setup.observe(observation))void this.scan();
+  }
   view(){return {profiles:[...this.setups.values()].map(s=>s.view()),busy:!!this.job,checking:!!this.scanning};}
   async scan(force=false){
     if(this.closed||this.scanning||this.job)return;

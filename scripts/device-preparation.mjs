@@ -33,6 +33,7 @@ export function readPreparation(device){
   if(descriptor.version===2){
     if(!Array.isArray(descriptor.components)||!descriptor.components.length||descriptor.components.length>8||new Set(descriptor.components).size!==descriptor.components.length)throw Error('invalid_preparation_components');
     for(const id of descriptor.components)if(!/^[a-z][a-z0-9-]{0,31}$/.test(id)||!/^\d+\.\d+\.\d+$/.test(release.components?.[id]?.version??'')||typeof release.components[id].name!=='string')throw Error('invalid_preparation_components');
+    if(descriptor.observation!==undefined&&(!descriptor.components.includes(descriptor.observation?.component)||!descriptor.identity.hexLength))throw Error('invalid_preparation_components');
   }
   const files=new Set([descriptorFile]);
   function walk(relative){const target=inside(root,relative),stat=fs.statSync(target);if(stat.isDirectory())for(const child of fs.readdirSync(target).sort())walk(relative+'/'+child);else if(stat.isFile())files.add(target);else throw Error('invalid_preparation_path');}
