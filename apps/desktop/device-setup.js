@@ -123,8 +123,15 @@ function componentCard(device,t){
     });card.append(install);
   }
   if(!device.writable&&device.online&&device.phase!=='awaiting-device'&&status!=='newer'){
-    const blocked=element('button',ko?'업데이트 대기 · USB 응답 필요':'Update waiting · USB response required');blocked.disabled=true;card.append(blocked);
-    card.append(element('p',device.transport==='lan'?(ko?'이 항목은 LAN 발견 정보이므로 업데이트할 수 없습니다. USB 업데이트 기기와 백업 가능 여부가 확인되면 별도 USB 항목에서 진행할 수 있습니다. 다시 확인은 연결 상태만 조회합니다.':'This LAN discovery entry cannot update firmware. A separate USB entry enables updating after a valid updater response and backup check. Check again only reads connection state.'):(ko?'기기의 USB 업데이트 응답과 백업 가능 여부가 확인되면 업데이트 버튼이 활성화됩니다. 다시 확인은 연결 상태만 조회하며 펌웨어를 쓰지 않습니다.':'Updating becomes available after the device answers over USB and backup is possible. Check again only reads connection state; it does not write firmware.'),'muted'));
+    const reason=device.transport==='lan'?(ko?'LAN 발견 · USB 업데이트 연결 미확인':'LAN discovered · USB updater not confirmed'):
+      device.nextStep==='enter-dfu'?(ko?'키보드 USB 연결됨 · 업데이트에는 DFU 모드 필요':'Keyboard USB connected · DFU required to update'):
+      device.nextStep==='usb-driver'?(ko?'DFU 백업 접근 불가':'DFU backup access unavailable'):
+      device.nextStep==='usb-bootstrap'?(ko?'USB 업데이트 수신기 응답 없음':'USB updater did not respond'):
+      (ko?'런타임 USB 연결 미확인':'Runtime USB connection not confirmed');
+    card.append(element('p',reason,'muted'));
+    card.append(element('p',device.transport==='lan'?(ko?'이 항목은 LAN 발견 정보입니다. USB 업데이트 연결과 백업 가능 여부가 확인되어야 업데이트할 수 있습니다. 버전 미확인은 현재 펌웨어의 버전 응답이 없다는 뜻입니다.':'This is LAN discovery information. Updating requires a verified USB updater and backup access. Unknown means the running firmware did not answer its version query.'):
+      device.nextStep==='enter-dfu'?(ko?'현재 키보드 USB에서는 설치 이미지의 정확한 버전을 읽을 수 없습니다. 위 DFU 연결 안내를 따라야 백업과 이미지 비교가 가능합니다. 다시 확인만 눌러서는 DFU 모드로 바뀌지 않습니다.':'The exact installed image cannot be identified through normal keyboard USB. Follow the DFU connection instructions above to enable readback and image comparison. Check again does not enter DFU mode.'):
+      (ko?'다시 확인은 연결 상태만 조회합니다. 기기에 업데이트 수신기가 없는 경우, PC 미들웨어 업데이트나 반복 조회만으로 수신기가 설치되지 않습니다.':'Check again only reads connection state. Updating the PC middleware or repeatedly scanning cannot install a missing device-side updater.'),'muted'));
   }
   if(device.phase==='awaiting-device'){
     const verify=element('button',ko?'부팅 확인':'Check boot');verify.disabled=snapshot.busy||snapshot.checking;verify.addEventListener('click',()=>action({action:'verify',port:device.port}));card.append(verify);
