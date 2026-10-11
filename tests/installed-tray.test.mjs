@@ -12,10 +12,11 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {LocalClient} from '../packages/client-sdk/dist/index.js';
 import {planDeviceConfigs,planDevices} from '../scripts/suite-devices.mjs';
+import {desktopRuntime} from '../scripts/desktop-runtime.mjs';
 
 const root=fileURLToPath(new URL('..',import.meta.url));
 let nativeAvailable=false;
-try{nativeAvailable=fs.existsSync(createRequire(import.meta.url)('electron'));}catch{}
+try{nativeAvailable=fs.existsSync(desktopRuntime().executable);}catch{}
 test('installed suite: native tray owns the real runtime after launcher exit and stops its children',{
   skip:!['win32','darwin'].includes(process.platform)||!nativeAvailable,timeout:150000,
 },async t=>{
@@ -46,6 +47,7 @@ test('installed suite: native tray owns the real runtime after launcher exit and
     let output='';for(const stream of [child.stdout,child.stderr])stream.on('data',bytes=>output+=bytes);
     const timer=setTimeout(()=>child.kill(),110000);
     const [code]=await once(child,'exit');clearTimeout(timer);
+    if(code!==expected){const log=path.join(path.dirname(file),'desktop.log');if(fs.existsSync(log))output+='\n'+fs.readFileSync(log,'utf8').slice(-3000);}
     assert.equal(code,expected,output);return output;
   }
   t.after(async()=>{try{await launch(['--stop']);}finally{
@@ -55,13 +57,33 @@ test('installed suite: native tray owns the real runtime after launcher exit and
     }
     assert.equal(path.dirname(temp),path.resolve(os.tmpdir()));fs.rmSync(temp,{recursive:true,force:true});
   }});
+  if(process.platform==='win32'){
+    // A real isolated legacy OS login entry must migrate, retaining its enabled choice.
+    const register=path.join(temp,'register-legacy.mjs'),name='Snowball Middleware '+createHash('sha256').update(config).digest('hex').slice(0,12);
+    const legacy={name,path:createRequire(import.meta.url)('electron'),args:[path.join(root,'apps/desktop/main.mjs'),'--suite-config',config,'--background'],openAtLogin:true};
+    const branded={path:desktopRuntime().executable,args:['--suite-config',config,'--background']};
+    fs.writeFileSync(register,`import {app} from 'electron';import {sourceLogin} from ${JSON.stringify(pathToFileURL(path.join(root,'apps/desktop/source-login.mjs')).href)};void app.whenReady().then(()=>{
+      const legacy=${JSON.stringify(legacy)},branded=${JSON.stringify(branded)};
+      app.setLoginItemSettings({...legacy,enabled:false});
+      const login=sourceLogin(app,branded,${JSON.stringify(config)},legacy);login.migrate();
+      if(login.get())throw Error('Disabled legacy startup preference was enabled');
+      app.setLoginItemSettings(legacy);app.exit(0);
+    });`);
+    const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
+    execFileSync(legacy.path,[register],{env,windowsHide:true,timeout:20000,stdio:'pipe'});
+  }
   assert.match(await launch(),/running in the background/);
   const marker=JSON.parse(fs.readFileSync(path.join(temp,'desktop.v1.json')));
   process.kill(marker.pid,0);
+  if(process.platform==='win32'){
+    const actual=execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',`(Get-Process -Id ${marker.pid}).Path`],{encoding:'utf8',windowsHide:true}).trim();
+    assert.equal(actual.toLowerCase(),desktopRuntime().executable.toLowerCase(),'Installed tray must use the branded application executable');
+  }
   const client=new LocalClient(`http://127.0.0.1:${port}`);
   let snapshot=await client.snapshot();
   assert.equal(snapshot.accessMode,'local-no-auth');assert.equal(snapshot.desktopCapabilities.tray,true);
   if(process.platform==='win32'){
+    assert.equal(snapshot.settings.autostart,true,'Legacy enabled login preference must survive the branded executable migration');
     await client.updateSettings(snapshot.settings.revision,{autostart:true});snapshot=await client.snapshot();
     assert.equal(snapshot.settings.autostart,true,'Paths with spaces must register a real native login item');
     await client.updateSettings(snapshot.settings.revision,{autostart:false});snapshot=await client.snapshot();

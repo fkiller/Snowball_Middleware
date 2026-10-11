@@ -21,7 +21,7 @@
     "plan": "node docs/middleware/validate-plan.mjs --next",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "test:plugin-reference": "node --test examples/standalone-device-plugin/test.mjs",
-    "install:desktop": "node node_modules/electron/install.js",
+    "install:desktop": "node scripts/prepare-desktop.mjs",
     "start:tray": "node apps/desktop/launch.mjs",
     "test:tray": "node apps/desktop/launch.mjs --smoke-test",
     "export:harnesses": "node scripts/export-harness-repositories.mjs",
@@ -33,6 +33,7 @@
     "@electron/packager": "20.3.0",
     "@types/node": "20.19.43",
     "electron": "44.4.3",
+    "resedit": "2.0.3",
     "typescript": "5.9.3"
   }
 }

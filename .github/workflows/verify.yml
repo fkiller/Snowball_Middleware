@@ -15,4 +15,6 @@ jobs:
         with:
           node-version: '24'
       - run: npm ci
+      - run: npm run install:desktop
+        if: runner.os == 'Windows'
       - run: npm test

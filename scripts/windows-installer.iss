@@ -23,6 +23,9 @@ OutputBaseFilename=SnowballMiddlewareSetup-{#AppVersion}-win-x64
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile={#SourceDir}\resources\app\assets\icon.ico
+WizardImageFile={#SourceDir}\resources\app\assets\installer-welcome.bmp
+WizardSmallImageFile={#SourceDir}\resources\app\assets\installer-small.bmp
 CloseApplications=yes
 RestartApplications=no
 UninstallDisplayIcon={app}\SnowballMiddleware.exe
@@ -31,7 +34,7 @@ UninstallDisplayIcon={app}\SnowballMiddleware.exe
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{userprograms}\Snowball Middleware"; Filename: "{app}\SnowballMiddleware.exe"
+Name: "{userprograms}\Snowball Middleware"; Filename: "{app}\SnowballMiddleware.exe"; IconFilename: "{app}\SnowballMiddleware.exe"; AppUserModelID: "local.snowball.middleware"
 
 [Run]
 Filename: "{app}\SnowballMiddleware.exe"; Description: "Launch Snowball Middleware"; Flags: nowait postinstall skipifsilent

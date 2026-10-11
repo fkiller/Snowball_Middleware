@@ -82,7 +82,7 @@ for(const profile of deviceProfiles) {
     const control = device.controlRoot;
     npmRun(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], path.join(control, 'host'));
     npmRun(['run', 'build'], path.join(control, 'host'));
-    console.log('MK20 joins over Wi-Fi: select this middleware with K17. The tray Device setup handles QMK/SD preparation; ADB is debug-only.');
+    console.log('MK20 joins over Wi-Fi: select this middleware with K17. The tray Device setup handles QMK/USB runtime preparation; ADB is debug-only.');
     if (!fs.existsSync(device.python)) run(python, ['-m', 'venv', path.dirname(path.dirname(device.python))]);
     run(device.python, ['-m', 'pip', 'install', '-r', path.join(control, 'hardware/mk20/requirements-setup.txt')]);
     run(device.python, [path.join(middleware, 'scripts/ensure_stt_runtime.py'), '--install', '--python', device.python]);
@@ -105,9 +105,9 @@ if (process.platform === 'win32') {
   const desktop = run('powershell.exe', ['-NoProfile', '-Command', '[Environment]::GetFolderPath("Desktop")'], root, { capture: true });
   if (!options['no-shortcut'] && fs.existsSync(desktop)) {
     // A .lnk keeps paths with spaces/non-ASCII characters intact; no cmd interpolation.
-    const {createRequire}=await import('node:module');
-    const electron=createRequire(import.meta.url)('electron');
-    const ps = `$s=(New-Object -ComObject WScript.Shell).CreateShortcut(${quote(path.join(desktop, 'Snowball.lnk'))});$s.TargetPath=${quote(electron)};$s.Arguments=${quote('"'+path.join(middleware,'apps/desktop/main.mjs')+'" --suite-config "'+configFile+'"')};$s.WorkingDirectory=${quote(root)};$s.Save()`;
+    const {desktopRuntime}=await import('./desktop-runtime.mjs');
+    const runtime=desktopRuntime();
+    const ps = `$s=(New-Object -ComObject WScript.Shell).CreateShortcut(${quote(path.join(desktop, 'Snowball.lnk'))});$s.TargetPath=${quote(runtime.executable)};$s.Arguments=${quote('--suite-config "'+configFile+'"')};$s.WorkingDirectory=${quote(root)};$s.IconLocation=${quote(path.join(middleware,'assets/icon.ico')+',0')};$s.Description='Snowball Middleware';$s.Save()`;
     run('powershell.exe', ['-NoProfile', '-Command', ps]);
   }
 } else {

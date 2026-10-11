@@ -328,14 +328,16 @@ export class LocalApi {
     if (url.search && (!workspaceMatch || [...url.searchParams.keys()].some(k => k !== 'path') || url.searchParams.getAll('path').length !== 1)) fail(400, 'query_denied');
     if (this.options.supervisor && req.method === 'GET') {
       const assets = this.options.supervisor;
-      const asset = new Map<string, [string, string]>([
+      const asset = new Map<string, [string, string | Uint8Array]>([
         ['/', ['text/html', assets.html]], ['/supervisor/app.js', ['text/javascript', assets.script]],
         ['/supervisor/style.css', ['text/css', assets.style]], ['/supervisor/client.js', ['text/javascript', assets.client]],
+        ...(assets.icon ? [['/supervisor/icon.png', ['image/png', assets.icon]] as [string, [string, Uint8Array]]] : []),
+        ...(assets.favicon ? [['/favicon.ico', ['image/x-icon', assets.favicon]] as [string, [string, Uint8Array]]] : []),
       ]).get(url.pathname);
       if (asset) {
         if (Buffer.byteLength(asset[1]) > 1024 * 1024) fail(503, 'asset_capacity');
-        res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
-        res.writeHead(200, { 'Content-Type': `${asset[0]}; charset=utf-8` }); res.end(asset[1]); return;
+        res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+        res.writeHead(200, { 'Content-Type': asset[0].startsWith('image/') ? asset[0] : `${asset[0]}; charset=utf-8` }); res.end(asset[1]); return;
       }
     }
     if (url.pathname === '/v1/bootstrap' && req.method === 'POST') {

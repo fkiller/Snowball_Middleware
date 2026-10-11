@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import {verifyDesktopBranding} from './verify-desktop-branding.mjs';
 
 const packageDir=process.argv[2];
 if(!packageDir||!path.isAbsolute(packageDir))throw new Error('Absolute package directory required');
@@ -24,6 +25,7 @@ walk(appDir);
 if(actual.length!==allowed.size||actual.some(name=>!allowed.has(name)))throw new Error('Unexpected or missing packaged application file');
 for(const [name,hash] of expected){const actualHash=createHash('sha256').update(fs.readFileSync(path.join(appDir,name))).digest('hex');if(actualHash!==hash)throw new Error('Packaged application hash mismatch');}
 const executable=process.platform==='win32'?path.join(packageDir,'SnowballMiddleware.exe'):path.join(packageDir,'Snowball Middleware.app','Contents','MacOS','SnowballMiddleware');
+const branding=await verifyDesktopBranding(executable);
 const output=await new Promise((resolve,reject)=>{
   const child=spawn(executable,['--smoke-test'],{windowsHide:true,stdio:['ignore','pipe','pipe']});
   let stdout='',stderr='';const deadline=setTimeout(()=>{child.kill();reject(new Error('Packaged tray smoke timed out'));},40000);
@@ -35,4 +37,4 @@ const output=await new Promise((resolve,reject)=>{
 const line=output.split(/\r?\n/).find(value=>value.startsWith('{')&&value.includes('native-tray'));
 const smoke=JSON.parse(line??'null');
 if(smoke?.trayCreated!==true||smoke?.mainWindows!==0||smoke?.loopbackNoPin!==true||smoke?.pauseRoundtrip!==true||smoke?.autostartChanged!==false)throw new Error('Packaged tray smoke did not meet local contract');
-console.log(JSON.stringify({packageDir,applicationFiles:actual.length,verifiedHashes:expected.size,smoke}));
+console.log(JSON.stringify({packageDir,applicationFiles:actual.length,verifiedHashes:expected.size,branding,smoke}));

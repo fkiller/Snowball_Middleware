@@ -574,3 +574,5 @@ footer {
   .prompt-actions { flex-direction: row; justify-content: flex-end; }
   .breadcrumb-container { flex-direction: column; align-items: stretch; }
 }
+
+.brand-icon{display:block;object-fit:contain;flex-shrink:0}

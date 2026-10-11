@@ -45,6 +45,8 @@ For initial M5Stack preparation or firmware upgrades, **connect USB and use the 
 
 All devices, including MK20 and future devices, follow the same **Device setup…** journey: detection, version/improvements, consent, verified recovery backup, preserved settings, update/reboot and network setup/visual guidance. Supported adapters are bundled by default; no per-device registration script is required. MK20 runtime 0.2.5 adds a USB receiver: the SD card stays inside while the entire affected runtime partition is backed up, fixed runtime files are transferred and an automatic reboot is verified against running-image hashes. QMK retains its separate DFU/readback path. A card reader is an advanced recovery tool, not a normal journey step. Existing firmware without the USB receiver still needs initial migration; a middleware update cannot install a receiver into unreachable legacy firmware. The common guide now shows MK20’s actual 20-key/two-knob matrix and M5Stack Core’s A/B/C plus FACES controls with interactive instructions. Tutorial navigation never controls hardware or claims a live connection. Physical USB update/reboot acceptance remains unverified; ordinary LAN pairing and all three harness contracts are unchanged.
 
+The existing Snowball icon is used throughout the native application, tray, device setup window, notifications, shortcuts, installer and local Web UI. Source installation prepares a branded native executable; updates preserve the existing autostart preference of the selected suite. Firmware and provider applications keep their own reviewed resources.
+
 **Check again** waits for any active automatic discovery and performs a fresh read; it does not start a firmware write. The window shows scanning and reports action errors by cause. For a LAN-only MK20, **Unknown** means the running firmware did not supply its version. A disabled update button explains that a real USB updater response and backup capability are still required; the included version is not the installed version.
 
 On Windows, allow the middleware Node.js process on your private network when Windows asks. Denying network access can block LAN discovery and selection even while the background middleware and USB detection work. The local Web UI remains loopback-only.
@@ -69,7 +71,7 @@ Our philosophy is to keep control in the user's hands and on their computer: mak
 
 It provides developers with:
 - **Web Supervisor (`http://127.0.0.1:8765/`)**: Local-loopback dashboard without a login/PIN. Available control operations depend on the native adapters connected to the selected runtime; discovery alone does not grant execution or approval capabilities.
-- **Native Desktop System Tray**: Electron tray shell for managing the local runtime. The package builder currently supports Windows and macOS; this review's installed harness baseline is Windows.
+- **Native Desktop System Tray**: Snowball Middleware runs in the background with its product icon and local runtime controls. The package builder supports Windows and macOS; this review's installed harness baseline is Windows.
 - **MK20 Hardware Integration**: The default installation includes the companion **Snowball Control** transport and speech library alongside the M5Stack gateway. Explicit development subsets can run the common native-session API independently. Native approval, cancellation, and recovery boundaries are defined in the architecture specification.
 
 > 💡 **Looking for MK20 Firmware and Hardware Tooling?**  

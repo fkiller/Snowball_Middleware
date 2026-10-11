@@ -16,9 +16,10 @@ try{
   ipcMain.handle('device-setup-snapshot',()=>view());
   let overlappedRefresh=false;
   ipcMain.handle('device-setup-action',async(_event,request)=>{if(!['wifi','refresh'].includes(request.action))throw Error('Read-only verification');if(request.action==='refresh')overlappedRefresh=setup.view().checking;await setup.action(request);return view();});
-  window=new BrowserWindow({width:1000,height:1100,show:false,webPreferences:{preload:fileURLToPath(new URL('../apps/desktop/device-setup-preload.cjs',import.meta.url)),nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  window=new BrowserWindow({width:1000,height:1100,show:false,icon:fileURLToPath(new URL('../assets/icon.ico',import.meta.url)),webPreferences:{preload:fileURLToPath(new URL('../apps/desktop/device-setup-preload.cjs',import.meta.url)),nodeIntegration:false,contextIsolation:true,sandbox:true,backgroundThrottling:false}});
   await window.loadFile(fileURLToPath(new URL('../apps/desktop/device-setup.html',import.meta.url)));
   await new Promise(resolve=>setTimeout(resolve,1200));
+  if(!await window.webContents.executeJavaScript(`(()=>{const icon=document.querySelector('.brand-heading img');return icon.complete&&icon.naturalWidth===256;})()`))throw Error('Snowball setup branding did not load');
   setup.on('change',()=>window.webContents.send('device-setup-state',view()));
   // Exercise actual OS enumeration through the sandbox/preload while discovery owns USB.
   const background=setup.scan();

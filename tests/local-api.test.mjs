@@ -260,6 +260,12 @@ test('optional Supervisor serves only reviewed same-origin assets; data still re
   assert.match(await page.text(), /id="content"/);
   const script = await fetch(api.origin + '/supervisor/app.js');
   assert.equal(script.status, 200); assert.match(await script.text(), /LocalClient/);
+  for(const [url,file,type]of [['/supervisor/icon.png','assets/icon-256.png','image/png'],['/favicon.ico','assets/icon.ico','image/x-icon']]){
+    const response=await fetch(api.origin+url);assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),type);
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()),fs.readFileSync(file));
+    assert.equal((await request(api,url,{headers:{Origin:'https://example.test'}})).status,403);
+    assert.equal((await request(api,url+'?path=outside')).status,400);
+  }
   assert.equal((await request(api, '/v1/snapshot')).status, 401);
   assert.equal((await request(api, '/supervisor/unknown.js')).status, 401);
   assert.equal((await request(api, '/supervisor/app.js?token=bad')).status, 400);
