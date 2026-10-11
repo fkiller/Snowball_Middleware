@@ -14,10 +14,25 @@ try{
   await setup.scan();
   const view=()=>({...setup.view(),language:'ko'});
   ipcMain.handle('device-setup-snapshot',()=>view());
-  ipcMain.handle('device-setup-action',async(_event,request)=>{if(request.action!=='wifi')throw Error('Read-only verification');await setup.action(request);return view();});
+  let overlappedRefresh=false;
+  ipcMain.handle('device-setup-action',async(_event,request)=>{if(!['wifi','refresh'].includes(request.action))throw Error('Read-only verification');if(request.action==='refresh')overlappedRefresh=setup.view().checking;await setup.action(request);return view();});
   window=new BrowserWindow({width:1000,height:1100,show:false,webPreferences:{preload:fileURLToPath(new URL('../apps/desktop/device-setup-preload.cjs',import.meta.url)),nodeIntegration:false,contextIsolation:true,sandbox:true}});
   await window.loadFile(fileURLToPath(new URL('../apps/desktop/device-setup.html',import.meta.url)));
   await new Promise(resolve=>setTimeout(resolve,1200));
+  setup.on('change',()=>window.webContents.send('device-setup-state',view()));
+  // Exercise actual OS enumeration through the sandbox/preload while discovery owns USB.
+  const background=setup.scan();
+  if(!setup.view().checking)throw Error('Real discovery did not acquire the scan lease');
+  await window.webContents.executeJavaScript(`document.getElementById('refresh').click();`);
+  await background;
+  const waitUntil=Date.now()+60000;
+  while(await window.webContents.executeJavaScript(`document.getElementById('refresh').disabled`)){
+    if(Date.now()>waitUntil)throw Error('Manual refresh did not finish');
+    await new Promise(resolve=>setTimeout(resolve,100));
+  }
+  if(await window.webContents.executeJavaScript(`document.getElementById('notice').textContent`))throw Error('Manual refresh reported an error after real enumeration');
+  if(!overlappedRefresh)throw Error('Manual refresh did not overlap real discovery');
+  if(!await window.webContents.executeJavaScript(`actionFailure(new Error('USB: usb_device_disconnected')).includes('연결')&&!actionFailure(new Error('unexpected')).includes('진행 중')`))throw Error('Action errors were masked as busy');
   fs.mkdirSync(output,{recursive:true});
   for(const language of ['ko','en']){
     await window.webContents.executeJavaScript(`document.getElementById('language').value='${language}';document.getElementById('language').dispatchEvent(new Event('change'));`);
@@ -52,7 +67,7 @@ try{
       await window.webContents.executeJavaScript('window.scrollTo(0,0)');
     }
   }
-  console.log(JSON.stringify({test:'m5stack-native-setup',firmware:setup.setups.get('m5stack').release.version,actualUsbCandidates:setup.setups.get('m5stack').records.size,languages:['ko','en'],flashed:false,secretRead:false}));
+  console.log(JSON.stringify({test:'m5stack-native-setup',firmware:setup.setups.get('m5stack').release.version,actualUsbCandidates:setup.setups.get('m5stack').records.size,refreshDuringDiscovery:'passed',languages:['ko','en'],flashed:false,secretRead:false}));
 }catch(error){console.error(error.message);process.exitCode=1;}
 finally{await setup?.close();window?.destroy();app.exit(process.exitCode??0);}
 });

@@ -23,18 +23,42 @@ export class DeviceSetupHub extends EventEmitter {
     if(setup.observe(observation))void this.scan();
   }
   view(){return {profiles:[...this.setups.values()].map(s=>s.view()),busy:!!this.job,checking:!!this.scanning};}
-  async scan(force=false){
-    if(this.closed||this.scanning||this.job)return;
-    this.scanning=true;
-    try{for(const setup of this.setups.values()){if(this.closed)break;await setup.scan(force);}}
-    finally{this.scanning=false;this.emit('change',this.view());}
+  scan(force=false){
+    if(this.closed||this.job)return Promise.resolve();
+    if(this.scanPromise){
+      // Coalesce manual checks into one forced pass after an ordinary scan.
+      // Joining a forced pass never opens a second helper on the same UART.
+      if(force&&!this.scanForced)this.refreshPending=true;
+      return this.scanPromise;
+    }
+    this.scanning=true;this.scanForced=force;this.refreshPending=false;
+    this.scanPromise=Promise.resolve().then(async()=>{
+      try{
+        do{
+          for(const setup of this.setups.values()){if(this.closed)break;await setup.scan(this.scanForced);}
+          if(!this.refreshPending||this.closed||this.job)break;
+          this.refreshPending=false;this.scanForced=true;
+        }while(true);
+      }finally{
+        this.scanning=false;this.scanPromise=null;this.refreshPending=false;
+        this.emit('change',this.view());
+      }
+    });
+    this.emit('change',this.view());
+    return this.scanPromise;
   }
-  start(){void this.scan();this.timer=setInterval(()=>void this.scan(),3000);this.timer.unref();}
+  start(){
+    if(this.started||this.closed)return;this.started=true;
+    const poll=async()=>{
+      try{await this.scan();}
+      finally{if(!this.closed){this.timer=setTimeout(poll,3000);this.timer.unref();}}
+    };void poll();
+  }
   async action(request){
     if(this.closed||!request||typeof request!=='object'||Array.isArray(request))throw Error('invalid_setup_action');
     const {profile,...action}=request,setup=this.setups.get(profile);
     if(!setup)throw Error('unknown_preparation_profile');
-    if(this.job||(this.scanning&&action.action!=='wifi'))throw Error('usb_setup_busy');
+    if(this.job||(this.scanning&&!['wifi','refresh'].includes(action.action)))throw Error('usb_setup_busy');
     if(action.action==='install'&&[...this.setups.values()].some(s=>s!==setup&&(s.records.get(action.port)?.hello||s.records.get(action.port)?.writable===true)))throw Error('device_type_conflict');
     // A refresh uses the common scan lease, so two adapters never open one UART together.
     if(action.action==='refresh'){
@@ -43,5 +67,5 @@ export class DeviceSetupHub extends EventEmitter {
     }else await setup.action(action);
     return this.view();
   }
-  async close(){this.closed=true;clearInterval(this.timer);await Promise.allSettled([...this.setups.values()].map(s=>s.close()));}
+  async close(){this.closed=true;clearInterval(this.timer);await Promise.allSettled([...this.setups.values()].map(s=>s.close()));await this.scanPromise;}
 }

@@ -67,3 +67,36 @@ test('common action router rejects unknown devices, cross-model writes and write
   assert.equal([...hub.setups.values()].every(s=>s.children.size===0),true);
   await hub.close();
 });
+
+test('manual refresh joins discovery and coalesces one forced pass without concurrent adapter access',async()=>{
+  // Scheduler-only barriers: no hardware response, firmware success or elapsed delay is simulated.
+  const hub=new DeviceSetupHub({adapters:[],backupDirectory:os.tmpdir()});
+  const passes=[],waiting=[];let active=0,maximum=0;
+  hub.setups.set('scheduler',{view:()=>({}),close:async()=>{},scan:async force=>{
+    passes.push(force);maximum=Math.max(maximum,++active);
+    await new Promise(resolve=>waiting.push(resolve));active--;
+  }});
+  const checks=[];hub.on('change',view=>checks.push(view.checking));
+  const automatic=hub.scan();
+  const first=hub.action({profile:'scheduler',action:'refresh'});
+  const second=hub.action({profile:'scheduler',action:'refresh'});
+  await Promise.resolve();assert.equal(hub.view().checking,true);
+  await assert.rejects(hub.action({profile:'scheduler',action:'install'}),/usb_setup_busy/);
+  assert.deepEqual(passes,[false]);waiting.shift()();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(passes,[false,true]);
+  const third=hub.action({profile:'scheduler',action:'refresh'});
+  waiting.shift()();await Promise.all([automatic,first,second,third]);
+  assert.equal(maximum,1);assert.deepEqual(passes,[false,true]);
+  assert.equal(hub.view().checking,false);assert.deepEqual(checks,[true,false]);
+  await hub.close();
+});
+
+test('refresh still rejects an active update and validates its closed request shape',async()=>{
+  const hub=new DeviceSetupHub({adapters:[],backupDirectory:os.tmpdir()});
+  hub.setups.set('scheduler',{view:()=>({}),close:async()=>{},job:Promise.resolve()});
+  await assert.rejects(hub.action({profile:'scheduler',action:'refresh'}),/usb_setup_busy/);
+  hub.setups.get('scheduler').job=null;
+  await assert.rejects(hub.action({profile:'scheduler',action:'refresh',port:'COM7'}),/invalid_setup_action/);
+  await hub.close();
+});
