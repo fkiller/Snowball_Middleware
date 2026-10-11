@@ -42,16 +42,17 @@ export class ComponentSetup extends DeviceSetup {
       for(const r of this.records.values())r.online=r.transport==='lan'?Date.now()-(this.observations?.get(r.port)?.seen??0)<8000:present.has(r.port);
       for(const candidate of ports){
         let record=this.records.get(candidate.port);const identity=String(candidate.usbIdentity??'').slice(0,256);
-        if(!record||record.usbIdentity!==identity||(!record.wasPresent&&candidate.present!==false)||force){
+        const retryUsb=record?.nextStep==='usb-bootstrap'&&Date.now()-(record.checked??0)>15000;
+        if(!record||record.usbIdentity!==identity||(!record.wasPresent&&candidate.present!==false)||force||retryUsb){
           const previous=record;
-          record={port:candidate.port,label:String(candidate.label??this.descriptor.name).slice(0,128),usbIdentity:identity,online:candidate.present!==false,wasPresent:true,phase:'checking',status:'unknown'};
+          record={port:candidate.port,label:String(candidate.label??this.descriptor.name).slice(0,128),usbIdentity:identity,online:candidate.present!==false,wasPresent:true,phase:'checking',status:'unknown',checked:Date.now()};
           this.records.set(record.port,record);
           try{
             const response=await this.run('probe',record.port);if(response.event!=='target')throw Error('invalid_device_response');
             Object.assign(record,this.target(response.target),{phase:previous?.phase==='awaiting-device'||response.target.pending?'awaiting-device':'ready'});
             if(previous?.backup)record.backup=previous.backup;
           }catch(error){record.phase='failed';record.code=code(error);}
-          this.emit('attached',record);
+          if(!previous||previous.usbIdentity!==identity||!previous.wasPresent||previous.currentVersion!==record.currentVersion||previous.writable!==record.writable||force)this.emit('attached',record);
         }
       }
       for(const [port,observation]of this.observations??[]){

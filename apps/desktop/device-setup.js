@@ -58,7 +58,7 @@ function componentCard(device,t){
     'enter-dfu':ko?'USB를 빼고 좌측 상단 키를 누른 채 다시 연결하세요. DFU 연결을 실제로 확인한 뒤 업데이트할 수 있습니다.':'Unplug USB, hold the top-left key and reconnect. Updating requires an actual DFU attachment.',
     'usb-driver':ko?'DFU 읽기 또는 드라이버 접근을 확인하지 못했습니다. 백업이 가능해질 때까지 쓰지 않습니다.':'DFU readback or driver access is unavailable. Writing is blocked until backup is possible.',
     'usb-connect':ko?'USB 연결 상태에서 업데이트합니다. SD 카드를 분리하지 않습니다. 제품용 USB 응답을 기다립니다.':'Updating uses the connected USB cable. Keep the SD card in the device. Waiting for product USB.',
-    'usb-bootstrap':ko?'이 구 펌웨어에는 USB 업데이트 수신 기능이 없습니다. 최초 이관이 필요하며, 현재 상태를 업데이트 가능으로 표시하지 않습니다.':'This legacy firmware has no USB update receiver. Initial migration is required; this attachment is not yet writable.',
+    'usb-bootstrap':ko?'USB 업데이트 수신기 응답을 기다립니다. 부팅 중일 수 있어 자동으로 다시 확인합니다. 수신기가 없는 구 펌웨어는 최초 이관이 필요하며 응답 전에는 쓰지 않습니다.':'Waiting for the USB update receiver; startup is retried automatically. Legacy firmware without the receiver needs initial migration. No writes before a valid response.',
     'insert-card':ko?'복구용 카드 리더 연결입니다. 일반 업데이트는 기기에 SD 카드를 둔 채 USB로 진행합니다.':'Recovery card-reader attachment. Normal updates use USB with the SD card left in the device.',
     'return-card':ko?'안전하게 카드를 분리해 MK20에 돌려 넣고 전원을 연결하세요. 부팅 확인은 실제 실행 중인 버전·해시를 LAN에서 확인합니다.':'Safely remove the card, return it to MK20 and power it on. Check boot verifies actual running version/hashes over LAN.'
   };if(guidance[device.nextStep])card.append(element('p',guidance[device.nextStep]));
