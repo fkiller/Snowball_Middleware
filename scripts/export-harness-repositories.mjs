@@ -155,6 +155,8 @@ Standalone harness plugin for **${title}** in the [Snowball Local Control ecosys
 
 [Snowball Middleware's common installer](https://github.com/fkiller/Snowball_Middleware#one-shot-install) includes **MK20**, **M5Stack + FACES**, **Web UI** and every harness plugin by default, without profile selection or USB. M5Stack firmware 0.4.0 and later discovers unknown PCs and pairs the device-selected PC over LAN. For initial firmware or upgrades, USB opens the common native device setup window with current/included versions, improvements, full backup, NVS preservation, reboot checks and reviewed Wi-Fi import or visual device guidance. Included firmware is 0.5.0. Older device firmware needs one upgrade; no USB registration is required per PC. MK20 and all future devices must follow this same bundled preparation journey without separate user registration scripts. The concrete MK20 component adapter handles QMK DFU and SD runtime preparation in the same window with recovery backups and actual boot verification; ordinary LAN pairing requires no USB/ADB. Physical firmware/card acceptance remains separate. Detected device types stay visible together; MK20 also uses actual LAN discovery and old firmware without a version response stays Unknown. Middleware owns installation and PC runtime; Control owns MK20 hardware, and Device M5Stack owns the ESP32 firmware/gateway. Native provider installation and sign-in remain vendor prerequisites.
 
+On Windows, allow the middleware Node.js process on your private network when Windows asks. Denying network access can block LAN discovery and selection even while the background middleware and USB detection work. The local Web UI remains loopback-only.
+
 This plugin provides seamless, sandbox-isolated orchestration between the [Snowball Middleware](https://github.com/fkiller/Snowball_Middleware) host and the local \`${provider}\` native execution environment.
 
 ---
@@ -216,6 +218,8 @@ This project is licensed under the Apache-2.0 License - see the [LICENSE](LICENS
   fs.writeFileSync(path.join(destination, 'README.ko.md'), header + `## Snowball 설치
 
 [Snowball Middleware 공통 설치기](https://github.com/fkiller/Snowball_Middleware#one-shot-install)는 프로필 선택·USB 연결 없이 MK20, M5Stack + FACES, Web UI와 하네스 플러그인 3종을 기본으로 함께 설치합니다. M5Stack 펌웨어 0.4.0 이상은 미등록 PC까지 발견하고 기기에서 선택한 PC를 LAN으로 등록합니다. 최초 펌웨어와 갱신은 USB 연결 시 열리는 공통 네이티브 기기 설정 창에서 현재/제공 버전·개선 사항·전체 백업·NVS 보존·재기동 확인·검토한 Wi-Fi 이관 또는 기기 조작 그림 안내로 진행합니다. 제공 펌웨어는 0.5.0입니다. 이전 펌웨어는 한 번 업그레이드해야 하며 PC마다 USB 등록할 필요는 없습니다. MK20과 모든 미래 디바이스에 별도 사용자 등록 스크립트 없는 같은 기본 포함 준비 여정을 적용합니다. MK20의 구체적인 구성 요소 어댑터가 같은 창에서 QMK DFU·SD 런타임을 복구 백업과 실제 부팅 검증으로 처리하며 일반 LAN 페어링은 USB/ADB 없이 동작합니다. 실물 펌웨어·카드 인수 검증은 별도입니다. 검색된 기기 종류를 함께 표시하고 MK20의 실제 LAN 검색도 받으며 버전 응답이 없는 구 펌웨어는 미확인으로 남깁니다. Middleware는 PC 실행·설치를, Control은 MK20 기기 코드를, Device M5Stack은 ESP32 펌웨어·게이트웨이를 담당합니다. 네이티브 공급자 앱 설치·로그인은 공급자별 사용자 단계입니다.
+
+Windows가 Node.js 네트워크 접근을 요청하면 미들웨어가 사용할 개인 네트워크 접근을 허용합니다. 거절하면 백그라운드 미들웨어·USB 감지가 동작해도 LAN 검색과 선택은 차단될 수 있습니다. 로컬 Web UI는 계속 루프백 전용입니다.
 
 ## 플러그인 개발
 
