@@ -62,8 +62,9 @@ test('installed suite: native tray owns the real runtime after launcher exit and
     const register=path.join(temp,'register-legacy.mjs'),name='Snowball Middleware '+createHash('sha256').update(config).digest('hex').slice(0,12);
     const legacy={name,path:createRequire(import.meta.url)('electron'),args:[path.join(root,'apps/desktop/main.mjs'),'--suite-config',config,'--background'],openAtLogin:true};
     const branded={path:desktopRuntime().executable,args:['--suite-config',config,'--background']};
-    fs.writeFileSync(register,`import {app} from 'electron';import {sourceLogin} from ${JSON.stringify(pathToFileURL(path.join(root,'apps/desktop/source-login.mjs')).href)};void app.whenReady().then(()=>{
+    fs.writeFileSync(register,`import {app,shell} from 'electron';import {writeSuiteShortcut} from ${JSON.stringify(pathToFileURL(path.join(root,'apps/desktop/shortcut.mjs')).href)};import {sourceLogin} from ${JSON.stringify(pathToFileURL(path.join(root,'apps/desktop/source-login.mjs')).href)};void app.whenReady().then(()=>{
       const legacy=${JSON.stringify(legacy)},branded=${JSON.stringify(branded)};
+      writeSuiteShortcut(shell,${JSON.stringify(path.join(temp,'Snowball.lnk'))},{executable:branded.path,config:${JSON.stringify(config)},icon:${JSON.stringify(path.join(root,'assets/icon.ico'))},cwd:${JSON.stringify(temp)}});
       app.setLoginItemSettings({...legacy,enabled:false});
       const login=sourceLogin(app,branded,${JSON.stringify(config)},legacy);login.migrate();
       if(login.get())throw Error('Disabled legacy startup preference was enabled');

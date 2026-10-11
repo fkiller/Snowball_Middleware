@@ -103,12 +103,10 @@ if (process.platform === 'win32') {
   fs.writeFileSync(launcher, `& ${quote(process.execPath)} ${quote(launchScript)} --config ${quote(configFile)}\nexit $LASTEXITCODE\n`);
   fs.writeFileSync(path.join(root,'Register-M5Stack.ps1'),`param([string]$Serial,[switch]$Flash)\n$arguments = @(${quote(path.join(middleware,'scripts/prepare-installed-m5stack.mjs'))}, '--config', ${quote(configFile)})\nif ($Serial) { $arguments += @('--serial', $Serial) }\nif ($Flash) { $arguments += '--flash' }\n& ${quote(process.execPath)} @arguments\nexit $LASTEXITCODE\n`);
   const desktop = run('powershell.exe', ['-NoProfile', '-Command', '[Environment]::GetFolderPath("Desktop")'], root, { capture: true });
-  if (!options['no-shortcut'] && fs.existsSync(desktop)) {
-    // A .lnk keeps paths with spaces/non-ASCII characters intact; no cmd interpolation.
-    const {desktopRuntime}=await import('./desktop-runtime.mjs');
-    const runtime=desktopRuntime();
-    const ps = `$s=(New-Object -ComObject WScript.Shell).CreateShortcut(${quote(path.join(desktop, 'Snowball.lnk'))});$s.TargetPath=${quote(runtime.executable)};$s.Arguments=${quote('--suite-config "'+configFile+'"')};$s.WorkingDirectory=${quote(root)};$s.IconLocation=${quote(path.join(middleware,'assets/icon.ico')+',0')};$s.Description='Snowball Middleware';$s.Save()`;
-    run('powershell.exe', ['-NoProfile', '-Command', ps]);
+  if (!options['no-shortcut']) {
+    const {createRequire}=await import('node:module');
+    const env={...process.env};delete env.ELECTRON_RUN_AS_NODE;
+    run(createRequire(import.meta.url)('electron'),[path.join(middleware,'scripts/create-shortcuts.mjs'),configFile,desktop],middleware,{env});
   }
 } else {
   fs.writeFileSync(path.join(root, 'Start-Snowball.sh'), `#!/bin/sh\nexec '${process.execPath.replaceAll("'", "'\\''")}' '${launchScript.replaceAll("'", "'\\''")}' --config '${configFile.replaceAll("'", "'\\''")}'\n`, { mode: 0o700 });
