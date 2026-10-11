@@ -93,7 +93,8 @@ function componentCard(device,t){
   }
   if(!['ready',undefined].includes(device.phase)){
     const box=element('div',undefined,'progress');box.setAttribute('role','status');
-    box.append(element('p',device.phase==='awaiting-device'?(ko?'카드 설치 후 실제 부팅 확인을 기다립니다.':'Waiting for actual boot after card installation.'):device.phase==='complete'?t.complete:(t.phase[device.phase]??device.phase)));
+    const backupPhase=device.component==='runtime'?(ko?'런타임 파티션 전체를 USB로 백업 중…':'Backing up the complete runtime partition over USB…'):(ko?'QMK 앱·설정 영역 전체 백업 중…':'Backing up the complete QMK application/settings region…');
+    box.append(element('p',device.phase==='awaiting-device'?(ko?'고급 복구 후 실제 부팅 확인을 기다립니다.':'Waiting for actual boot after advanced recovery.'):device.phase==='backup'?backupPhase:device.phase==='complete'?t.complete:(t.phase[device.phase]??device.phase)));
     if(device.phase==='failed')box.append(element('p',`${t.failed} (${device.code??'device_setup_failed'})`,'error'));
     if(device.backup)box.append(element('p',(ko?'복구 백업: ':'Recovery backup: ')+device.backup,'muted'));card.append(box);
   }
