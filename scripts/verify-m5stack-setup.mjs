@@ -23,9 +23,13 @@ try{
     await window.webContents.executeJavaScript(`document.getElementById('language').value='${language}';document.getElementById('language').dispatchEvent(new Event('change'));`);
     await new Promise(resolve=>setTimeout(resolve,150));
     const text=await window.webContents.executeJavaScript('document.body.innerText');
-    if(!text.includes(setup.setups.get('m5stack').release.version)||!text.includes(language==='ko'?'기기에서 직접 설정하기':'Set up on the device'))throw Error('Setup UI did not render');
+    if(!text.includes(setup.setups.get('m5stack').release.version)||!text.includes(language==='ko'?'기기 조작 따라하기':'Follow the physical controls'))throw Error('Setup UI did not render');
     fs.writeFileSync(path.join(output,language+'.png'),(await window.webContents.capturePage()).toPNG());
     await window.webContents.executeJavaScript('window.scrollTo(0,document.body.scrollHeight)');
+    const m5=await window.webContents.executeJavaScript(`({keys:document.querySelectorAll('.m5-buttons button').length,faces:!!document.querySelector('.faces-keyboard'),steps:document.querySelectorAll('.guide-step').length})`);
+    if(m5.keys!==3||!m5.faces||m5.steps!==6)throw Error('M5Stack physical walkthrough missing');
+    await window.webContents.executeJavaScript(`document.querySelector('.guide-step').click();document.querySelector('[data-control=select]:not(:disabled)').click();`);
+    if(!await window.webContents.executeJavaScript(`!!document.querySelector('[data-control=down]:not(:disabled)')`))throw Error('M5Stack guide did not advance');
     await new Promise(resolve=>setTimeout(resolve,150));
     fs.writeFileSync(path.join(output,language+'-guide.png'),(await window.webContents.capturePage()).toPNG());
     await window.webContents.executeJavaScript('window.scrollTo(0,0)');
@@ -38,7 +42,13 @@ try{
       if(!text.includes('MK20')||!text.includes(setup.setups.get('mk20').release.version)||!text.includes('QMK'))throw Error('MK20 setup UI did not render');
       fs.writeFileSync(path.join(output,'mk20-'+language+'.png'),(await window.webContents.capturePage()).toPNG());
       await window.webContents.executeJavaScript('window.scrollTo(0,document.body.scrollHeight)');
+      const mk20=await window.webContents.executeJavaScript(`({keys:[...document.querySelectorAll('.display-key')].map(k=>k.firstChild.textContent),knobs:document.querySelectorAll('.knob').length,steps:document.querySelectorAll('.guide-step').length})`);
+      if(mk20.keys.join(',')!=='K17,K13,K9,K5,K1,K18,K14,K10,K6,K2,K19,K15,K11,K7,K3,K20,K16,K12,K8,K4'||mk20.knobs!==2||mk20.steps!==5)throw Error('MK20 physical layout mismatch');
+      await window.webContents.executeJavaScript(`document.querySelectorAll('.guide-step')[1].click();document.querySelector('[data-control=machine-key]').click();`);
+      if(!await window.webContents.executeJavaScript(`!!document.querySelector('[data-control=left-turn]:not(:disabled)')`))throw Error('MK20 guide did not open machine navigation');
       fs.writeFileSync(path.join(output,'mk20-'+language+'-guide.png'),(await window.webContents.capturePage()).toPNG());
+      await window.webContents.executeJavaScript(`document.querySelector('[data-control=left-turn]').click();document.querySelector('[data-control=left-press]').click();`);
+      if(!await window.webContents.executeJavaScript(`document.getElementById('guide-position').textContent==='5 / 5'`))throw Error('MK20 walkthrough did not reach physical verification');
       await window.webContents.executeJavaScript('window.scrollTo(0,0)');
     }
   }

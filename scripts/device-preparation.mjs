@@ -26,6 +26,11 @@ export function readPreparation(device){
     if(!p||!['connection','confirmation','note'].every(k=>typeof p[k]==='string'&&p[k].length>0&&p[k].length<2000)||!Array.isArray(p.steps)||!p.steps.length||p.steps.length>12||p.steps.some(s=>typeof s!=='string'||s.length>2000))throw Error('preparation_visual_guide_required');
     if(!p.diagram||!['title','selection','hint'].every(k=>typeof p.diagram[k]==='string'&&p.diagram[k].length<100)||!Array.isArray(p.diagram.buttons)||p.diagram.buttons.length>8||p.diagram.buttons.some(s=>typeof s!=='string'||s.length>32))throw Error('preparation_visual_guide_required');
     if(p.journey!==undefined&&(!Array.isArray(p.journey)||p.journey.length!==4||p.journey.some(s=>typeof s!=='string'||s.length>80)))throw Error('preparation_visual_guide_required');
+    if(p.diagram.model!==undefined&&!['mk20','m5stack-core'].includes(p.diagram.model))throw Error('preparation_visual_guide_required');
+    if(p.walkthrough!==undefined){
+      const controls=new Set(p.diagram.model==='mk20'?['next','machine-key','left-turn','left-press']:['next','up','down','select','enter']);
+      if(!p.diagram.model||!Array.isArray(p.walkthrough)||!p.walkthrough.length||p.walkthrough.length>12||p.walkthrough.some(f=>!f||typeof f.text!=='string'||!f.text.length||f.text.length>2000||!controls.has(f.control)||!Array.isArray(f.screen)||f.screen.length<1||f.screen.length>5||f.screen.some(s=>typeof s!=='string'||s.length>120)))throw Error('preparation_visual_guide_required');
+    }
   }
   const release=JSON.parse(fs.readFileSync(releaseFile,'utf8'));
   if(release.board!==descriptor.id||!/^\d+\.\d+\.\d+$/.test(release.version??''))throw Error('invalid_firmware_release');

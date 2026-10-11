@@ -8,7 +8,7 @@ import {privateIpv4} from '../../scripts/setup-profile.mjs';
 
 const targetId=value=>typeof value==='string'&&/^t-[a-f0-9]{32}$/.test(value);
 const code=error=>/^[a-z0-9_]{1,80}$/.test(error?.message??'')?error.message:'device_setup_failed';
-const steps=new Set(['ready','enter-dfu','usb-driver','insert-card','return-card']);
+const steps=new Set(['ready','enter-dfu','usb-driver','usb-connect','usb-bootstrap','insert-card','return-card']);
 async function hash(file){const digest=createHash('sha256');for await(const chunk of createReadStream(file))digest.update(chunk);return digest.digest('hex');}
 
 /** Version-2 component/transport contract; the hub and native window stay shared. */
