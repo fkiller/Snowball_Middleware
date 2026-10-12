@@ -3,10 +3,12 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
+import {linuxLogin} from './linux-login.mjs';
 // Source installs need their arguments on macOS; Electron login items launch
 // only a signed app bundle there, not the selected source suite.
 export function sourceLogin(app,config,identity,legacy){
   const predecessors=Array.isArray(legacy)?legacy:legacy?[legacy]:[];
+  if(process.platform==='linux')return linuxLogin(config,identity,predecessors);
   if(process.platform==='win32'){
     // Electron 44 serializes Windows arguments itself. Adding literal quotes
     // here would make paths with spaces arrive with quotes inside argv.

@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+const python = process.platform === 'win32' ? 'python' : 'python3';
 
 test('STT Runtime: ensure_stt_runtime.py check outputs valid JSON status', async () => {
   const script = path.resolve('scripts/ensure_stt_runtime.py');
-  const res = spawnSync('python', [script, '--check'], { encoding: 'utf8', windowsHide: true });
+  const res = spawnSync(python, [script, '--check'], { encoding: 'utf8', windowsHide: true });
   assert.equal(res.status, 0, `Script failed: ${res.stderr}`);
   
   const status = JSON.parse(res.stdout);
@@ -25,7 +26,7 @@ test('STT Runtime: LocalWhisperProvider.ensureDependencies runs and returns stat
 
 test('STT Runtime: assess_stt_backend verifies cuBLAS when CUDA is detected', async () => {
   const script = path.resolve('scripts/assess_stt_backend.py');
-  const res = spawnSync('python', [script, '--json'], { encoding: 'utf8', windowsHide: true });
+  const res = spawnSync(python, [script, '--json'], { encoding: 'utf8', windowsHide: true });
   assert.equal(res.status, 0, `assess_stt_backend failed: ${res.stderr}`);
   
   const assess = JSON.parse(res.stdout.trim());
@@ -38,7 +39,7 @@ test('STT Runtime: assess_stt_backend verifies cuBLAS when CUDA is detected', as
 
 test('STT Fallback: simulated CUDA failure falls back to CPU universal plan', async () => {
   const script = path.resolve('scripts/assess_stt_backend.py');
-  const res = spawnSync('python', [script, '--simulate', 'cuda_fail', '--json'], { encoding: 'utf8', windowsHide: true });
+  const res = spawnSync(python, [script, '--simulate', 'cuda_fail', '--json'], { encoding: 'utf8', windowsHide: true });
   assert.equal(res.status, 0);
   const assess = JSON.parse(res.stdout.trim());
   assert.equal(assess.selected_backend, 'cpu');
@@ -48,7 +49,7 @@ test('STT Fallback: simulated CUDA failure falls back to CPU universal plan', as
 
 test('STT Fallback: simulated Vulkan failure falls back to CPU universal plan', async () => {
   const script = path.resolve('scripts/assess_stt_backend.py');
-  const res = spawnSync('python', [script, '--simulate', 'vulkan_fail', '--json'], { encoding: 'utf8', windowsHide: true });
+  const res = spawnSync(python, [script, '--simulate', 'vulkan_fail', '--json'], { encoding: 'utf8', windowsHide: true });
   assert.equal(res.status, 0);
   const assess = JSON.parse(res.stdout.trim());
   assert.equal(assess.selected_backend, 'cpu');
@@ -57,7 +58,7 @@ test('STT Fallback: simulated Vulkan failure falls back to CPU universal plan', 
 
 test('STT Fallback: simulated Apple Silicon Metal failure falls back to CPU', async () => {
   const script = path.resolve('scripts/assess_stt_backend.py');
-  const res = spawnSync('python', [script, '--simulate', 'metal_fail', '--json'], { encoding: 'utf8', windowsHide: true });
+  const res = spawnSync(python, [script, '--simulate', 'metal_fail', '--json'], { encoding: 'utf8', windowsHide: true });
   assert.equal(res.status, 0);
   const assess = JSON.parse(res.stdout.trim());
   assert.equal(assess.selected_backend, 'cpu');

@@ -3,11 +3,23 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { HarnessDiscovery } from '../packages/core/dist/index.js';
+import { HarnessDiscovery, defaultDiscoveryProviders } from '../packages/core/dist/index.js';
 const provider = extra => ({ id: 'example.harness', commandNames: ['harness'], knownPaths: [], ...extra });
 const options = { platform: 'darwin', pathValue: '/bin:/tools' };
 const missing = () => { throw Object.assign(new Error(), { code: 'ENOENT' }); };
 const fact = canonicalPath => ({ canonicalPath, stamp: '1:2:3:4' });
+
+test('Linux discovers actual POSIX CLI files and does not invent macOS app locations', {skip:process.platform==='win32'}, async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'snowball-linux-discovery-'));
+  t.after(() => rm(directory, {recursive:true, force:true}));
+  await writeFile(path.join(directory, 'codex'), '#!/bin/sh\n');
+  const providers = defaultDiscoveryProviders('linux');
+  assert.ok(providers.every(p => p.knownPaths.every(file => !file.includes('.app/'))));
+  const result = await new HarnessDiscovery().scan(providers, {platform:'linux', pathValue:directory});
+  const codex = result.candidates.find(c => c.providerId === 'snowball.codex');
+  assert.equal(codex.locator, await (await import('node:fs/promises')).realpath(path.join(directory, 'codex')));
+  assert.equal(codex.controllable, false);
+});
 
 test('macOS fixtures preserve multiple installs, provenance and manual paths without GUI PATH', async () => {
   const calls = [];

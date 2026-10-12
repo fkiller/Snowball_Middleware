@@ -45,9 +45,9 @@ export class HarnessDiscovery {
   constructor(private readonly io: DiscoveryIO = localDiscoveryIO) {}
   snapshot(): DiscoverySnapshot { return copy(this.#snapshot); }
   cancel(): void { this.#abort?.abort(); }
-  async scan(providers: DiscoveryProvider[], options: { platform: 'win32' | 'darwin'; pathValue: string; deadlineMs?: number }): Promise<DiscoverySnapshot> {
+  async scan(providers: DiscoveryProvider[], options: { platform: 'win32' | 'darwin' | 'linux'; pathValue: string; deadlineMs?: number }): Promise<DiscoverySnapshot> {
     const deadline = options.deadlineMs ?? 2000;
-    if (!['win32', 'darwin'].includes(options.platform) || !Number.isInteger(deadline) || deadline < 10 || deadline > 5000 || typeof options.pathValue !== 'string' || options.pathValue.length > 32768 || !Array.isArray(providers) || providers.length > 16) throw new Error('invalid_discovery_request');
+    if (!['win32', 'darwin', 'linux'].includes(options.platform) || !Number.isInteger(deadline) || deadline < 10 || deadline > 5000 || typeof options.pathValue !== 'string' || options.pathValue.length > 32768 || !Array.isArray(providers) || providers.length > 16) throw new Error('invalid_discovery_request');
     // Copy before any await: caller changes cannot redirect an active scan.
     const config = copy(providers);
     const paths = options.platform === 'win32' ? path.win32 : path.posix;
@@ -179,8 +179,8 @@ export class HarnessDiscovery {
   }
 }
 
-/** Default discovery providers for zero-config harness discovery on Windows and macOS. */
-export function defaultDiscoveryProviders(platform: 'win32' | 'darwin' = (process.platform === 'win32' ? 'win32' : 'darwin')): DiscoveryProvider[] {
+/** Default discovery providers for the supported desktop platforms. */
+export function defaultDiscoveryProviders(platform: 'win32' | 'darwin' | 'linux' = process.platform as 'win32' | 'darwin' | 'linux'): DiscoveryProvider[] {
   const isWin = platform === 'win32';
   const localAppData = process.env.LOCALAPPDATA || '';
   const home = process.env.HOME || process.env.USERPROFILE || '';
@@ -190,7 +190,7 @@ export function defaultDiscoveryProviders(platform: 'win32' | 'darwin' = (proces
   const codexKnown: string[] = [];
   if (isWin && /^[A-Za-z]:[\\/]/.test(localAppData)) {
     codexKnown.push(path.win32.join(localAppData, 'Programs', 'Codex', 'codex.exe'));
-  } else if (!isWin) {
+  } else if (platform === 'darwin') {
     codexKnown.push('/Applications/Codex.app/Contents/MacOS/Codex');
   }
   providers.push({

@@ -18,7 +18,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
   <img src="https://img.shields.io/badge/Node.js-%3E%3D22.12-green.svg" alt="Node.js">
-  <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS-orange.svg" alt="Platforms">
+  <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux-orange.svg" alt="Platforms">
   <a href="https://github.com/fkiller/Snowball_Middleware#one-shot-install"><img src="https://img.shields.io/badge/Install-Snowball-purple.svg" alt="Install Snowball"></a>
 </p>
 
@@ -31,15 +31,38 @@
 
 기존 Snowball 아이콘을 네이티브 앱·트레이·기기 설정 창·알림·바로가기·설치 프로그램·로컬 Web UI에 일관되게 적용합니다. 소스 설치도 제품 이름과 아이콘을 가진 실행 파일을 준비하며, 업데이트 시 해당 suite의 기존 자동 시작 선택을 보존합니다. 기기 펌웨어와 제공사 앱은 각각의 검토된 리소스를 유지합니다.
 
-Windows PowerShell에서 실행하세요.
+아래에서 플랫폼을 펼친 뒤 GitHub 코드 블록의 **Copy** 버튼으로 명령을 복사하세요. README Markdown에서는 접기/펼치기 선택을 사용하며, 실제 탭은 별도 문서 웹사이트가 필요합니다.
+
+<details open>
+<summary><strong>Windows · PowerShell</strong></summary>
 
 ```powershell
 & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.ps1')))
 ```
 
-설치기는 Node/Git/Python과 구성 요소를 준비하고 실제 격리 하네스 워커를 확인한 뒤, 트레이 아이콘이 있는 사용자별 숨김 백그라운드 앱을 시작합니다. 소유 런타임이 응답하면 설치 터미널로 돌아옵니다. 트레이에서 Web UI, 상태, 설정, 일시정지/재개, 재시작, 종료, 로그인 자동 시작을 제공합니다. Web UI는 **http://127.0.0.1:8765/**이며 기본 설치 위치는 `%LOCALAPPDATA%\Snowball`입니다. **Start-Snowball.ps1**은 다운로드 없이 다시 실행합니다. 네이티브 하네스 앱과 로그인은 공급자를 통해 준비하며, 없으면 사용 불가로 표시합니다.
+</details>
 
-기존 설치 업데이트는 같은 `-InstallRoot`에 `-Update`를 추가하고 `-Profile`은 생략하세요. 기존 단일 기기 설치에도 두 어댑터를 준비하며 기기 설정·페어링 키·컨트롤러 상태·음성 캐시·사용자 지정 API 포트·로그인 자동 시작 설정을 보존합니다. 사설 LAN이 없거나 선택이 모호하면 자동 검색은 대기·재시도하고 Web UI는 유지합니다. 필요하면 `-Bind PC의_사설_IP`를 지정하세요.
+<details>
+<summary><strong>macOS · Terminal</strong></summary>
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.sh | bash
+```
+
+</details>
+
+<details>
+<summary><strong>Linux · Terminal</strong></summary>
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.sh | bash
+```
+
+</details>
+
+Windows는 Node/Git/Python을 준비합니다. macOS/Linux는 curl·Git·venv/pip을 포함한 Python >=3.12가 필요하며, 설치기가 체크섬을 검증한 Node LTS를 사용자 폴더에 준비합니다. 구성 요소를 빌드하고 실제 격리 하네스 워커를 확인한 뒤, 트레이 아이콘이 있는 사용자별 숨김 백그라운드 앱을 시작합니다. 소유 런타임이 응답하면 설치 터미널로 돌아옵니다. 트레이에서 Web UI, 상태, 설정, 일시정지/재개, 재시작, 종료, 로그인 자동 시작을 제공합니다. Web UI는 **http://127.0.0.1:8765/**이며 기본 설치 위치는 Windows `%LOCALAPPDATA%\Snowball`, macOS `~/Library/Application Support/Snowball`, Linux `${XDG_DATA_HOME:-~/.local/share}/Snowball`입니다. **Start-Snowball.ps1**(Windows) / **Start-Snowball.sh**(macOS/Linux)은 다운로드 없이 다시 실행합니다. 네이티브 하네스 앱과 로그인은 공급자를 통해 준비하며, 없으면 사용 불가로 표시합니다.
+
+기존 설치 업데이트는 Windows에서 같은 `-InstallRoot`에 `-Update`, macOS/Linux에서 같은 `--root 경로`에 `--update`를 추가하고 프로필 옵션은 생략하세요. 예를 들어 Linux에서는 `install.sh`를 내려받아 `bash install.sh --root "$HOME/.local/share/Snowball" --update`로 갱신합니다(실제 기존 설치 경로 사용). 기존 단일 기기 설치에도 두 어댑터를 준비하며 기기 설정·페어링 키·컨트롤러 상태·음성 캐시·사용자 지정 API 포트·로그인 자동 시작 설정을 보존합니다. 사설 LAN이 없거나 선택이 모호하면 자동 검색은 대기·재시도하고 Web UI는 유지합니다. 필요하면 Windows `-Bind PC의_사설_IP` / macOS·Linux `--bind PC의_사설_IP`를 지정하세요.
 
 MK20은 Wi-Fi에 독립적으로 연결한 뒤 K17(Machines)에서 PC를 선택해 페어링합니다. M5Stack 펌웨어 **0.4.0 이상**은 같은 LAN의 등록 PC와 새 미들웨어를 자동 검색합니다. 머신 목록에서 새 PC를 선택하면 Wi-Fi로 페어링합니다. PC 추가에는 전체 미들웨어 설치만 필요하며 기기별 추가 설치·USB 연결·등록 스크립트는 필요하지 않습니다. 같은 브로드캐스트 서브넷, 기기 포트 허용, 클라이언트 격리 해제 상태의 신뢰하는 사설 LAN을 사용하세요.
 
@@ -49,6 +72,8 @@ M5Stack 전체 플래시 백업 중에는 기기 설정 창에서 실제 읽기 
 
 기기 설정 창의 언어를 바꾸면 이미 표시된 상태·오류 메시지도 즉시 바뀝니다. 언어 변경으로 기기 작업을 다시 실행하지 않습니다.
 
+업데이트 실패 시 실패 단계를 표시합니다. 백업 경로는 도구가 백업 검증 완료를 알린 뒤에만 표시하며 예정 파일명이나 이전 시도의 백업을 이번 복구 백업으로 표시하지 않습니다. 최초 백업 읽기 중 실패했다면 펌웨어 쓰기를 시작하지 않은 상태입니다.
+
 MK20과 미래 기기를 포함한 모든 디바이스는 같은 **기기 설정…** 여정(감지·버전/개선 사항·동의·검증한 복구 백업·설정 보존·업데이트·재기동·네트워크 설정/시각 안내)을 따릅니다. 지원 어댑터는 기본 설치에 포함하며 별도 등록 스크립트가 필요 없습니다. MK20 런타임 0.2.5는 제품 USB 수신기를 추가하여 SD 카드를 기기에 둔 채 변경하는 런타임 파티션 전체 백업·고정 파일 전송·자동 재기동 후 실행 이미지 해시 검증을 수행합니다. QMK는 별도 DFU·읽기 백업 경로를 유지합니다. 카드 리더는 일반 여정의 단계가 아닌 고급 복구 수단입니다. USB 수신기가 없는 구 펌웨어는 최초 이관이 남아 있으며, 미들웨어 업데이트만으로 도달 불가능한 기기에 수신기를 설치할 수는 없습니다. 공통 창은 MK20 실제 20개 화면 키·두 노브와 M5Stack Core A/B/C·FACES를 반영한 단계별 인터랙티브 안내를 제공합니다. 안내 클릭은 실물 제어나 연결 성공으로 처리하지 않습니다. M5Stack 0.5.2는 업데이트 후 실물 백업·Wi-Fi·두 PC LAN 검증을 통과했습니다(상세 범위는 중앙 검증 기록 참조). MK20 첫 USB 이관·업데이트 검증은 미해결이며 일반 LAN 페어링·하네스 3종 계약은 유지합니다.
 
 **다시 확인**은 자동 검색이 진행 중이면 기다린 뒤 새로 조회하며 펌웨어를 쓰지 않습니다. 창에서 검색 진행과 원인별 오류를 표시합니다. LAN으로만 발견한 MK20의 **미확인**은 실행 중인 펌웨어가 버전을 응답하지 않았다는 뜻입니다. 비활성 업데이트 버튼에는 실제 USB 수신기 응답과 백업 가능 확인이 필요하다고 표시하며, 제공 버전을 설치 버전으로 취급하지 않습니다.
@@ -57,7 +82,7 @@ MK20 설정은 복합 USB 기능마다 항목을 만들지 않고 실물 USB 부
 
 Windows가 Node.js 네트워크 접근을 요청하면 미들웨어가 사용할 개인 네트워크 접근을 허용합니다. 거절하면 백그라운드 미들웨어·USB 감지가 동작해도 LAN 검색과 선택은 차단될 수 있습니다. 로컬 Web UI는 계속 루프백 전용입니다.
 
-옵션: `-Update`, `-InstallRoot 경로`, `-Bind PC의_사설_IP`, `-Port 8765`, `-NoStart`, `-NoShortcut`. `-Profile web|mk20|m5stack`은 개발·진단용 명시적 부분 구성으로 유지하며 일반 설치에서는 필요 없습니다. 같은 루트에 이미 설치된 어댑터는 유지합니다. Node/Git/Python이 준비된 macOS 소스 환경에서는 같은 부모 폴더 체크아웃으로 `npm run setup --`을 실행하며, USB 준비는 `--prepare-m5stack [--no-flash]`로 명시합니다. Linux 전체 워커 런타임은 아직 지원하지 않습니다. 프로토콜·인증·실물 검증 범위는 중앙 명세를 확인하세요.
+옵션: `-Update`, `-InstallRoot 경로`, `-Bind PC의_사설_IP`, `-Port 8765`, `-NoStart`, `-NoShortcut`. `-Profile web|mk20|m5stack`은 개발·진단용 명시적 부분 구성으로 유지하며 일반 설치에서는 필요 없습니다. 같은 루트에 이미 설치된 어댑터는 유지합니다. macOS/Linux 옵션: `--update`, `--root 경로`, `--bind PC의_사설_IP`, `--port 8765`, `--no-start`, `--no-shortcut`, `--python 경로`, `--data-dir 경로`. 전체 옵션은 `bash install.sh --help`로 확인합니다. Linux는 그래픽 데스크톱·Electron 시스템 라이브러리·사용자의 USB/시리얼 접근 권한이 필요하며 sandbox 우회나 USB 권한 자동 변경은 하지 않습니다. Linux에서 OS Wi-Fi 가져오기를 지원하지 않으면 공통 기기 설정 안내를 사용합니다. macOS/Linux의 대화형 실물 기기 인수 검증은 자동 테스트와 별도입니다. 프로토콜·인증·실물 검증 범위는 중앙 명세를 확인하세요.
 
 [공통 아키텍처와 저장소 역할](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.md)
 
@@ -72,8 +97,6 @@ Windows가 Node.js 네트워크 접근을 요청하면 미들웨어가 사용할
 제품의 철학은 **제어권을 사용자의 손과 컴퓨터에 두는 것**입니다. 도구를 오가고 작업을 확인하는 동작은 즉각적이어야 하며, 기능은 실제 설치 환경에서 발견하고 결과와 한계는 사실대로 보여줘야 합니다. 자세한 [제품 철학](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.ko.md#제품-철학-inter-harness-로컬-제어)은 중앙 아키텍처 문서에서 관리합니다.
 
 **Preview:** 개인 PC와 신뢰하는 내부 네트워크 전용입니다. 루프백 Web UI에는 로그인/PIN을 요구하지 않습니다. MK20 UDP/개발 ADB의 인증·암호화 생략은 [현재 설계 문서](docs/ARCHITECTURE.ko.md)에 명시합니다.
-업데이트 실패 시 실패 단계를 표시합니다. 백업 경로는 도구가 백업 검증 완료를 알린 뒤에만 표시하며 예정 파일명이나 이전 시도의 백업을 이번 복구 백업으로 표시하지 않습니다. 최초 백업 읽기 중 실패했다면 펌웨어 쓰기를 시작하지 않은 상태입니다.
-
 
 **Snowball Middleware**는 로컬 AI 코딩 에이전트—**OpenAI Codex**, **Google Antigravity (AGY)**, **OpenCode**—를 단일한 초저지연 데스크톱 인터페이스로 통합하는 호스트 제어 평면입니다.
 

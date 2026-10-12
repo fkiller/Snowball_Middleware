@@ -6,6 +6,8 @@ The existing `assets/icon.png` is the product mark. `npm run install:desktop` pr
 
 Requires Node >=22.12. Development setup:
 
+The common entry points are `install.ps1` (Windows) and `install.sh` (macOS/desktop Linux, x64/arm64). Unix bootstrap needs curl, Git and Python >=3.12 with venv/pip; it verifies an official Node LTS archive when Node is missing. Linux also needs graphical login, Electron desktop libraries and normal USB/serial permissions. Source suites use macOS LaunchAgents or Linux XDG autostart entries scoped to the install root. Existing disabled login choices remain disabled. Start again with the generated `Start-Snowball.sh`; update using `bash install.sh --root PATH --update`. Headless Linux and physical macOS/Linux device acceptance are outside the verified scope. Renderer sandboxing and worker digest approval remain enabled.
+
 ```text
 npm ci --ignore-scripts
 npm run build

@@ -18,7 +18,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
   <img src="https://img.shields.io/badge/Node.js-%3E%3D22.12-green.svg" alt="Node.js">
-  <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS-orange.svg" alt="Platforms">
+  <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux-orange.svg" alt="Platforms">
   <a href="https://github.com/fkiller/Snowball_Middleware#one-shot-install"><img src="https://img.shields.io/badge/Install-Snowball-purple.svg" alt="Install Snowball"></a>
 </p>
 
@@ -29,15 +29,38 @@
 
 **Install Snowball once per PC.** The default installation includes the Web UI, MK20 discovery/transport and speech runtime, M5Stack discovery/gateway, and all three Codex/Antigravity/OpenCode harness plugins. No device profile selection or connected USB device is needed.
 
-Run in Windows PowerShell:
+Choose your platform below, then use the code block’s **Copy** button on GitHub. README Markdown supports these expandable selectors; interactive tabs require a documentation website.
+
+<details open>
+<summary><strong>Windows · PowerShell</strong></summary>
 
 ```powershell
 & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.ps1')))
 ```
 
-The installer prepares Node/Git/Python, builds the companion components, checks the actual isolated harness workers, and starts a hidden per-user background application with a tray icon. The terminal returns after the owned runtime responds. The tray provides Web UI, status, Settings, Pause/Resume, Restart, Quit and login startup. Web UI stays on **http://127.0.0.1:8765/**. Default location: `%LOCALAPPDATA%\Snowball`; **Start-Snowball.ps1** restarts it without downloading dependencies. Missing native harness applications remain unavailable until installed and signed in through their vendors.
+</details>
 
-For updates, use the same `-InstallRoot` with `-Update` and omit `-Profile`. Old single-device installs gain both adapters while preserving device settings, pairing keys, controller state, speech caches, custom API port and login startup preference. An absent or ambiguous private LAN leaves automatic discovery waiting while the Web UI remains available; use `-Bind PRIVATE_PC_IP` when needed.
+<details>
+<summary><strong>macOS · Terminal</strong></summary>
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.sh | bash
+```
+
+</details>
+
+<details>
+<summary><strong>Linux · Terminal</strong></summary>
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/install.sh | bash
+```
+
+</details>
+
+Windows prepares Node/Git/Python; macOS/Linux require curl, Git and Python >=3.12 with venv/pip and prepare a checksum-verified Node LTS locally. The installer builds the companion components, checks the actual isolated harness workers, and starts a hidden per-user background application with a tray icon. The terminal returns after the owned runtime responds. The tray provides Web UI, status, Settings, Pause/Resume, Restart, Quit and login startup. Web UI stays on **http://127.0.0.1:8765/**. Default locations: Windows `%LOCALAPPDATA%\Snowball`, macOS `~/Library/Application Support/Snowball`, Linux `${XDG_DATA_HOME:-~/.local/share}/Snowball`. **Start-Snowball.ps1** (Windows) / **Start-Snowball.sh** (macOS/Linux) restart it without downloading dependencies. Missing native harness applications remain unavailable until installed and signed in through their vendors.
+
+For updates, use the same `-InstallRoot` with `-Update` on Windows, or `--root PATH --update` on macOS/Linux, and omit the profile option. For example, download `install.sh` and run `bash install.sh --root "$HOME/.local/share/Snowball" --update` on Linux (use your existing root). Old single-device installs gain both adapters while preserving device settings, pairing keys, controller state, speech caches, custom API port and login startup preference. An absent or ambiguous private LAN leaves automatic discovery waiting while the Web UI remains available; use `-Bind PRIVATE_PC_IP` (Windows) / `--bind PRIVATE_PC_IP` (macOS/Linux) when needed.
 
 MK20 joins Wi-Fi independently: press K17 (Machines), choose a PC and pair/select it. M5Stack firmware **0.4.0 and later** automatically discovers registered and new middleware PCs on the same LAN. Select a New PC in Machines to pair over Wi-Fi. Adding a PC requires only the complete middleware installation: no device-specific install, USB connection or registration script. Use a trusted private LAN with device ports allowed, the same broadcast subnet and no client isolation.
 
@@ -46,6 +69,8 @@ For initial M5Stack preparation or firmware upgrades, **connect USB and use the 
 During M5Stack full-flash backup, Device setup shows the actual read percentage, MiB and elapsed time. A 16MB USB read can take several minutes; the backup file appears only after the read finishes. Reading 100% still requires size/hash verification before firmware writing. Keep USB connected throughout. Full backups are read in 1 MiB chunks; a failed chunk is retried once at a lower USB serial speed. If both reads fail, writing is blocked and the tool attempts to restart and verify the existing firmware.
 
 Changing the setup window's language also updates existing status and error messages immediately, without retrying the device operation.
+
+If an update fails, the window retains the failed stage. A backup path is shown only after the helper confirms backup verification; a planned filename or a previous attempt's backup is not presented as the current recovery backup. A failure while reading the initial backup means firmware writing has not started.
 
 All devices, including MK20 and future devices, follow the same **Device setup…** journey: detection, version/improvements, consent, verified recovery backup, preserved settings, update/reboot and network setup/visual guidance. Supported adapters are bundled by default; no per-device registration script is required. MK20 runtime 0.2.5 adds a USB receiver: the SD card stays inside while the entire affected runtime partition is backed up, fixed runtime files are transferred and an automatic reboot is verified against running-image hashes. QMK retains its separate DFU/readback path. A card reader is an advanced recovery tool, not a normal journey step. Existing firmware without the USB receiver still needs initial migration; a middleware update cannot install a receiver into unreachable legacy firmware. The common guide now shows MK20’s actual 20-key/two-knob matrix and M5Stack Core’s A/B/C plus FACES controls with interactive instructions. Tutorial navigation never controls hardware or claims a live connection. M5Stack 0.5.2 has passed physical post-update backup/Wi-Fi and two-PC LAN checks (see the central verification record); MK20 first USB migration/update acceptance remains unresolved. Ordinary LAN pairing and all three harness contracts are unchanged.
 
@@ -57,7 +82,7 @@ MK20 setup displays one QMK entry per physical USB parent, rather than one per c
 
 On Windows, allow the middleware Node.js process on your private network when Windows asks. Denying network access can block LAN discovery and selection even while the background middleware and USB detection work. The local Web UI remains loopback-only.
 
-Options: `-Update`, `-InstallRoot PATH`, `-Bind PRIVATE_PC_IP`, `-Port 8765`, `-NoStart`, `-NoShortcut`. `-Profile web|mk20|m5stack` remains an explicit development/diagnostic subset option, not the normal installation flow; it retains adapters already installed in that root. macOS source users with Node/Git/Python can run `npm run setup --` from a sibling checkout layout; explicit USB preparation uses `--prepare-m5stack [--no-flash]`. Linux suite workers are not yet supported. See the central specification for protocol, authentication and field-verification limits.
+Options: `-Update`, `-InstallRoot PATH`, `-Bind PRIVATE_PC_IP`, `-Port 8765`, `-NoStart`, `-NoShortcut`. `-Profile web|mk20|m5stack` remains an explicit development/diagnostic subset option, not the normal installation flow; it retains adapters already installed in that root. macOS/Linux: `--update`, `--root PATH`, `--bind PRIVATE_PC_IP`, `--port 8765`, `--no-start`, `--no-shortcut`, `--python PATH`, `--data-dir PATH`; `bash install.sh --help` lists all options. Linux requires a graphical desktop, Electron system libraries and user access to device USB/serial interfaces; no sandbox bypass or automatic USB permission changes are used. Linux Wi-Fi import may be unavailable: use the common device setup guide. macOS/Linux interactive device acceptance remains separate from automated tests. See the central specification for protocol, authentication and field-verification limits.
 
 [Common architecture and repository ownership](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.md)
 
@@ -70,8 +95,6 @@ Options: `-Update`, `-InstallRoot PATH`, `-Bind PRIVATE_PC_IP`, `-Port 8765`, `-
 **Snowball is an inter-Harness local control interface.** It gives developers a common way to navigate and control Codex, AGY, and OpenCode through an MK20 desk terminal and local Web Supervisor. The user chooses the harness, project, and session; each harness keeps its native runtime, history, models, and permissions.
 
 Our philosophy is to keep control in the user's hands and on their computer: make switching tools and following work immediate, discover capabilities from the installed environment, and show real results and limitations. The full [product philosophy](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.md#product-philosophy-inter-harness-local-control) is maintained with the central architecture.
-If an update fails, the window retains the failed stage. A backup path is shown only after the helper confirms backup verification; a planned filename or a previous attempt's backup is not presented as the current recovery backup. A failure while reading the initial backup means firmware writing has not started.
-
 
 **Preview:** Intended exclusively for personal workstations and trusted local networks. The loopback Web UI requires no login or PIN. The omission of authentication/encryption in MK20 UDP and development TCP ADB is detailed in [Current Design and Pre-Release Checklist](docs/ARCHITECTURE.md).
 
@@ -79,7 +102,7 @@ If an update fails, the window retains the failed stage. A backup path is shown 
 
 It provides developers with:
 - **Web Supervisor (`http://127.0.0.1:8765/`)**: Local-loopback dashboard without a login/PIN. Available control operations depend on the native adapters connected to the selected runtime; discovery alone does not grant execution or approval capabilities.
-- **Native Desktop System Tray**: Snowball Middleware runs in the background with its product icon and local runtime controls. The package builder supports Windows and macOS; this review's installed harness baseline is Windows.
+- **Native Desktop System Tray**: Snowball Middleware runs in the background with its product icon and local runtime controls. The package builder supports Windows, macOS and Linux; this review's installed harness baseline is Windows.
 - **MK20 Hardware Integration**: The default installation includes the companion **Snowball Control** transport and speech library alongside the M5Stack gateway. Explicit development subsets can run the common native-session API independently. Native approval, cancellation, and recovery boundaries are defined in the architecture specification.
 
 > 💡 **Looking for MK20 Firmware and Hardware Tooling?**  

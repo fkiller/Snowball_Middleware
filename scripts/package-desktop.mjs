@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 import {packager} from '@electron/packager';
 
 const root=fileURLToPath(new URL('..',import.meta.url));
-if(!['win32','darwin'].includes(process.platform))throw new Error('Build on the target Windows or macOS host');
+if(!['win32','darwin','linux'].includes(process.platform))throw new Error('Build on the target Windows, macOS or Linux host');
 const requested=process.argv[2];
 if(requested&&(!path.isAbsolute(requested)||fs.existsSync(requested)))throw new Error('Choose a new absolute output directory');
 const output=requested??path.join(root,'artifacts','desktop',String(Date.now()));
@@ -19,7 +19,7 @@ function copy(relative,destination=relative){
  fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(source,target);
  inventory.push({path:destination.replaceAll('\\','/'),sha256:createHash('sha256').update(fs.readFileSync(target)).digest('hex')});
 }
-for(const name of ['main.mjs','core-worker.mjs','presentation.mjs','codex-connections.mjs','windows-device-presence.mjs','source-login.mjs','device-setup.mjs','component-setup.mjs','device-setup-hub.mjs','device-setup-preload.cjs','device-setup.html','device-setup.css','device-setup.js'])copy('apps/desktop/'+name);
+for(const name of ['main.mjs','core-worker.mjs','presentation.mjs','codex-connections.mjs','windows-device-presence.mjs','source-login.mjs','linux-login.mjs','device-setup.mjs','component-setup.mjs','device-setup-hub.mjs','device-setup-preload.cjs','device-setup.html','device-setup.css','device-setup.js'])copy('apps/desktop/'+name);
 for(const name of ['suite-devices.mjs','setup-profile.mjs','device-preparation.mjs','os_wifi.py'])copy('scripts/'+name);
 for(const name of ['icon.png','icon-32.png','icon-256.png','icon.ico','icon.icns','installer-small.bmp','installer-welcome.bmp'])copy('assets/'+name);
 for(const name of ['runtime.mjs','controller-store.mjs','codex-plugin.mjs','opencode-owned.mjs','settings-store.mjs','private-state.mjs','native-picker.mjs','mk20-lan.mjs','index.html','app.js','style.css'])copy('apps/supervisor/'+name);

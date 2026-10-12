@@ -61,6 +61,11 @@ for (const profile of ['web', 'm5stack']) test(`${profile} native API starts and
   assert.ok(snapshot, 'Real native-session API did not respond: ' + output);
   assert.equal(snapshot.accessMode, 'local-no-auth');
   assert.equal((await fetch(origin + '/')).status, 200);
+  if (process.platform !== 'win32') {
+    for (const name of ['host.v1.json', 'live-bootstrap.json']) assert.equal(fs.statSync(path.join(temporary, 'private-state', name)).mode & 0o777, 0o600);
+    const {ensurePrivateStateDirectory} = await import('../apps/supervisor/private-state.mjs');
+    ensurePrivateStateDirectory(path.join(temporary, 'private-state'));
+  }
   assert.doesNotMatch(output, /Whisper Runtime|MK20 LAN Hardware|USB Raw HID/);
   child.send('snowball.stop');
   const [code] = await exited;

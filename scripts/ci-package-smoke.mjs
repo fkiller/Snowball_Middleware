@@ -37,7 +37,13 @@ if (process.platform === 'darwin') {
   execFileSync('tar.exe', ['-x', '-f', archive, '-C', extracted], { cwd: root, windowsHide: true, stdio: 'pipe', timeout: 120000 });
   roundtripDir = path.join(extracted, path.basename(packageDir));
   artifactPath = archive;
-} else throw new Error('Native desktop archive verification requires Windows or macOS');
+} else if (process.platform === 'linux') {
+  const archive = path.join(path.dirname(packageDir), `SnowballMiddleware-linux-${process.arch}.tar.gz`);
+  execFileSync('tar', ['-czf', archive, '-C', path.dirname(packageDir), path.basename(packageDir)], {stdio:'pipe', timeout:120000});
+  execFileSync('tar', ['-xzf', archive, '-C', extracted], {stdio:'pipe', timeout:120000});
+  roundtripDir = path.join(extracted, path.basename(packageDir));
+  artifactPath = archive;
+} else throw new Error('Unsupported native desktop archive platform');
 const roundtrip = execFileSync(process.execPath, [fileURLToPath(new URL('./verify-packaged-desktop.mjs', import.meta.url)), roundtripDir], {
   cwd: root, encoding: 'utf8', windowsHide: true, maxBuffer: 2 * 1024 * 1024, timeout: 60000,
 });

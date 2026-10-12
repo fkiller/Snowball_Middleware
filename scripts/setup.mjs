@@ -9,7 +9,7 @@ import {approveDevicePreparations} from './device-preparation.mjs';
 process.env.AGY_CLI_DISABLE_AUTO_UPDATE='true';
 
 const options = parseSetupOptions(process.argv.slice(2));
-if (!['win32', 'darwin'].includes(process.platform)) throw Error('Suite plugin workers currently support Windows and macOS');
+if (!['win32', 'darwin', 'linux'].includes(process.platform)) throw Error('Suite installation supports Windows, macOS and desktop Linux');
 const middleware = fileURLToPath(new URL('..', import.meta.url));
 const root = path.resolve(options.root ?? path.dirname(middleware));
 if (path.join(root, 'Snowball_Middleware') !== path.resolve(middleware)) throw Error('Install root must contain this Snowball_Middleware checkout');

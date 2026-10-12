@@ -71,7 +71,7 @@ try {
   hostId = parseHostId(data.hostId);
 } catch {
   hostId = createHostId();
-  fs.writeFileSync(hostIdFile, JSON.stringify({ version: 1, hostId }) + '\n');
+  fs.writeFileSync(hostIdFile, JSON.stringify({ version: 1, hostId }) + '\n', {mode:0o600});
 }
 
 const commandDir = ensurePrivateStateDirectory(path.join(directory, 'commands'));
@@ -309,7 +309,7 @@ function refreshCode() {
       expiresAt: bootstrap.expiresAt,
       url: `${api.origin}/`
     };
-    fs.writeFileSync(bootstrapFile, JSON.stringify(info, null, 2) + '\n');
+    fs.writeFileSync(bootstrapFile, JSON.stringify(info, null, 2) + '\n', {mode:0o600});
     return info;
   } catch {
     return null;

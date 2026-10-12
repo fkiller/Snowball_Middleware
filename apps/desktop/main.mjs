@@ -74,14 +74,14 @@ const attentionNotifications=new AttentionNotifications();
 const launchArgs=[...(app.isPackaged?[]:[fileURLToPath(import.meta.url)]),...args.filter(a=>!['--smoke-test','--register-autostart','--stop'].includes(a))];
 const loginConfig={path:process.execPath,args:launchArgs};
 const sourceRoot=installed?.middleware??fileURLToPath(new URL('../..',import.meta.url));
-const legacyLogin={path:path.join(sourceRoot,'node_modules/electron/dist',process.platform==='win32'?'electron.exe':'Electron.app/Contents/MacOS/Electron'),args:[fileURLToPath(import.meta.url),...args.filter(a=>!['--smoke-test','--register-autostart','--stop'].includes(a))]};
+const legacyLogin={path:path.join(sourceRoot,'node_modules/electron/dist',process.platform==='win32'?'electron.exe':process.platform==='darwin'?'Electron.app/Contents/MacOS/Electron':'electron'),args:[fileURLToPath(import.meta.url),...args.filter(a=>!['--smoke-test','--register-autostart','--stop'].includes(a))]};
 const predecessors=[legacyLogin];
 try{
   const prior=JSON.parse(fs.readFileSync(path.join(sourceRoot,'.state/desktop-runtime.json'),'utf8')).previousExecutable;
   const relative=prior&&path.relative(path.join(sourceRoot,'.state/desktop-runtimes'),prior);
   if(relative&&!relative.startsWith('..')&&!path.isAbsolute(relative))predecessors.push({path:prior,args:launchArgs});
 }catch{}
-const login=suiteConfig?sourceLogin(app,loginConfig,suiteConfig,predecessors):{get:()=>app.getLoginItemSettings(loginConfig).openAtLogin,set:value=>{app.setLoginItemSettings({...loginConfig,openAtLogin:value});if(app.getLoginItemSettings(loginConfig).openAtLogin!==value)throw Error('Autostart not applied');}};
+const login=suiteConfig||process.platform==='linux'?sourceLogin(app,loginConfig,suiteConfig??dataDir,predecessors):{get:()=>app.getLoginItemSettings(loginConfig).openAtLogin,set:value=>{app.setLoginItemSettings({...loginConfig,openAtLogin:value});if(app.getLoginItemSettings(loginConfig).openAtLogin!==value)throw Error('Autostart not applied');}};
 const getAutostart=()=>login.get();
 const open=async(settings=false)=>{if(origin)await shell.openExternal(origin+(settings?'#settings':''));};
 function drawIcon(){

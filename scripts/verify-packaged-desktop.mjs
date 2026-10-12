@@ -6,7 +6,7 @@ import {verifyDesktopBranding} from './verify-desktop-branding.mjs';
 
 const packageDir=process.argv[2];
 if(!packageDir||!path.isAbsolute(packageDir))throw new Error('Absolute package directory required');
-const appDir=process.platform==='win32'?path.join(packageDir,'resources','app'):path.join(packageDir,'Snowball Middleware.app','Contents','Resources','app');
+const appDir=process.platform==='darwin'?path.join(packageDir,'Snowball Middleware.app','Contents','Resources','app'):path.join(packageDir,'resources','app');
 const inventory=JSON.parse(fs.readFileSync(path.join(appDir,'BUILD-INVENTORY.json'),'utf8'));
 if(inventory.platform!==process.platform||inventory.arch!==process.arch||inventory.signed!==false||!Array.isArray(inventory.files))throw new Error('Unexpected package inventory');
 const expected=new Map(inventory.files.map(item=>[item.path,item.sha256]));
@@ -24,7 +24,7 @@ function walk(directory,prefix=''){
 walk(appDir);
 if(actual.length!==allowed.size||actual.some(name=>!allowed.has(name)))throw new Error('Unexpected or missing packaged application file');
 for(const [name,hash] of expected){const actualHash=createHash('sha256').update(fs.readFileSync(path.join(appDir,name))).digest('hex');if(actualHash!==hash)throw new Error('Packaged application hash mismatch');}
-const executable=process.platform==='win32'?path.join(packageDir,'SnowballMiddleware.exe'):path.join(packageDir,'Snowball Middleware.app','Contents','MacOS','SnowballMiddleware');
+const executable=process.platform==='win32'?path.join(packageDir,'SnowballMiddleware.exe'):process.platform==='darwin'?path.join(packageDir,'Snowball Middleware.app','Contents','MacOS','SnowballMiddleware'):path.join(packageDir,'SnowballMiddleware');
 const branding=await verifyDesktopBranding(executable);
 const output=await new Promise((resolve,reject)=>{
   const child=spawn(executable,['--smoke-test'],{windowsHide:true,stdio:['ignore','pipe','pipe']});

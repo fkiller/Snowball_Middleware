@@ -19,6 +19,11 @@ export async function verifyDesktopBranding(executable){
     }
     return {platform:'win32',iconGroups:groups.length,iconSizes:expected.length,productName:'Snowball Middleware'};
   }
+  if(process.platform==='linux'){
+    assert.equal(path.basename(executable),'SnowballMiddleware');
+    assert.ok(fs.statSync(executable).mode&0o111,'Native executable must be executable');
+    return {platform:'linux',executableName:'SnowballMiddleware'};
+  }
   const app=path.resolve(path.dirname(executable),'../..'),plist=path.join(app,'Contents/Info.plist');
   const value=key=>execFileSync('/usr/libexec/PlistBuddy',['-c','Print :'+key,plist],{encoding:'utf8'}).trim();
   assert.equal(value('CFBundleName'),'Snowball Middleware');assert.equal(value('CFBundleExecutable'),'SnowballMiddleware');assert.equal(value('CFBundleIdentifier'),'local.snowball.middleware');
