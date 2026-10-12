@@ -61,3 +61,23 @@ test('a failed helper protocol terminates its real owned descendant before UART 
   assert.equal(alive,false,'a helper failure must not leave a flasher descendant alive');
   descendant=undefined;await setup.close();
 });
+
+test('a real failing helper retains the failed phase without advertising a planned or previous backup',{
+  skip:!process.env.SNOWBALL_M5_PYTHON,timeout:20000
+},async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-usb-backup-failure-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  guardPreparation(root);
+  const planned=path.join(root,'planned.bin');
+  // Failure-only protocol: no flash read/write or successful backup is simulated.
+  fs.writeFileSync(path.join(root,'scripts/usb_setup.py'),`import json,sys\nprint(json.dumps({'event':'progress','phase':'backup','backup':${JSON.stringify(planned)}}),flush=True)\nprint(json.dumps({'event':'error','code':'usb_operation_failed'}),flush=True)\nsys.exit(1)\n`);
+  const setup=new M5StackSetup({device:{deviceRoot:root,python:process.env.SNOWBALL_M5_PYTHON},backupDirectory:root});
+  const record={port:'COM7',online:true,hello:{firmware:'0.4.0'},backup:path.join(root,'previous.bin')};
+  setup.records.set('COM7',record);
+  await setup.action({action:'install',port:'COM7',version:'0.5.0',confirmBoard:true});
+  await setup.job;
+  assert.equal(record.phase,'failed');assert.equal(record.failedPhase,'backup');
+  assert.equal(record.code,'usb_operation_failed');assert.equal(record.backup,undefined);
+  assert.equal(fs.existsSync(planned),false);assert.equal(setup.children.size,0);
+  await setup.close();
+});

@@ -44,3 +44,13 @@ test('incoming status codes and in-progress discovery use the currently selected
   assert.equal(ui.node('notice').textContent,'Checking connected devices…');
   ui.language('ko');assert.equal(ui.node('notice').textContent,'연결된 기기를 확인하고 있습니다…');
 });
+
+test('a failed unverified backup is distinguished from later failures in either language',async()=>{
+  const ui=setupRenderer();await new Promise(resolve=>setImmediate(resolve));
+  const message=()=>vm.runInContext("operationFailure({failedPhase:'backup'},ui[language])",ui.context);
+  assert.match(message(),/백업 읽기에 실패/);
+  assert.match(message(),/펌웨어 쓰기는 시작하지 않았습니다/);
+  ui.language('en');assert.match(message(),/firmware writing did not start/);
+  const later=vm.runInContext("operationFailure({failedPhase:'flash'},ui[language])",ui.context);
+  assert.doesNotMatch(later,/writing did not start/);
+});

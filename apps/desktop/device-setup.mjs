@@ -121,14 +121,15 @@ export class DeviceSetup extends EventEmitter {
     }else if(request.action==='migrate'){
       if(record.hello?.usbSetup!==true||record.hello?.wifiConfigured!==false||typeof request.ssid!=='string'||request.ssid!==this.network?.ssid||this.network.enterprise)throw Error('wifi_review_required');
     }else throw Error('invalid_setup_action');
-    record.code=null;record.phase=request.action==='install'?'identify':'wifi';delete record.backupProgress;
+    record.code=null;record.phase=request.action==='install'?'identify':'wifi';delete record.backupProgress;delete record.failedPhase;
+    if(request.action==='install')delete record.backup;
     const completed=new Set();
     const job=(async()=>{
       try{
         await this.withUart(record.port,async()=>{
         const result=await this.run(request.action,record.port,{version:request.version,confirmBoard:request.confirmBoard,deviceId:record.hello?.deviceId,usbIdentity:record.usbIdentity,ssid:request.ssid},event=>{
           if(event.event==='progress'&&['identify','backup','backup-verified','build','flash','verify-settings','verify-nvs','reboot'].includes(event.phase)){
-            completed.add(event.phase);record.phase=event.phase;if(event.backup&&path.dirname(event.backup)===this.backupDirectory&&event.backup.endsWith('.bin'))record.backup=event.backup;
+            completed.add(event.phase);record.phase=event.phase;if(event.phase==='backup-verified'&&event.backup&&path.dirname(event.backup)===this.backupDirectory&&event.backup.endsWith('.bin'))record.backup=event.backup;
             if(event.phase==='backup')record.backupProgress=readBackupProgress(event,record.backupProgress);
             this.changed();
           }
@@ -150,7 +151,7 @@ export class DeviceSetup extends EventEmitter {
         }
         });
         record.phase='complete';
-      }catch(error){record.phase='failed';record.code=errorCode(error);}finally{this.job=null;this.changed();}
+      }catch(error){record.failedPhase=record.phase;record.phase='failed';record.code=errorCode(error);}finally{this.job=null;this.changed();}
     })();
     this.job=job;this.changed();return this.view();
   }

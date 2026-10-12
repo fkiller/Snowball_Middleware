@@ -18,6 +18,13 @@ function backupProgressView(device){
   return box;
 }
 function actionFailureCode(cause){return String(cause?.message??'').match(/(?:^|[\s:])([a-z][a-z0-9_]{0,79})$/)?.[1]??'';}
+function operationFailure(device,t){
+  const ko=language==='ko';
+  if(device.code==='backup_read_failed_reboot_unconfirmed')return ko?'전체 플래시 백업 읽기에 실패했고 기존 펌웨어의 재기동도 확인하지 못했습니다. 펌웨어 쓰기는 시작하지 않았습니다. USB를 다시 연결한 뒤 기기를 확인하세요.':'Full flash backup reading failed, and the existing firmware did not confirm its restart. Firmware writing did not start. Reconnect USB and check the device.';
+  if(device.code==='backup_read_failed')return ko?'전체 플래시 백업 읽기에 실패했습니다. 펌웨어 쓰기는 시작하지 않았으며 기존 펌웨어의 재기동을 확인했습니다. USB 연결을 확인한 뒤 다시 시도하세요.':'Full flash backup reading failed. Firmware writing did not start, and the existing firmware restarted successfully. Check USB before trying again.';
+  if(device.failedPhase==='backup'&&!device.backup)return ko?'전체 플래시 백업 읽기에 실패했습니다. 이번 백업은 완료되지 않았으며 펌웨어 쓰기는 시작하지 않았습니다. USB 연결을 확인한 뒤 다시 시도하세요.':'Full flash backup reading failed. This backup did not complete and firmware writing did not start. Check USB before trying again.';
+  return failureText[language][device.code]??t.failed;
+}
 function actionFailure(cause){
   // Electron adds an IPC prefix. Match only known codes; never display raw paths or secrets.
   const codes={
@@ -78,7 +85,7 @@ function render(){
     }
     if(snapshot.capabilities?.wifiImport&&device.hello?.usbSetup===true&&device.hello.wifiConfigured===false){const migrate=element('button',t.migrate);migrate.disabled=!snapshot.network||snapshot.network.enterprise||snapshot.busy||!device.online;migrate.addEventListener('click',()=>action({action:'migrate',port:device.port,ssid:snapshot.network.ssid}));actions.append(migrate);}
     card.append(actions);
-    if(!['ready',undefined].includes(device.phase)){const progress=element('div',undefined,'progress');progress.setAttribute('role','status');progress.append(element('p',t.phase[device.phase]??device.phase));if(device.phase==='backup')progress.append(backupProgressView(device));if(device.phase==='failed')progress.append(element('p',`${failureText[language][device.code]??t.failed} (${device.code??'usb_operation_failed'})`,'error'));if(device.backup)progress.append(element('p',`${t.backup}: ${device.backup}`,'muted'));card.append(progress);}
+    if(!['ready',undefined].includes(device.phase)){const progress=element('div',undefined,'progress');progress.setAttribute('role','status');progress.append(element('p',t.phase[device.phase]??device.phase));if(device.phase==='backup')progress.append(backupProgressView(device));if(device.phase==='failed'){progress.append(element('p',`${operationFailure(device,t)} (${device.code??'usb_operation_failed'})`,'error'));if(t.phase[device.failedPhase])progress.append(element('p',(language==='ko'?'실패 단계: ':'Failed during: ')+t.phase[device.failedPhase],'muted'));}if(device.backup)progress.append(element('p',`${t.backup}: ${device.backup}`,'muted'));card.append(progress);}
     return card;
   });$('devices').replaceChildren(...(cards.length?cards:[element('p',t.empty,'muted')]));
 }
