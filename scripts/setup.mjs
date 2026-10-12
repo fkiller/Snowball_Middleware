@@ -82,9 +82,12 @@ for(const profile of deviceProfiles) {
     const control = device.controlRoot;
     npmRun(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], path.join(control, 'host'));
     npmRun(['run', 'build'], path.join(control, 'host'));
-    console.log('MK20 joins over Wi-Fi: select this middleware with K17. The tray Device setup handles QMK/USB runtime preparation; ADB is debug-only.');
+    console.log('MK20 joins over Wi-Fi: select this middleware with K17. Device setup handles QMK DFU, verified runtime USB, and an existing authorized LAN maintenance connection for legacy runtime migration.');
     if (!fs.existsSync(device.python)) run(python, ['-m', 'venv', path.dirname(path.dirname(device.python))]);
     run(device.python, ['-m', 'pip', 'install', '-r', path.join(control, 'hardware/mk20/requirements-setup.txt')]);
+    // Native maintenance uses only Google's verified tool and an already
+    // authorized connection. Preparing it never discovers or writes a device.
+    if(process.platform==='win32')Object.assign(device, JSON.parse(run(device.python, [path.join(control, 'hardware/mk20/dev-tools/prepare_adb.py'), '--output', path.join(installDir, 'tools', 'mk20-maintenance')], root, {capture:true})));
     run(device.python, [path.join(middleware, 'scripts/ensure_stt_runtime.py'), '--install', '--python', device.python]);
     run(device.python, [path.join(control, 'scripts/ensure_tts_runtime.py'), '--ensure']);
   }

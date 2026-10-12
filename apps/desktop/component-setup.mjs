@@ -8,7 +8,7 @@ import {privateIpv4} from '../../scripts/setup-profile.mjs';
 
 const targetId=value=>typeof value==='string'&&/^t-[a-f0-9]{32}$/.test(value);
 const code=error=>/^[a-z0-9_]{1,80}$/.test(error?.message??'')?error.message:'device_setup_failed';
-const steps=new Set(['ready','enter-dfu','usb-driver','usb-connect','usb-bootstrap','insert-card','return-card']);
+const steps=new Set(['ready','enter-dfu','usb-driver','usb-connect','usb-bootstrap','insert-card','return-card','maintenance']);
 async function hash(file){const digest=createHash('sha256');for await(const chunk of createReadStream(file))digest.update(chunk);return digest.digest('hex');}
 
 /** Version-2 component/transport contract; the hub and native window stay shared. */
@@ -45,7 +45,7 @@ export class ComponentSetup extends DeviceSetup {
         const retryUsb=record?.nextStep==='usb-bootstrap'&&Date.now()-(record.checked??0)>15000;
         if(!record||record.usbIdentity!==identity||(!record.wasPresent&&candidate.present!==false)||force||retryUsb){
           const previous=record;
-          record={port:candidate.port,label:String(candidate.label??this.descriptor.name).slice(0,128),usbIdentity:identity,online:candidate.present!==false,wasPresent:true,phase:'checking',status:'unknown',checked:Date.now()};
+          record={port:candidate.port,label:String(candidate.label??this.descriptor.name).slice(0,128),usbIdentity:identity,...(candidate.transport==='maintenance'?{transport:'maintenance'}:{}),online:candidate.present!==false,wasPresent:true,phase:'checking',status:'unknown',checked:Date.now()};
           this.records.set(record.port,record);
           try{
             const response=await this.run('probe',record.port);if(response.event!=='target')throw Error('invalid_device_response');
@@ -97,13 +97,14 @@ export class ComponentSetup extends DeviceSetup {
         if(this.descriptor.capabilities.manualWifi!==true||record.component!=='runtime'||record.wifiConfigured===true||request.migrateWifi===true||!n||typeof n!=='object'||Array.isArray(n)||Object.keys(n).some(k=>!['ssid','password'].includes(k))||typeof n.ssid!=='string'||!Buffer.byteLength(n.ssid)||Buffer.byteLength(n.ssid)>32||typeof n.password!=='string'||(n.password.length&&(Buffer.byteLength(n.password)<8||Buffer.byteLength(n.password)>63)))throw Error('wifi_review_required');
       }
     }else if(request.action!=='verify'||record.phase!=='awaiting-device')throw Error('invalid_setup_action');
-    const phases=new Set();record.code=null;record.phase=request.action==='verify'?'reboot':'identify';
+    const phases=new Set();record.code=null;record.phase=request.action==='verify'?'reboot':'identify';delete record.failedPhase;
+    if(request.action==='install')delete record.backup;
     this.job=(async()=>{
       try{
         const lan=Object.values(os.networkInterfaces()).flat().filter(n=>n.family==='IPv4'&&!n.internal).slice(0,16).map(n=>({address:n.address,netmask:n.netmask}));
         const result=await this.run(request.action,record.port,{version:request.version,confirmBoard:request.confirmBoard,usbIdentity:record.usbIdentity,ssid:request.ssid,migrateWifi:request.migrateWifi===true,lan,...(request.network?{network:request.network}:{})},event=>{
           if(event.event==='progress'&&['identify','backup','backup-verified','build','flash','verify-settings','reboot'].includes(event.phase)){
-            phases.add(event.phase);record.phase=event.phase;if(event.backup&&path.dirname(event.backup)===this.backupDirectory&&event.backup.endsWith('.bin'))record.backup=event.backup;this.changed();
+            phases.add(event.phase);record.phase=event.phase;if(event.phase==='backup-verified'&&event.backup&&path.dirname(event.backup)===this.backupDirectory&&event.backup.endsWith('.bin'))record.backup=event.backup;this.changed();
           }
         });
         if(result.component!==record.component||!['awaiting-device','verified'].includes(result.event))throw Error('invalid_device_response');
@@ -113,7 +114,7 @@ export class ComponentSetup extends DeviceSetup {
           if(result.version!==(request.action==='verify'?record.pendingVersion??this.release.components[record.component].version:this.release.components[record.component].version)||!phases.has('reboot'))throw Error('firmware_verification_incomplete');
           record.currentVersion=result.version;record.phase='complete';record.nextStep='ready';
         }else{record.phase='awaiting-device';record.nextStep='return-card';record.pendingVersion=this.release.components[record.component].version;}
-      }catch(error){record.phase='failed';record.code=code(error);}finally{this.job=null;this.changed();}
+      }catch(error){record.failedPhase=record.phase;record.phase='failed';record.code=code(error);}finally{this.job=null;this.changed();}
     })();this.changed();return this.view();
   }
 }

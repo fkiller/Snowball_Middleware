@@ -93,20 +93,21 @@ function render(){
 function componentCard(device,t){
   const ko=language==='ko',key=selectedProfile+device.port,component=snapshot.release.components[device.component];
   const card=element('article',undefined,'device');card.append(element('strong',device.label));
-  if(device.transport==='lan')card.append(element('p',ko?'LAN에서 MK20을 찾았습니다. USB 업데이트 연결은 별도로 확인합니다. 현재 버전 미확인은 실행 중인 펌웨어가 버전 조회에 응답하지 않았다는 뜻이며, 공기계라는 뜻이 아닙니다.':'MK20 was discovered on LAN. Its USB update connection is checked separately. Unknown means the running firmware did not answer the version query; it does not mean the device is blank.','muted'));
+  if(device.transport==='lan')card.append(element('p',ko?'LAN에서 MK20을 찾았습니다. 업데이트 가능한 관리 연결은 별도 항목으로 표시합니다. 현재 버전 미확인은 버전 조회 응답이 없다는 뜻입니다.':'MK20 was discovered on LAN. An available maintenance connection appears separately. Unknown means the version query received no response.','muted'));
   const versions=element('div',undefined,'versions');
   for(const [label,version]of [[t.current,device.currentVersion??t.unknown],[t.available,component?.version??t.unknown]]){if(versions.childElementCount)versions.append(element('span','→','arrow'));const box=element('div',undefined,'version');box.append(element('small',label),element('strong',version));versions.append(box);}card.append(versions);
   const guidance={
     'enter-dfu':ko?'USB를 빼고 좌측 상단 키를 누른 채 다시 연결하세요. DFU 연결을 실제로 확인한 뒤 업데이트할 수 있습니다.':'Unplug USB, hold the top-left key and reconnect. Updating requires an actual DFU attachment.',
     'usb-driver':ko?'DFU 읽기 또는 드라이버 접근을 확인하지 못했습니다. 백업이 가능해질 때까지 쓰지 않습니다.':'DFU readback or driver access is unavailable. Writing is blocked until backup is possible.',
-    'usb-connect':ko?'USB 연결 상태에서 업데이트합니다. SD 카드를 분리하지 않습니다. 제품용 USB 응답을 기다립니다.':'Updating uses the connected USB cable. Keep the SD card in the device. Waiting for product USB.',
+    'usb-connect':ko?'이 항목은 LAN 발견 정보입니다. 최초 런타임 업데이트는 확인된 LAN 관리 연결 항목에서 진행합니다. 키보드 USB 연결만으로 런타임 업데이트가 가능해지지는 않습니다.':'This is LAN discovery information. Use a verified LAN maintenance entry for the initial runtime update. Keyboard USB alone does not enable runtime updating.',
+    'maintenance':ko?'기존에 허용된 LAN 관리 연결을 확인했습니다. SD 카드를 기기에 둔 채 런타임 파티션 전체를 백업하고 제공 파일만 업데이트합니다. 기존 Wi-Fi·PC 등록을 보존하며 재부팅 후 실제 실행 파일을 확인합니다.':'An existing authorized LAN maintenance connection is verified. Leave the SD card in the device. The full runtime partition is backed up before updating the included files; saved Wi-Fi and PC registrations are preserved, and running images are checked after reboot.',
     'usb-bootstrap':ko?'USB 업데이트 수신기 응답을 기다립니다. 부팅 중일 수 있어 자동으로 다시 확인합니다. 수신기가 없는 구 펌웨어는 최초 이관이 필요하며 응답 전에는 쓰지 않습니다.':'Waiting for the USB update receiver; startup is retried automatically. Legacy firmware without the receiver needs initial migration. No writes before a valid response.',
     'insert-card':ko?'복구용 카드 리더 연결입니다. 일반 업데이트는 기기에 SD 카드를 둔 채 USB로 진행합니다.':'Recovery card-reader attachment. Normal updates use USB with the SD card left in the device.',
     'return-card':ko?'안전하게 카드를 분리해 MK20에 돌려 넣고 전원을 연결하세요. 부팅 확인은 실제 실행 중인 버전·해시를 LAN에서 확인합니다.':'Safely remove the card, return it to MK20 and power it on. Check boot verifies actual running version/hashes over LAN.'
   };if(guidance[device.nextStep])card.append(element('p',guidance[device.nextStep]));
   if(device.wifiConfigured===true)card.append(element('p',t.saved));
   const status=device.imageMatch===false?'unknown':relation(device.currentVersion,component?.version);
-  if(device.imageMatch===false)card.append(element('p',ko?'응답 버전은 같지만 실행 이미지가 제공 빌드와 다릅니다. 업데이트 확인이 필요합니다.':'Reported version matches, but running images differ from the included build. Review the update.','muted'));
+  if(device.imageMatch===false)card.append(element('p',ko?'설치 이미지가 제공 빌드와 다릅니다. 업데이트 확인이 필요합니다.':'Installed images differ from the included build. Review the update.','muted'));
   if(status==='current'||status==='newer')card.append(element('p',status==='current'?t.latest:t.newer,'muted'));
   if(device.writable&&device.online&&device.phase!=='awaiting-device'&&status!=='newer'){
     const check=element('label',undefined,'check'),confirm=element('input');confirm.type='checkbox';confirm.checked=approved.has(key);confirm.disabled=snapshot.busy;check.append(confirm,element('span',t.confirm));card.append(check);
@@ -122,7 +123,7 @@ function componentCard(device,t){
         enable.addEventListener('change',()=>{manual.enabled=enable.checked;manualNetworks.set(key,manual);fields.hidden=!manual.enabled;if(importBox)importBox.checked=!manual.enabled&&!declinedWifi.has(key);});fields.append(ssid,password);card.append(fields);
       }
     }
-    const install=element('button',device.currentVersion?t.update:t.install);const enabled=()=>{install.disabled=!confirm.checked||snapshot.busy||snapshot.checking;};confirm.addEventListener('change',()=>{confirm.checked?approved.add(key):approved.delete(key);enabled();});enabled();
+    const install=element('button',device.transport==='maintenance'?(ko?'백업 후 런타임 업데이트':'Back up and update runtime'):device.currentVersion?t.update:t.install);const enabled=()=>{install.disabled=!confirm.checked||snapshot.busy||snapshot.checking;};confirm.addEventListener('change',()=>{confirm.checked?approved.add(key):approved.delete(key);enabled();});enabled();
     install.addEventListener('click',()=>{
       const network=manual.enabled?{ssid:manual.ssid,password:manual.password}:undefined;
       const request={action:'install',port:device.port,version:snapshot.release.version,confirmBoard:true,migrateWifi:importBox?.checked===true&&!network,...(importBox?.checked&&!network?{ssid:snapshot.network.ssid}:{}),...(network?{network}:{})};
@@ -131,13 +132,13 @@ function componentCard(device,t){
     });card.append(install);
   }
   if(!device.writable&&device.online&&device.phase!=='awaiting-device'&&status!=='newer'){
-    const reason=device.transport==='lan'?(ko?'LAN 발견 · USB 업데이트 연결 미확인':'LAN discovered · USB updater not confirmed'):
+    const reason=device.transport==='lan'?(ko?'LAN 발견 · 관리 연결 확인 필요':'LAN discovered · maintenance connection required'):
       device.nextStep==='enter-dfu'?(ko?'키보드 USB 연결됨 · 업데이트에는 DFU 모드 필요':'Keyboard USB connected · DFU required to update'):
       device.nextStep==='usb-driver'?(ko?'DFU 백업 접근 불가':'DFU backup access unavailable'):
       device.nextStep==='usb-bootstrap'?(ko?'USB 업데이트 수신기 응답 없음':'USB updater did not respond'):
       (ko?'런타임 USB 연결 미확인':'Runtime USB connection not confirmed');
     card.append(element('p',reason,'muted'));
-    card.append(element('p',device.transport==='lan'?(ko?'이 항목은 LAN 발견 정보입니다. USB 업데이트 연결과 백업 가능 여부가 확인되어야 업데이트할 수 있습니다. 버전 미확인은 현재 펌웨어의 버전 응답이 없다는 뜻입니다.':'This is LAN discovery information. Updating requires a verified USB updater and backup access. Unknown means the running firmware did not answer its version query.'):
+    card.append(element('p',device.transport==='lan'?(ko?'LAN에서 발견했다는 정보만으로는 쓰지 않습니다. 기존에 허용된 관리 연결과 전체 백업 접근을 실제로 확인하면 별도 업데이트 항목이 나타납니다.':'Discovery alone does not allow writing. A separate update entry appears after an existing authorized maintenance connection and full backup access are verified.'):
       device.nextStep==='enter-dfu'?(ko?'현재 키보드 USB에서는 설치 이미지의 정확한 버전을 읽을 수 없습니다. 위 DFU 연결 안내를 따라야 백업과 이미지 비교가 가능합니다. 다시 확인만 눌러서는 DFU 모드로 바뀌지 않습니다.':'The exact installed image cannot be identified through normal keyboard USB. Follow the DFU connection instructions above to enable readback and image comparison. Check again does not enter DFU mode.'):
       (ko?'다시 확인은 연결 상태만 조회합니다. 기기에 업데이트 수신기가 없는 경우, PC 미들웨어 업데이트나 반복 조회만으로 수신기가 설치되지 않습니다.':'Check again only reads connection state. Updating the PC middleware or repeatedly scanning cannot install a missing device-side updater.'),'muted'));
   }
