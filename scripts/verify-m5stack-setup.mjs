@@ -21,6 +21,15 @@ try{
   await new Promise(resolve=>setTimeout(resolve,1200));
   if(!await window.webContents.executeJavaScript(`(()=>{const icon=document.querySelector('.brand-heading img');return icon.complete&&icon.naturalWidth===256;})()`))throw Error('Snowball setup branding did not load');
   setup.on('change',()=>window.webContents.send('device-setup-state',view()));
+  // A real read-only IPC rejection must follow subsequent language changes.
+  await window.webContents.executeJavaScript(`action({action:'invalid-localization-check'})`);
+  const notice=()=>window.webContents.executeJavaScript(`document.getElementById('notice').textContent`);
+  const koreanNotice=await notice();
+  if(!koreanNotice.includes('요청을 완료하지 못했습니다'))throw Error('Read-only IPC rejection was not shown in Korean');
+  await window.webContents.executeJavaScript(`document.getElementById('language').value='en';document.getElementById('language').dispatchEvent(new Event('change'));`);
+  if(!(await notice()).includes('The request failed.'))throw Error('Existing IPC rejection did not switch to English');
+  await window.webContents.executeJavaScript(`document.getElementById('language').value='ko';document.getElementById('language').dispatchEvent(new Event('change'));`);
+  if(await notice()!==koreanNotice)throw Error('Existing IPC rejection did not switch back to Korean');
   // Exercise actual OS enumeration through the sandbox/preload while discovery owns USB.
   const background=setup.scan();
   if(!setup.view().checking)throw Error('Real discovery did not acquire the scan lease');
@@ -68,7 +77,7 @@ try{
       await window.webContents.executeJavaScript('window.scrollTo(0,0)');
     }
   }
-  console.log(JSON.stringify({test:'m5stack-native-setup',firmware:setup.setups.get('m5stack').release.version,actualUsbCandidates:setup.setups.get('m5stack').records.size,refreshDuringDiscovery:'passed',languages:['ko','en'],flashed:false,secretRead:false}));
+  console.log(JSON.stringify({test:'m5stack-native-setup',firmware:setup.setups.get('m5stack').release.version,actualUsbCandidates:setup.setups.get('m5stack').records.size,refreshDuringDiscovery:'passed',existingNoticeLanguageSwitch:'passed',languages:['ko','en'],flashed:false,secretRead:false}));
 }catch(error){console.error(error.message);process.exitCode=1;}
 finally{await setup?.close();window?.destroy();app.exit(process.exitCode??0);}
 });

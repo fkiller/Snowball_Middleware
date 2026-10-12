@@ -4,7 +4,7 @@ const ui={
   en:{heading:'Device setup',subtitle:'USB detection, firmware and Wi-Fi in one window.',journey:['01 · Identify','02 · Back up + update','03 · Reboot','04 · Wi-Fi + LAN discovery'],usb:'USB devices',refresh:'Check again',empty:'',release:'Included firmware',scope:'Uses firmware included with this middleware. Flash is written only after you choose Install / Update. Missing build tools may take time to download.',wifi:'Import this PC’s Wi-Fi',readWifi:'Read connected Wi-Fi',noWifi:'Connected Wi-Fi is unavailable. This PC may use Ethernet, require OS permission or use unsupported security. You can configure the device using the guide below.',wifiBoundary:'Saved device Wi-Fi is never replaced. The OS password is read only when you choose Import and sent to the selected device; it never appears in the window or logs.',guide:'Follow the physical controls',caption:'Illustration of the controls, not a live device screen.',steps:[],faces:'',current:'Installed',unknown:'Unknown',available:'Included',unrecognized:'No Snowball firmware response. This may be a blank device or other firmware.',confirm:'',install:'Back up and install',update:'Back up and update',latest:'Matches the included firmware.',newer:'The device has a newer version. No automatic downgrade.',saved:'Saved Wi-Fi retained',connected:'Connected',notConnected:'Saved · currently disconnected',needsWifi:'No network is saved on the device.',unknownWifi:'Saved Wi-Fi status will be checked after the firmware update.',migrate:'Import this Wi-Fi',unplugged:'USB disconnected',backup:'Full flash backup',complete:'Device response verified',failed:'The operation did not complete. Any backup created remains at the location below. Check USB and drivers, then check again.',phase:{checking:'Checking device firmware…',identify:'Checking ESP32 and flash capacity…',backup:'Backing up the entire flash…','backup-verified':'Backup size and hash verified',build:'Preparing firmware… (including missing build tools)',flash:'Updating firmware… Keep USB connected.','verify-settings':'Verifying retained settings…','verify-nvs':'Verifying retained settings…',reboot:'Rebooting and checking new firmware…',wifi:'Waiting for OS permission and real Wi-Fi association…',complete:'Complete',failed:'Needs attention',ready:'Ready'},busy:'A USB check or operation is in progress. Try again shortly.'}
 };
 const failureText={ko:{backup_incomplete:'전체 백업이 완료되지 않아 펌웨어 쓰기를 시작하지 않았습니다.',nvs_layout_incompatible:'기존 저장 영역 배치가 호환되지 않아 펌웨어를 쓰지 않았습니다. 전체 백업은 보존됩니다.',nvs_preservation_failed_restore_backup:'저장 영역 보존 검증에 실패했습니다. 보존된 전체 백업으로 복원이 필요합니다.',original_core_required:'선택한 기종과 실제 기기를 확인하세요.',wifi_changed_review_again:'PC의 연결된 Wi-Fi가 바뀌었습니다. 연결 정보를 다시 확인하세요.',wifi_connection_unconfirmed:'Wi-Fi 연결을 확인하지 못했습니다. 아래 기기 안내로 설정을 확인하세요.',wifi_key_permission_required:'OS가 비밀번호 읽기를 허용하지 않았습니다. 기기에서 직접 설정할 수 있습니다.',usb_device_changed:'USB 기기가 바뀌었습니다. 다시 확인한 뒤 진행하세요.'},en:{backup_incomplete:'Full backup did not complete; firmware was not written.',nvs_layout_incompatible:'Existing storage layout is incompatible. Firmware was not written; the full backup remains.',nvs_preservation_failed_restore_backup:'Storage preservation failed. Restore the retained full flash backup.',original_core_required:'Confirm the selected model matches the physical device.',wifi_changed_review_again:'The PC changed Wi-Fi networks. Review the connected network again.',wifi_connection_unconfirmed:'Wi-Fi association is unconfirmed. Follow the device guide below.',wifi_key_permission_required:'OS password access was denied. Configure Wi-Fi on the device instead.',usb_device_changed:'The USB device changed. Check it again before continuing.'}};
-const $=id=>document.getElementById(id);let language='ko',snapshot={devices:[],release:{version:'…',changes:{}}},hubState={profiles:[]},selectedProfile,lastRequestedProfile,error='',refreshPending=false;const approved=new Set(),declinedWifi=new Set(),manualNetworks=new Map();
+const $=id=>document.getElementById(id);let language='ko',snapshot={devices:[],release:{version:'…',changes:{}}},hubState={profiles:[]},selectedProfile,lastRequestedProfile,error=null,refreshPending=false;const approved=new Set(),declinedWifi=new Set(),manualNetworks=new Map();
 function element(tag,text,className){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(className)el.className=className;return el;}
 function relation(a,b){const x=String(a??'').split('.').map(Number),y=String(b??'').split('.').map(Number);if(x.length!==3||x.some(Number.isNaN))return 'unknown';for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]<y[i]?'older':'newer';return 'current';}
 function backupProgressView(device){
@@ -17,6 +17,7 @@ function backupProgressView(device){
   box.append(element('p',ko?'USB로 전체 플래시를 읽고 있습니다. 16MB 기기는 수분 걸릴 수 있으며, 파일은 읽기가 끝난 뒤 생성됩니다. 읽기 100% 이후 크기·해시 검증까지 완료해야 백업이 확인됩니다. USB 연결을 유지하세요.':'Reading the entire flash over USB. A 16MB device can take several minutes; the file is created after reading finishes. After the read reaches 100%, size and hash checks must finish before the backup is verified. Keep USB connected.','muted'));
   return box;
 }
+function actionFailureCode(cause){return String(cause?.message??'').match(/(?:^|[\s:])([a-z][a-z0-9_]{0,79})$/)?.[1]??'';}
 function actionFailure(cause){
   // Electron adds an IPC prefix. Match only known codes; never display raw paths or secrets.
   const codes={
@@ -31,14 +32,14 @@ function actionFailure(cause){
     usb_setup_closed:['기기 설정이 종료되었습니다. 트레이에서 다시 열어 주세요.','Device setup has closed. Open it again from the tray.'],
     ...Object.fromEntries(Object.keys(failureText.en).map(code=>[code,[failureText.ko[code],failureText.en[code]]]))
   };
-  const code=String(cause?.message??'').match(/(?:^|[\s:])([a-z][a-z0-9_]{0,79})$/)?.[1];
+  const code=actionFailureCode(cause);
   return codes[code]?.[language==='ko'?0:1]??(language==='ko'?'요청을 완료하지 못했습니다. 기기 상태와 미들웨어 로그를 확인해 주세요.':'The request failed. Check the device status and middleware log.');
 }
 async function action(request){
   if(request.action==='refresh'&&refreshPending)return;
-  error='';if(request.action==='refresh')refreshPending=true;render();
+  error=null;if(request.action==='refresh')refreshPending=true;render();
   try{accept(await window.snowballSetup.action({...request,profile:selectedProfile}));}
-  catch(cause){error=actionFailure(cause);}
+  catch(cause){error={message:actionFailureCode(cause)};}
   finally{if(request.action==='refresh')refreshPending=false;render();}
 }
 function render(){
@@ -55,7 +56,7 @@ function render(){
   $('wifi-section').hidden=!snapshot.capabilities?.wifiImport;document.documentElement.lang=language;$('heading').textContent=t.heading;$('subtitle').textContent=t.subtitle;
   for(const [id,value]of Object.entries({'usb-title':t.usb,refresh:t.refresh,'release-title':`${t.release} · ${snapshot.release.version}`,'scope':t.scope,'wifi-title':t.wifi,'read-wifi':t.readWifi,'wifi-boundary':t.wifiBoundary,'guide-title':t.guide,'guide-caption':t.caption,'faces-note':t.faces}))$(id).textContent=value;
   $('journey').replaceChildren(...t.journey.map(s=>element('span',s)));$('changes').replaceChildren(...(snapshot.release.changes[language]??[]).map(s=>element('li',s)));
-  renderGuide(p);$('notice').textContent=error||(snapshot.code?actionFailure(new Error(snapshot.code)):snapshot.checking?(language==='ko'?'연결된 기기를 확인하고 있습니다…':'Checking connected devices…'):'');
+  renderGuide(p);$('notice').textContent=error?actionFailure(error):snapshot.code?actionFailure(new Error(snapshot.code)):snapshot.checking?(language==='ko'?'연결된 기기를 확인하고 있습니다…':'Checking connected devices…'):'';
   $('network').textContent=snapshot.network?`Wi-Fi · ${snapshot.network.ssid}${snapshot.network.enterprise?' · Enterprise (manual setup)':''}`:t.noWifi;
   $('refresh').disabled=!!snapshot.busy||refreshPending;$('read-wifi').disabled=!!snapshot.busy;
   if(refreshPending)$('refresh').textContent=language==='ko'?'다시 확인 중…':'Checking again…';
