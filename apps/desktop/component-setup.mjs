@@ -8,7 +8,7 @@ import {privateIpv4} from '../../scripts/setup-profile.mjs';
 
 const targetId=value=>typeof value==='string'&&/^t-[a-f0-9]{32}$/.test(value);
 const code=error=>/^[a-z0-9_]{1,80}$/.test(error?.message??'')?error.message:'device_setup_failed';
-const steps=new Set(['ready','enter-dfu','usb-driver','usb-connect','usb-bootstrap','insert-card','return-card','maintenance']);
+const steps=new Set(['ready','enter-dfu','usb-driver','usb-connect','usb-bootstrap','insert-card','return-card','maintenance','qmk-readback']);
 async function hash(file){const digest=createHash('sha256');for await(const chunk of createReadStream(file))digest.update(chunk);return digest.digest('hex');}
 
 /** Version-2 component/transport contract; the hub and native window stay shared. */
@@ -31,8 +31,9 @@ export class ComponentSetup extends DeviceSetup {
     if(value.pending!==undefined&&typeof value.pending!=='boolean')throw Error('invalid_device_response');
     if(value.imageMatch!==undefined&&typeof value.imageMatch!=='boolean')throw Error('invalid_device_response');
     if(value.prepareSupported!==undefined&&typeof value.prepareSupported!=='boolean')throw Error('invalid_device_response');
+    if(value.returnSupported!==undefined&&typeof value.returnSupported!=='boolean')throw Error('invalid_device_response');
     if(value.pendingVersion!==undefined&&!/^\d+\.\d+\.\d+$/.test(value.pendingVersion))throw Error('invalid_device_response');
-    return Object.fromEntries(['component','currentVersion','nextStep','writable','wifiConfigured','pending','pendingVersion','imageMatch','prepareSupported'].filter(k=>value[k]!==undefined).map(k=>[k,value[k]]));
+    return Object.fromEntries(['component','currentVersion','nextStep','writable','wifiConfigured','pending','pendingVersion','imageMatch','prepareSupported','returnSupported'].filter(k=>value[k]!==undefined).map(k=>[k,value[k]]));
   }
   async scan(force=false){
     if(this.closed||this.scanning||this.job)return;this.scanning=true;
@@ -95,7 +96,7 @@ export class ComponentSetup extends DeviceSetup {
     if(request.action==='prepare'){
       if(!record.online||record.component!=='runtime'||record.transport!=='maintenance'||!this.descriptor.components.includes('qmk')||record.prepareSupported!==true||request.confirmBoard!==true||request.version!==this.release.version||request.network!==undefined||request.migrateWifi!==undefined||request.ssid!==undefined)throw Error('firmware_review_required');
     }else if(request.action==='return-keyboard'){
-      if(!record.online||record.component!=='qmk'||!record.writable||record.nextStep!=='ready'||request.confirmBoard!==true||request.version!==this.release.version||request.network!==undefined||request.migrateWifi!==undefined||request.ssid!==undefined)throw Error('firmware_review_required');
+      if(!record.online||record.component!=='qmk'||!(record.returnSupported===true&&['ready','qmk-readback'].includes(record.nextStep)||record.writable&&record.nextStep==='ready')||request.confirmBoard!==true||request.version!==this.release.version||request.network!==undefined||request.migrateWifi!==undefined||request.ssid!==undefined)throw Error('firmware_review_required');
     }else if(request.action==='install'){
       if(!record.online||!record.writable||request.confirmBoard!==true||request.version!==this.release.version||!preparationNeedsUpdate(record,this.release))throw Error('firmware_review_required');
       if(request.migrateWifi===true&&(record.component!=='runtime'||record.wifiConfigured===true||request.ssid!==this.network?.ssid||this.network.enterprise))throw Error('wifi_review_required');

@@ -101,7 +101,7 @@ function visibleComponents(devices){
 function componentSections(t){
   const ko=language==='ko',devices=visibleComponents(snapshot.devices),sections=[];
   for(const component of [...(snapshot.components??[])].sort((a,b)=>(b==='runtime')-(a==='runtime'))){
-    const records=devices.filter(d=>d.component===component),preparers=component==='qmk'?devices.filter(d=>d.component==='runtime'&&d.transport==='maintenance'&&d.prepareSupported&&d.online&&d.phase!=='awaiting-device'):[];
+    const records=devices.filter(d=>d.component===component),dfuPresent=records.some(d=>d.online&&d.nextStep!=='enter-dfu'),preparers=component==='qmk'&&!dfuPresent?devices.filter(d=>d.component==='runtime'&&d.transport==='maintenance'&&d.prepareSupported&&d.online&&d.phase!=='awaiting-device'):[];
     if(!records.length&&!preparers.length)continue;
     const section=element('section',undefined,'component-section');section.dataset.component=component;
     section.append(element('h3',component==='qmk'?(ko?'키보드 펌웨어 · QMK':'Keyboard firmware · QMK'):(ko?'화면·통신 소프트웨어 · 런타임':'Display and connection software · Runtime')));
@@ -149,6 +149,7 @@ function componentCard(device,t){
   const guidance={
     'enter-dfu':ko?'일반 USB 키보드 모드에서는 정확한 설치 버전을 읽을 수 없습니다. 미확인은 구버전이라는 뜻이 아닙니다. 아래 확인 모드 전환 또는 수동 DFU 안내를 사용하세요.':'Normal USB keyboard mode cannot report the exact installed version. Unknown does not mean outdated. Use firmware check mode below or the manual DFU instructions.',
     'usb-driver':ko?'DFU 읽기 또는 드라이버 접근을 확인하지 못했습니다. 백업이 가능해질 때까지 쓰지 않습니다.':'DFU readback or driver access is unavailable. Writing is blocked until backup is possible.',
+    'qmk-readback':ko?'DFU 모드 전환과 USB 접근은 확인했지만 키보드 펌웨어를 끝까지 읽지 못했습니다. 펌웨어는 쓰지 않았습니다. 다시 확인하거나 아래 버튼으로 일반 키보드 모드로 돌아갈 수 있습니다.':'DFU mode and USB access are confirmed, but the complete keyboard firmware could not be read. Firmware was not written. Check again or return to keyboard mode below.',
     'usb-connect':ko?'LAN에서 상태를 확인했습니다. 업데이트에는 허용된 관리 연결이 필요합니다.':'Status was read over LAN. Updating requires an authorized maintenance connection.',
     'maintenance':ko?'기존에 허용된 LAN 관리 연결을 확인했습니다. SD 카드를 기기에 둔 채 런타임 파티션 전체를 백업하고 제공 파일만 업데이트합니다. 기존 Wi-Fi·PC 등록을 보존하며 재부팅 후 실제 실행 파일을 확인합니다.':'An existing authorized LAN maintenance connection is verified. Leave the SD card in the device. The full runtime partition is backed up before updating the included files; saved Wi-Fi and PC registrations are preserved, and running images are checked after reboot.',
     'usb-bootstrap':ko?'USB 업데이트 수신기 응답을 기다립니다. 부팅 중일 수 있어 자동으로 다시 확인합니다. 수신기가 없는 구 펌웨어는 최초 이관이 필요하며 응답 전에는 쓰지 않습니다.':'Waiting for the USB update receiver; startup is retried automatically. Legacy firmware without the receiver needs initial migration. No writes before a valid response.',
@@ -157,7 +158,7 @@ function componentCard(device,t){
   };if(guidance[device.nextStep]&&!(device.nextStep==='maintenance'&&!needsUpdate(device,snapshot.release)))card.append(element('p',guidance[device.nextStep]));
   if(device.wifiConfigured===true)card.append(element('p',t.saved));
   const status=relation(device.currentVersion,component?.version),updateNeeded=needsUpdate(device,snapshot.release);
-  if(device.imageMatch===false)card.append(element('p',ko?'설치 이미지가 제공 빌드와 다릅니다. 업데이트 확인이 필요합니다.':'Installed images differ from the included build. Review the update.','muted'));
+  if(device.imageMatch===false)card.append(element('p',device.component==='qmk'?(ko?'키보드 펌웨어 전체 읽기를 마쳤으며 제공 이미지와 다릅니다. 기존 버전 번호는 식별할 수 없습니다. 아래에서 백업 후 설치를 선택할 수 있습니다.':'The complete keyboard firmware was read and differs from the included image. Its existing version number cannot be identified. You can choose back up and install below.'):(ko?'설치 이미지가 제공 빌드와 다릅니다. 업데이트 확인이 필요합니다.':'Installed images differ from the included build. Review the update.'),'muted'));
   if((status==='current'&&device.imageMatch!==false)||status==='newer')card.append(element('p',status==='current'?t.latest:t.newer,'muted'));
   if(device.writable&&device.online&&device.phase!=='awaiting-device'&&updateNeeded){
     const check=element('label',undefined,'check'),confirm=element('input');confirm.type='checkbox';confirm.checked=approved.has(key);confirm.disabled=snapshot.busy;check.append(confirm,element('span',t.confirm));card.append(check);
@@ -184,17 +185,17 @@ function componentCard(device,t){
   if(!device.writable&&device.online&&device.phase!=='awaiting-device'&&status!=='newer'&&device.nextStep!=='enter-dfu'){
     const reason=device.transport==='lan'?(ko?'LAN 발견 · 관리 연결 확인 필요':'LAN discovered · maintenance connection required'):
       device.nextStep==='enter-dfu'?(ko?'키보드 USB 연결됨 · 업데이트에는 DFU 모드 필요':'Keyboard USB connected · DFU required to update'):
-      device.nextStep==='usb-driver'?(ko?'DFU 백업 접근 불가':'DFU backup access unavailable'):
+      ['usb-driver','qmk-readback'].includes(device.nextStep)?(ko?'DFU 백업 접근 불가':'DFU backup access unavailable'):
       device.nextStep==='usb-bootstrap'?(ko?'USB 업데이트 수신기 응답 없음':'USB updater did not respond'):
       (ko?'런타임 USB 연결 미확인':'Runtime USB connection not confirmed');
     card.append(element('p',reason,'muted'));
-    card.append(element('p',device.transport==='lan'?(ko?'LAN 발견만으로 업데이트 권한이 생기지 않습니다. 관리 연결을 확인하면 이 런타임 항목에서 업데이트할 수 있습니다.':'LAN discovery does not grant update access. Updating becomes available here once maintenance access is verified.'):
+    if(device.component!=='qmk')card.append(element('p',device.transport==='lan'?(ko?'LAN 발견만으로 업데이트 권한이 생기지 않습니다. 관리 연결을 확인하면 이 런타임 항목에서 업데이트할 수 있습니다.':'LAN discovery does not grant update access. Updating becomes available here once maintenance access is verified.'):
       (ko?'다시 확인은 연결 상태만 조회합니다. 기기에 업데이트 수신기가 없는 경우, PC 미들웨어 업데이트나 반복 조회만으로 수신기가 설치되지 않습니다.':'Check again only reads connection state. Updating the PC middleware or repeatedly scanning cannot install a missing device-side updater.'),'muted'));
   }
   if(device.phase==='awaiting-device'){
     const verify=element('button',ko?'부팅 확인':'Check boot');verify.disabled=snapshot.busy;verify.addEventListener('click',()=>action({action:'verify',port:device.port}));card.append(verify);
   }
-  if(device.component==='qmk'&&device.online&&device.writable&&device.nextStep==='ready'){
+  if(device.component==='qmk'&&device.online&&(device.returnSupported&&['ready','qmk-readback'].includes(device.nextStep)||device.writable&&device.nextStep==='ready')){
     const resume=element('button',ko?'업데이트 없이 키보드로 돌아가기':'Return to keyboard without updating','secondary');resume.disabled=snapshot.busy;
     resume.addEventListener('click',()=>action({action:'return-keyboard',port:device.port,version:snapshot.release.version,confirmBoard:true}));card.append(resume);
   }
@@ -202,7 +203,7 @@ function componentCard(device,t){
     const box=element('div',undefined,'progress');box.setAttribute('role','status');
     const backupPhase=device.component==='runtime'?(ko?'런타임 파티션 전체 백업 중…':'Backing up the complete runtime partition…'):(ko?'QMK 앱·설정 영역 전체 백업 중…':'Backing up the complete QMK application/settings region…');
     box.append(element('p',device.phase==='awaiting-device'?(ko?'고급 복구 후 실제 부팅 확인을 기다립니다.':'Waiting for actual boot after advanced recovery.'):device.phase==='identify'?(ko?'선택한 기기를 확인하고 있습니다…':'Checking the selected device…'):device.phase==='backup'?backupPhase:device.phase==='complete'?t.complete:(t.phase[device.phase]??device.phase)));
-    if(device.phase==='failed')box.append(element('p',`${t.failed} (${device.code??'device_setup_failed'})`,'error'));
+    if(device.phase==='failed')box.append(element('p',`${device.code==='qmk_reboot_unconfirmed'?(ko?'일반 키보드 연결을 확인하지 못했습니다. MK20 전원을 완전히 껐다가 사각 키를 누르지 않은 채 다시 켜고 다시 확인하세요. 별도 전원을 사용하면 USB 재연결만으로 전원이 꺼지지 않을 수 있습니다.':'The normal keyboard connection was not confirmed. Fully power MK20 off, then turn it on without holding a square key and check again. Reconnecting USB alone may not power-cycle a separately powered device.'):t.failed} (${device.code??'device_setup_failed'})`,'error'));
     if(device.backup)box.append(element('p',(ko?'복구 백업: ':'Recovery backup: ')+device.backup,'muted'));card.append(box);
   }
   return card;

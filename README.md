@@ -132,6 +132,8 @@ Normal keyboard USB cannot identify the installed QMK image; Unknown does not me
 
 For manual DFU, power MK20 off. Hold the leftmost square display key in the top row (not a round knob), power on and connect PC USB. Reconnecting USB alone may not power-cycle a separately powered device.
 
+When DFU is detected, its readback result replaces the mode-entry controls. A readback failure is shown separately from a missing USB driver and offers a return to keyboard mode when USB access is available. Update the PC middleware first if an older installation stops after entering DFU; the host helper now recognizes the Maple bootloader's end-of-flash response. Firmware writing still requires a verified full backup and a separate update selection.
+
 </details>
 
 <details>

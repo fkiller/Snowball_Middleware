@@ -80,14 +80,20 @@ try{
         const needed=preparationNeedsUpdate(maintenance,mk20.release);
         if(!await window.webContents.executeJavaScript(`(()=>{const cards=document.querySelectorAll('[data-component=runtime] article.device');const card=[...cards].find(c=>c.dataset.target==='${maintenance.port}');if(!card||cards.length!==1)return false;const check=card.querySelector('.check input'),button=[...card.querySelectorAll('button')].find(b=>b.textContent.includes('${language==='ko'?'런타임 업데이트':'update runtime'}'));if(!${needed})return !button&&card.textContent.includes('${language==='ko'?'최신 제공 버전':'Matches the included firmware'}');if(!check||!button||!button.disabled)return false;check.checked=true;check.dispatchEvent(new Event('change'));const enabled=!button.disabled;check.checked=false;check.dispatchEvent(new Event('change'));return enabled&&button.disabled;})()`))throw Error('Real maintenance update eligibility or LAN folding incorrect');
       }
-      if([...setup.setups.get('mk20').records.values()].some(r=>r.prepareSupported)){
+      const dfu=[...setup.setups.get('mk20').records.values()].find(r=>r.component==='qmk'&&r.online&&r.nextStep!=='enter-dfu');
+      if(dfu){
+        if(!await window.webContents.executeJavaScript(`!document.querySelector('.qmk-preparation')&&!!document.querySelector('[data-component=qmk] article[data-target="${dfu.port}"]')`))throw Error('DFU did not replace keyboard mode entry');
+        if(dfu.writable&&preparationNeedsUpdate(dfu,setup.setups.get('mk20').release)){
+          if(!await window.webContents.executeJavaScript(`(()=>{const card=document.querySelector('[data-component=qmk] article[data-target="${dfu.port}"]'),check=card.querySelector('.check input'),button=[...card.querySelectorAll('button')].find(b=>b.textContent==='${language==='ko'?'백업 후 설치':'Back up and install'}');if(!check||!button||!button.disabled)return false;check.checked=true;check.dispatchEvent(new Event('change'));const enabled=!button.disabled;check.checked=false;check.dispatchEvent(new Event('change'));return enabled&&button.disabled;})()`))throw Error('Actual differing QMK image did not allow reviewed update');
+        }
+      }else if([...setup.setups.get('mk20').records.values()].some(r=>r.prepareSupported)){
         if(!await window.webContents.executeJavaScript(`(()=>{const card=document.querySelector('[data-component=qmk] .qmk-preparation'),button=card?.querySelector('button'),check=card?.querySelector('input');if(!button||!button.disabled||!check||document.querySelector('[data-component=runtime] .qmk-preparation'))return false;check.checked=true;check.dispatchEvent(new Event('change'));window.verifiedQmkButton=button;window.verifiedQmkCheck=check;return !button.disabled;})()`))throw Error('Real QMK mode switch missing or attached to runtime');
         await setup.scan();
         if(!await window.webContents.executeJavaScript(`window.verifiedQmkButton===document.querySelector('.qmk-preparation button')&&!window.verifiedQmkButton.disabled&&window.verifiedQmkCheck.checked`))throw Error('Actual background scan replaced or disabled QMK consent');
         await window.webContents.executeJavaScript(`window.verifiedQmkCheck.checked=false;window.verifiedQmkCheck.dispatchEvent(new Event('change'));delete window.verifiedQmkButton;delete window.verifiedQmkCheck;`);
       }
       fs.writeFileSync(path.join(output,'mk20-'+language+'.png'),(await window.webContents.capturePage()).toPNG());
-      await window.webContents.executeJavaScript(`document.querySelector('[data-component=qmk] .dfu-guide').open=true;document.querySelector('[data-component=qmk]').scrollIntoView();`);
+      await window.webContents.executeJavaScript(`(()=>{const manual=document.querySelector('[data-component=qmk] .dfu-guide');if(manual)manual.open=true;document.querySelector('[data-component=qmk]').scrollIntoView();})()`);
       fs.writeFileSync(path.join(output,'mk20-'+language+'-qmk.png'),(await window.webContents.capturePage()).toPNG());
       await window.webContents.executeJavaScript('window.scrollTo(0,document.body.scrollHeight)');
       const mk20=await window.webContents.executeJavaScript(`({keys:[...document.querySelectorAll('.display-key')].map(k=>k.firstChild.textContent),knobs:document.querySelectorAll('.knob').length,steps:document.querySelectorAll('.guide-step').length})`);

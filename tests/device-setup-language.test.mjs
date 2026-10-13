@@ -82,6 +82,31 @@ test('MK20 sections fold only matching LAN identities and keep QMK consent and D
   assert.equal(buttons,'업데이트 없이 키보드로 돌아가기','a matching DFU image can exit without reflashing');
 });
 
+test('DFU replaces mode entry and readback failure allows an explicit return without offering a write',async()=>{
+  const ui=setupRenderer();await new Promise(resolve=>setImmediate(resolve));
+  const maintenance={port:'maintenance',component:'runtime',transport:'maintenance',prepareSupported:true,online:true,currentVersion:'0.2.6',imageMatch:true,phase:'ready',nextStep:'maintenance',writable:true};
+  const dfu={port:'dfu',label:'MK20 QMK DFU',component:'qmk',online:true,currentVersion:null,phase:'ready',nextStep:'qmk-readback',writable:false,returnSupported:true};
+  const profile={profile:'mk20',name:'MK20',contract:2,components:['runtime','qmk'],devices:[maintenance,dfu],release:{version:'0.2.6',components:{runtime:{version:'0.2.6'},qmk:{version:'2026.9.18'}},changes:{}}};
+  ui.emit({profiles:[profile],busy:false,checking:false});
+  for(const language of ['ko','en','ko']){
+    ui.language(language);
+    const qmk=ui.node('devices').children.find(c=>c.dataset.component==='qmk');
+    assert.ok(!qmk.children.some(c=>c.className==='qmk-preparation'),'DFU attachment supersedes entry controls');
+    const card=qmk.children.find(c=>c.dataset.target==='dfu');
+    const text=card.children.map(c=>c.textContent).join(' ');
+    assert.match(text,language==='ko'?/DFU 모드 전환과 USB 접근은 확인/:/DFU mode and USB access are confirmed/);
+    const buttons=card.children.filter(c=>c.listeners.click);
+    assert.equal(buttons.length,1,'only the non-writing keyboard return is available');
+    assert.match(buttons[0].textContent,language==='ko'?/업데이트 없이 키보드로 돌아가기/:/Return to keyboard without updating/);
+    assert.doesNotMatch(text,/missing device-side updater|업데이트 수신기가 없는 경우/);
+    const ready=vm.runInContext(`componentCard(${JSON.stringify({...dfu,nextStep:'ready',writable:true,imageMatch:false})},ui.${language})`,ui.context);
+    assert.match(ready.children.map(c=>c.textContent).join(' '),language==='ko'?/키보드 펌웨어 전체 읽기를 마쳤으며/:/complete keyboard firmware was read/);
+    const failed=vm.runInContext(`componentCard(${JSON.stringify({...dfu,nextStep:'ready',writable:true,phase:'failed',lastAction:'return-keyboard',code:'qmk_reboot_unconfirmed'})},ui.${language})`,ui.context);
+    const notice=failed.children.find(c=>c.className==='progress');
+    assert.match(notice.children.map(c=>c.textContent).join(' '),language==='ko'?/전원을 완전히 껐다가/:/Fully power MK20 off/);
+  }
+});
+
 test('a failed unverified backup is distinguished from later failures in either language',async()=>{
   const ui=setupRenderer();await new Promise(resolve=>setImmediate(resolve));
   const message=()=>vm.runInContext("operationFailure({failedPhase:'backup'},ui[language])",ui.context);

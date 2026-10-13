@@ -31,6 +31,8 @@ test('disconnected targets disappear, pending boot checks survive, and reconnect
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-presence-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const hub=new DeviceSetupHub({adapters:[{profile:'mk20',device:{deviceRoot:path.join(control,'hardware/mk20'),python:path.join(root,'never-execute')}}],backupDirectory:root});
   const setup=hub.setups.get('mk20'),port='t-'+'a'.repeat(32),pending='t-'+'b'.repeat(32);
+  assert.throws(()=>setup.target({component:'qmk',currentVersion:null,nextStep:'qmk-readback',writable:false,returnSupported:'yes'}),/invalid_device_response/);
+  assert.equal(setup.target({component:'qmk',currentVersion:null,nextStep:'qmk-readback',writable:false,returnSupported:true}).returnSupported,true);
   const record={port,online:true,wasPresent:true,component:'qmk',currentVersion:'2026.9.17',phase:'ready'};
   setup.records.set(port,record);setup.records.set(pending,{port:pending,online:false,phase:'awaiting-device'});
   let announcements=0;hub.on('attached',()=>announcements++);
