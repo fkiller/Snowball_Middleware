@@ -115,6 +115,7 @@ The update preserves device settings, pairing keys, controller state, speech cac
 - Supports original ESP32 Core 4MB/16MB with FACES; CP210x detection alone does not identify the model. Confirm hardware if its firmware does not answer.
 - Keep USB connected during the full-flash backup. The window shows percentage, MiB and elapsed time; 16MB may take several minutes. Size/hash verification follows the read before writing.
 - Saved Wi-Fi and paired PCs are retained. If no network is saved, review Wi-Fi import or follow the FACES keyboard guide. The OS password is read only after that choice and is not shown in the UI/logs.
+- The PC updater recognizes an identical Wi-Fi driver record being written again without treating it as lost settings. Other storage differences still block completion and preserve the backup. If an older updater reports a preservation failure, verify the retained backup against the device before restoring or retrying; PC Update alone does not verify that device's storage.
 - Firmware 0.3.0 and earlier need one upgrade to discover new PCs over LAN. Use the installed window’s Included version; historical screenshot versions are examples.
 
 </details>
