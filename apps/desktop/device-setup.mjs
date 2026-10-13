@@ -74,7 +74,7 @@ export class DeviceSetup extends EventEmitter {
         });return termination;
       };
       child.stopOwned=terminate;
-      const timer=setTimeout(()=>{failure='usb_operation_timed_out';void terminate();},command==='install'?1500000:command==='migrate'?100000:command==='wifi'?70000:command==='prepare'?60000:15000);
+      const timer=setTimeout(()=>{failure='usb_operation_timed_out';void terminate();},command==='install'?1500000:command==='migrate'?100000:command==='wifi'?70000:['prepare','return-keyboard'].includes(command)?60000:15000);
       child.stdin.on('error',()=>{});child.stdin.end(JSON.stringify(payload)+'\n');child.stderr.resume();
       child.stdout.setEncoding('utf8');child.stdout.on('data',chunk=>{
         bytes+=chunk.length;buffer+=chunk.toString('utf8');if(bytes>1024*1024||buffer.length>65536){failure='usb_response_limit';void terminate();return;}

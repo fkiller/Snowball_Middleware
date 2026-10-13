@@ -26,7 +26,7 @@ export class DeviceSetupHub extends EventEmitter {
       });
     }
   }
-  get job(){return [...this.setups.values()].find(s=>s.job)?.job;}
+  get job(){return this.actionLease??[...this.setups.values()].find(s=>s.job)?.job;}
   observe(observation){
     const setup=this.setups.get(observation?.profile);
     if(this.closed||!(setup instanceof ComponentSetup))return;
@@ -68,13 +68,23 @@ export class DeviceSetupHub extends EventEmitter {
     if(this.closed||!request||typeof request!=='object'||Array.isArray(request))throw Error('invalid_setup_action');
     const {profile,...action}=request,setup=this.setups.get(profile);
     if(!setup)throw Error('unknown_preparation_profile');
-    if(this.job||(this.scanning&&!['wifi','refresh'].includes(action.action)))throw Error('usb_setup_busy');
-    if(action.action==='install'&&[...this.setups.values()].some(s=>s!==setup&&(s.records.get(action.port)?.hello||s.records.get(action.port)?.writable===true)))throw Error('device_type_conflict');
+    if(this.job)throw Error('usb_setup_busy');
     // A refresh uses the common scan lease, so two adapters never open one UART together.
     if(action.action==='refresh'){
       if(Object.keys(action).some(k=>k!=='action'))throw Error('invalid_setup_action');
       await this.scan(true);
-    }else await setup.action(action);
+    }else if(action.action==='wifi')await setup.action(action);
+    else{
+      // Reserve the operation before waiting for a read-only scan. Subsequent
+      // polls/actions cannot race it; the adapter revalidates the refreshed target.
+      let release;this.actionLease=new Promise(resolve=>{release=resolve;});this.emit('change',this.view());
+      try{
+        await this.scanPromise;
+        if(this.closed)throw Error('usb_setup_closed');
+        if(action.action==='install'&&[...this.setups.values()].some(s=>s!==setup&&(s.records.get(action.port)?.hello||s.records.get(action.port)?.writable===true)))throw Error('device_type_conflict');
+        await setup.action(action);
+      }finally{this.actionLease=null;release();this.emit('change',this.view());}
+    }
     return this.view();
   }
   async close(){this.closed=true;clearInterval(this.timer);await Promise.allSettled([...this.setups.values()].map(s=>s.close()));await this.scanPromise;}

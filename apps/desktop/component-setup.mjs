@@ -47,6 +47,8 @@ export class ComponentSetup extends DeviceSetup {
         if(!record||record.usbIdentity!==identity||(!record.wasPresent&&candidate.present!==false)||force||retryUsb){
           const previous=record;
           record={port:candidate.port,label:String(candidate.label??this.descriptor.name).slice(0,128),usbIdentity:identity,...(candidate.transport==='maintenance'?{transport:'maintenance'}:{}),online:candidate.present!==false,wasPresent:true,phase:'checking',status:'unknown',checked:Date.now()};
+          const suffix=String(candidate.deviceId??'').slice(this.descriptor.identity.prefix.length);
+          if(candidate.transport==='maintenance'&&typeof candidate.deviceId==='string'&&candidate.deviceId.startsWith(this.descriptor.identity.prefix)&&new RegExp('^[a-f0-9]{'+this.descriptor.identity.hexLength+'}$').test(suffix)&&privateIpv4(candidate.address))Object.assign(record,{deviceId:candidate.deviceId,address:candidate.address});
           this.records.set(record.port,record);
           try{
             const response=await this.run('probe',record.port);if(response.event!=='target')throw Error('invalid_device_response');
@@ -61,7 +63,7 @@ export class ComponentSetup extends DeviceSetup {
         const previous=this.records.get(port);
         if(previous&&!force&&Date.now()-observation.checked<30000)continue;
         observation.checked=Date.now();
-        const record={port,label:this.descriptor.name+' · LAN',usbIdentity:'',transport:'lan',deviceId:observation.deviceId,online:true,wasPresent:true,phase:'checking',status:'observed'};
+        const record={port,label:this.descriptor.name+' · LAN',usbIdentity:'',transport:'lan',deviceId:observation.deviceId,address:observation.address,online:true,wasPresent:true,phase:'checking',status:'observed'};
         this.records.set(port,record);
         try{
           const response=await this.run('status',undefined,{address:observation.address,deviceId:observation.deviceId});
@@ -92,6 +94,8 @@ export class ComponentSetup extends DeviceSetup {
     if(!targetId(request.port)||!record)throw Error('setup_target_disconnected');
     if(request.action==='prepare'){
       if(!record.online||record.component!=='runtime'||record.transport!=='maintenance'||!this.descriptor.components.includes('qmk')||record.prepareSupported!==true||request.confirmBoard!==true||request.version!==this.release.version||request.network!==undefined||request.migrateWifi!==undefined||request.ssid!==undefined)throw Error('firmware_review_required');
+    }else if(request.action==='return-keyboard'){
+      if(!record.online||record.component!=='qmk'||!record.writable||record.nextStep!=='ready'||request.confirmBoard!==true||request.version!==this.release.version||request.network!==undefined||request.migrateWifi!==undefined||request.ssid!==undefined)throw Error('firmware_review_required');
     }else if(request.action==='install'){
       if(!record.online||!record.writable||request.confirmBoard!==true||request.version!==this.release.version||!preparationNeedsUpdate(record,this.release))throw Error('firmware_review_required');
       if(request.migrateWifi===true&&(record.component!=='runtime'||record.wifiConfigured===true||request.ssid!==this.network?.ssid||this.network.enterprise))throw Error('wifi_review_required');
@@ -100,7 +104,7 @@ export class ComponentSetup extends DeviceSetup {
         if(this.descriptor.capabilities.manualWifi!==true||record.component!=='runtime'||record.wifiConfigured===true||request.migrateWifi===true||!n||typeof n!=='object'||Array.isArray(n)||Object.keys(n).some(k=>!['ssid','password'].includes(k))||typeof n.ssid!=='string'||!Buffer.byteLength(n.ssid)||Buffer.byteLength(n.ssid)>32||typeof n.password!=='string'||(n.password.length&&(Buffer.byteLength(n.password)<8||Buffer.byteLength(n.password)>63)))throw Error('wifi_review_required');
       }
     }else if(request.action!=='verify'||record.phase!=='awaiting-device')throw Error('invalid_setup_action');
-    const phases=new Set();record.code=null;record.phase=request.action==='verify'?'reboot':'identify';delete record.failedPhase;
+    const phases=new Set();record.code=null;record.lastAction=request.action;record.phase=['verify','return-keyboard'].includes(request.action)?'reboot':'identify';delete record.failedPhase;
     if(request.action==='install')delete record.backup;
     this.job=(async()=>{
       try{
@@ -114,6 +118,10 @@ export class ComponentSetup extends DeviceSetup {
           if(result.event!=='prepared'||result.component!=='qmk')throw Error('qmk_dfu_unconfirmed');
           record.phase='ready';return;
         }
+        if(request.action==='return-keyboard'){
+          if(result.event!=='returned'||result.component!=='qmk')throw Error('qmk_reboot_unconfirmed');
+          record.phase='complete';return;
+        }
         if(result.component!==record.component||!['awaiting-device','verified'].includes(result.event))throw Error('invalid_device_response');
         if(request.action==='install'&&!['backup-verified','flash','verify-settings'].every(p=>phases.has(p)))throw Error('firmware_verification_incomplete');
         await this.backup(result.backup,record.component,record.port);record.backup=result.backup;
@@ -121,7 +129,7 @@ export class ComponentSetup extends DeviceSetup {
           if(result.version!==(request.action==='verify'?record.pendingVersion??this.release.components[record.component].version:this.release.components[record.component].version)||!phases.has('reboot'))throw Error('firmware_verification_incomplete');
           record.currentVersion=result.version;record.imageMatch=true;record.pending=false;record.phase='complete';record.nextStep='ready';
         }else{record.phase='awaiting-device';record.nextStep='return-card';record.pendingVersion=this.release.components[record.component].version;}
-      }catch(error){record.failedPhase=record.phase;record.phase='failed';record.code=code(error);}finally{this.job=null;this.changed();if(request.action==='prepare'&&record.phase!=='failed'&&!this.closed)this.emit('rescan');}
+      }catch(error){record.failedPhase=record.phase;record.phase='failed';record.code=code(error);}finally{this.job=null;this.changed();if(['prepare','return-keyboard'].includes(request.action)&&record.phase!=='failed'&&!this.closed)this.emit('rescan');}
     })();this.changed();return this.view();
   }
 }

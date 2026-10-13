@@ -7,13 +7,13 @@ const source=fs.readFileSync(new URL('../apps/desktop/device-setup.js',import.me
 
 function setupRenderer(){
   // Presentation-only DOM/IPC fixtures; no device operation or success is simulated.
-  const element=()=>({textContent:'',value:'',children:[],listeners:{},append(...children){this.children.push(...children);},replaceChildren(...children){this.children=children;},setAttribute(){},addEventListener(name,callback){this.listeners[name]=callback;}});
+  const element=()=>({textContent:'',value:'',dataset:{},children:[],listeners:{},append(...children){this.children.push(...children);},replaceChildren(...children){this.children=children;},setAttribute(){},addEventListener(name,callback){this.listeners[name]=callback;}});
   const nodes=new Map(),node=id=>{if(!nodes.has(id))nodes.set(id,element());return nodes.get(id);};
-  let failure='usb_setup_busy';
-  const context=vm.createContext({document:{getElementById:node,createElement:element,documentElement:{}},window:{snowballSetup:{subscribe(){},snapshot:async()=>({profiles:[],language:'ko'}),action:async()=>{if(failure)throw Error(failure);return {profiles:[]};}}}});
+  let failure='usb_setup_busy',subscription;
+  const context=vm.createContext({document:{getElementById:node,createElement:element,documentElement:{}},window:{snowballSetup:{subscribe(callback){subscription=callback;},snapshot:async()=>({profiles:[],language:'ko'}),action:async()=>{if(failure)throw Error(failure);return {profiles:[]};}}}});
   vm.runInContext(source,context);
   const language=value=>{node('language').value=value;node('language').listeners.change({target:node('language')});};
-  return {context,node,language,setFailure:value=>{failure=value;}};
+  return {context,node,language,emit:state=>subscription(state),setFailure:value=>{failure=value;}};
 }
 
 test('an existing action failure follows ko/en/ko changes without retrying the device operation',async()=>{
@@ -52,8 +52,34 @@ test('current component hides update, differing images allow repair, and newer v
   assert.equal(labels('imageMatch:true'),'');
   assert.match(labels('imageMatch:false'),/업데이트/);
   assert.equal(labels("currentVersion:'0.3.0',imageMatch:false"),'');
-  const prepare=vm.runInContext("snapshot.release.components.qmk={version:'2026.9.18'};componentCard({port:'maintenance',label:'LAN maintenance',transport:'maintenance',component:'runtime',currentVersion:'0.2.6',writable:true,online:true,phase:'ready',nextStep:'maintenance',prepareSupported:true},ui.ko).children.find(c=>c.textContent==='QMK 업데이트 준비')",ui.context);
-  assert.ok(prepare);assert.equal(prepare.disabled,true);
+  const runtime=vm.runInContext("componentCard({port:'maintenance',transport:'maintenance',component:'runtime',currentVersion:'0.2.6',writable:true,online:true,phase:'ready',nextStep:'maintenance',prepareSupported:true},ui.ko)",ui.context);
+  assert.equal(runtime.children.some(c=>c.listeners.click),false,'QMK controls do not belong to the runtime version card');
+});
+
+test('MK20 sections fold only matching LAN identities and keep QMK consent and DOM stable during polling',async()=>{
+  const ui=setupRenderer();await new Promise(resolve=>setImmediate(resolve));
+  const maintenance={port:'maintenance',label:'MK20 maintenance',transport:'maintenance',deviceId:'mk20-aabbccddeeff',address:'192.168.1.2',component:'runtime',currentVersion:'0.2.6',imageMatch:true,writable:true,online:true,phase:'ready',nextStep:'maintenance',prepareSupported:true};
+  const lan={...maintenance,port:'lan',transport:'lan',writable:false,prepareSupported:false};
+  const usb={port:'usb',label:'MK20 USB QMK',component:'qmk',currentVersion:null,writable:false,online:true,phase:'ready',nextStep:'enter-dfu'};
+  const profile={profile:'mk20',name:'MK20',contract:2,components:['qmk','runtime'],release:{version:'0.2.6',changes:{},components:{runtime:{version:'0.2.6'},qmk:{version:'2026.9.18'}}},capabilities:{},devices:[maintenance,lan,usb]};
+  const state={profiles:[profile],busy:false,checking:false};ui.emit(state);
+  const sections=ui.node('devices').children;
+  assert.deepEqual(sections.map(s=>s.dataset.component),['runtime','qmk']);
+  assert.equal(sections[0].children.filter(c=>c.dataset.target).length,1);
+  const preparation=sections[1].children.find(c=>c.className==='qmk-preparation');
+  const check=preparation.children.find(c=>c.className==='check').children[0],button=preparation.children.find(c=>c.listeners.click);
+  assert.equal(button.disabled,true);check.checked=true;check.listeners.change();assert.equal(button.disabled,false);
+  ui.emit({...state,checking:true,profiles:[{...profile,checking:true,devices:profile.devices.map(d=>({...d,checked:Date.now(),wasPresent:true}))}]});
+  assert.equal(ui.node('devices').children,sections,'read-only scan does not replace focused controls');
+  assert.equal(check.checked,true);assert.equal(button.disabled,false);
+  ui.emit({...state,checking:false});assert.equal(ui.node('devices').children,sections);
+  ui.emit({...state,profiles:[{...profile,devices:[maintenance,usb]}]});assert.equal(ui.node('devices').children,sections,'expiry of folded LAN metadata does not replace visible controls');
+  const mismatches=vm.runInContext(`visibleComponents(${JSON.stringify([maintenance,{...lan,address:'192.168.1.3'},{...lan,port:'foreign',deviceId:'mk20-112233445566'},usb])}).length`,ui.context);
+  assert.equal(mismatches,4,'address alone, model and USB count never merge separate devices');
+  const guide=sections[1].children.find(c=>c.className==='dfu-guide');
+  assert.ok(guide.children.some(c=>c.textContent.includes('원형 노브가 아닙니다')));
+  const buttons=vm.runInContext("componentCard({port:'dfu',label:'DFU',component:'qmk',currentVersion:'2026.9.18',online:true,writable:true,nextStep:'ready',phase:'ready'},ui.ko).children.filter(c=>c.listeners.click).map(c=>c.textContent).join('|')",ui.context);
+  assert.equal(buttons,'업데이트 없이 키보드로 돌아가기','a matching DFU image can exit without reflashing');
 });
 
 test('a failed unverified backup is distinguished from later failures in either language',async()=>{

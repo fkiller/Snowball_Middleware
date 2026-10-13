@@ -8,7 +8,7 @@ const $=id=>document.getElementById(id);let language='ko',snapshot={devices:[],r
 function element(tag,text,className){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(className)el.className=className;return el;}
 function relation(a,b){const x=String(a??'').split('.').map(Number),y=String(b??'').split('.').map(Number);if(x.length!==3||x.some(Number.isNaN))return 'unknown';for(let i=0;i<3;i++)if(x[i]!==y[i])return x[i]<y[i]?'older':'newer';return 'current';}
 function needsUpdate(device,release){const status=relation(device.hello?.firmware??device.currentVersion,release.components?.[device.component]?.version??release.version);return status!=='newer'&&(status!=='current'||device.imageMatch===false);}
-function needsReview(device,release){return device.pending===true||(!(device.component==='qmk'&&device.nextStep==='enter-dfu'&&!device.currentVersion)&&needsUpdate(device,release));}
+function needsReview(device,release){return device.online&&device.phase!=='failed'&&(device.pending===true||(!(device.component==='qmk'&&device.nextStep==='enter-dfu'&&!device.currentVersion)&&needsUpdate(device,release)));}
 function backupProgressView(device){
   const box=element('div'),ko=language==='ko',value=device.backupProgress;
   if(value){
@@ -56,7 +56,7 @@ function render(){
   $('profile-label').textContent=language==='ko'?'기기 종류':'Device type';
   $('profile').replaceChildren(...hubState.profiles.map(profile=>{const option=element('option',profile.name);option.value=profile.profile;return option;}));$('profile').value=selectedProfile??'';
   $('detected-profiles').replaceChildren(...hubState.profiles.filter(p=>p.devices.some(d=>d.online||d.phase==='awaiting-device')).map(profile=>{
-    const devices=profile.devices.filter(d=>d.online||d.phase==='awaiting-device');
+    const devices=(profile.contract===2?visibleComponents(profile.devices):profile.devices).filter(d=>d.online||d.phase==='awaiting-device');
     const review=devices.some(d=>needsReview(d,profile.release));
     const label=profile.name+' · '+(language==='ko'?(review?'업데이트 확인':'연결됨'):(review?'Review update':'Detected'));
     const button=element('button',label,'secondary');button.setAttribute('aria-pressed',String(profile.profile===selectedProfile));
@@ -64,13 +64,14 @@ function render(){
   }));
   $('wifi-section').hidden=!snapshot.capabilities?.wifiImport;document.documentElement.lang=language;$('heading').textContent=t.heading;$('subtitle').textContent=t.subtitle;
   for(const [id,value]of Object.entries({'usb-title':t.usb,refresh:t.refresh,'release-title':`${t.release} · ${snapshot.release.version}`,'scope':t.scope,'wifi-title':t.wifi,'read-wifi':t.readWifi,'wifi-boundary':t.wifiBoundary,'guide-title':t.guide,'guide-caption':t.caption,'faces-note':t.faces}))$(id).textContent=value;
+  if(snapshot.contract===2)$('release-title').textContent=language==='ko'?'제공 개선 사항':'Included changes';
   $('journey').replaceChildren(...t.journey.map(s=>element('span',s)));$('changes').replaceChildren(...(snapshot.release.changes[language]??[]).map(s=>element('li',s)));
   renderGuide(p);$('notice').textContent=error?actionFailure(error):snapshot.code?actionFailure(new Error(snapshot.code)):'';
   $('network').textContent=snapshot.network?`Wi-Fi · ${snapshot.network.ssid}${snapshot.network.enterprise?' · Enterprise (manual setup)':''}`:t.noWifi;
   $('refresh').disabled=!!snapshot.busy||refreshPending;$('read-wifi').disabled=!!snapshot.busy;
   if(refreshPending)$('refresh').textContent=language==='ko'?'다시 확인 중…':'Checking again…';
+  if(snapshot.contract===2){$('devices').replaceChildren(...componentSections(t));return;}
   const cards=snapshot.devices.map(device=>{
-    if(snapshot.contract===2)return componentCard(device,t);
     const card=element('article',undefined,'device');card.append(element('strong',`${device.port} · ${device.hello?.deviceId??device.label}`));
     if(!device.online)card.append(element('p',t.unplugged,'error'));
     const versions=element('div',undefined,'versions');
@@ -83,7 +84,7 @@ function render(){
     const actions=element('div',undefined,'actions');
     if(['older','unknown'].includes(status)){
       const check=element('label',undefined,'check'),input=element('input');input.type='checkbox';input.checked=approved.has(selectedProfile+device.port);input.disabled=!!snapshot.busy;check.append(input,element('span',t.confirm));card.append(check);
-      let importWifi=null;if(snapshot.capabilities?.wifiImport&&snapshot.network&&!snapshot.network.enterprise&&device.hello?.wifiConfigured!==true){const label=element('label',undefined,'check');importWifi=element('input');importWifi.type='checkbox';importWifi.checked=!declinedWifi.has(selectedProfile+device.port);importWifi.disabled=!!snapshot.busy;importWifi.addEventListener('change',()=>{importWifi.checked?declinedWifi.delete(selectedProfile+device.port):declinedWifi.add(selectedProfile+device.port);});label.append(importWifi,element('span',language==='ko'?"저장된 Wi-Fi가 없으면 업데이트 후 PC Wi-Fi("+snapshot.network.ssid+" )를 가져옵니다.":"If no Wi-Fi is saved, import this PC’s network ("+snapshot.network.ssid+" ) after the update."));card.append(label);}const install=element('button',device.hello?t.update:t.install);const updateEnabled=()=>{install.disabled=!input.checked||snapshot.busy||snapshot.checking||!device.online||device.phase==='checking';};input.addEventListener('change',()=>{input.checked?approved.add(selectedProfile+device.port):approved.delete(selectedProfile+device.port);updateEnabled();});updateEnabled();install.addEventListener('click',()=>action({action:'install',port:device.port,version:snapshot.release.version,confirmBoard:true,migrateWifi:importWifi?.checked===true,...(importWifi?.checked?{ssid:snapshot.network.ssid}:{})}));actions.append(install);
+      let importWifi=null;if(snapshot.capabilities?.wifiImport&&snapshot.network&&!snapshot.network.enterprise&&device.hello?.wifiConfigured!==true){const label=element('label',undefined,'check');importWifi=element('input');importWifi.type='checkbox';importWifi.checked=!declinedWifi.has(selectedProfile+device.port);importWifi.disabled=!!snapshot.busy;importWifi.addEventListener('change',()=>{importWifi.checked?declinedWifi.delete(selectedProfile+device.port):declinedWifi.add(selectedProfile+device.port);});label.append(importWifi,element('span',language==='ko'?"저장된 Wi-Fi가 없으면 업데이트 후 PC Wi-Fi("+snapshot.network.ssid+" )를 가져옵니다.":"If no Wi-Fi is saved, import this PC’s network ("+snapshot.network.ssid+" ) after the update."));card.append(label);}const install=element('button',device.hello?t.update:t.install);const updateEnabled=()=>{install.disabled=!input.checked||snapshot.busy||!device.online||device.phase==='checking';};input.addEventListener('change',()=>{input.checked?approved.add(selectedProfile+device.port):approved.delete(selectedProfile+device.port);updateEnabled();});updateEnabled();install.addEventListener('click',()=>action({action:'install',port:device.port,version:snapshot.release.version,confirmBoard:true,migrateWifi:importWifi?.checked===true,...(importWifi?.checked?{ssid:snapshot.network.ssid}:{})}));actions.append(install);
     }
     if(snapshot.capabilities?.wifiImport&&device.hello?.usbSetup===true&&device.hello.wifiConfigured===false){const migrate=element('button',t.migrate);migrate.disabled=!snapshot.network||snapshot.network.enterprise||snapshot.busy||!device.online;migrate.addEventListener('click',()=>action({action:'migrate',port:device.port,ssid:snapshot.network.ssid}));actions.append(migrate);}
     card.append(actions);
@@ -92,16 +93,63 @@ function render(){
   });$('devices').replaceChildren(...(cards.length?cards:[element('p',t.empty,'muted')]));
 }
 
+function visibleComponents(devices){
+  // Only verified native maintenance identity plus address can fold LAN metadata.
+  // USB keyboard identity is deliberately never inferred from this relationship.
+  return devices.filter(d=>!(d.transport==='lan'&&d.deviceId&&d.address&&devices.some(m=>m.online&&m.transport==='maintenance'&&m.deviceId===d.deviceId&&m.address===d.address)));
+}
+function componentSections(t){
+  const ko=language==='ko',devices=visibleComponents(snapshot.devices),sections=[];
+  for(const component of [...(snapshot.components??[])].sort((a,b)=>(b==='runtime')-(a==='runtime'))){
+    const records=devices.filter(d=>d.component===component),preparers=component==='qmk'?devices.filter(d=>d.component==='runtime'&&d.transport==='maintenance'&&d.prepareSupported&&d.online&&d.phase!=='awaiting-device'):[];
+    if(!records.length&&!preparers.length)continue;
+    const section=element('section',undefined,'component-section');section.dataset.component=component;
+    section.append(element('h3',component==='qmk'?(ko?'키보드 펌웨어 · QMK':'Keyboard firmware · QMK'):(ko?'화면·통신 소프트웨어 · 런타임':'Display and connection software · Runtime')));
+    section.append(element('p',component==='qmk'?(ko?'사각 키와 노브의 입력을 처리합니다. 런타임과 버전 체계가 다릅니다.':'Handles square keys and knobs. Its version is independent of the runtime.'):(ko?'화면, 네트워크 연결과 하네스 제어를 담당합니다.':'Runs the display, networking and harness controls.'),'muted'));
+    records.forEach(d=>section.append(componentCard(d,t)));
+    preparers.forEach(d=>section.append(qmkPreparation(d)));
+    if(component==='qmk'&&(preparers.length||records.some(d=>d.nextStep==='enter-dfu')))section.append(dfuGuide());
+    sections.push(section);
+  }
+  return sections.length?sections:[element('p',t.empty,'muted')];
+}
+function dfuGuide(){
+  const ko=language==='ko',details=element('details',undefined,'dfu-guide');
+  details.append(element('summary',ko?'버튼으로 전환할 수 없을 때: 수동 DFU 진입':'If automatic entry is unavailable: manual DFU entry'));
+  details.append(element('p',ko?'DFU는 키보드 펌웨어를 읽고 업데이트하는 모드입니다. 20개 사각 화면 키 중 맨 윗줄 맨 왼쪽 키를 사용합니다. 위쪽 원형 노브가 아닙니다.':'DFU is the mode for reading and updating keyboard firmware. Use the leftmost square display key in the top row of 20 keys, below the round knobs. Do not press a knob.'));
+  const grid=element('div',undefined,'dfu-key-grid');grid.setAttribute('role','img');grid.setAttribute('aria-label',ko?'4행 5열 사각 키 배열의 왼쪽 위 키':'Top-left key in the four-row, five-column square key grid');
+  for(let i=0;i<20;i++)grid.append(element('span',i===0?'▼':'',i===0?'dfu-key selected':'dfu-key'));details.append(grid);
+  details.append(element('p',ko?'1. MK20 전원을 끕니다. 2. 표시한 사각 키를 누른 채 MK20 전원을 켭니다. 3. PC에 USB를 연결한 상태로 이 창에서 DFU 연결을 확인합니다. 별도 전원을 쓰는 경우 USB 케이블만 다시 꽂아서는 전원이 꺼지지 않을 수 있습니다.':'1. Turn MK20 off. 2. Hold the marked square key while powering MK20 on. 3. Keep USB connected to this PC and check for a DFU connection here. With a separate power supply, reconnecting USB alone may not power-cycle the keyboard.'));
+  return details;
+}
+function qmkPreparation(device){
+  const ko=language==='ko',key=selectedProfile+device.port+':qmk',card=element('div',undefined,'qmk-preparation');
+  card.append(element('strong',ko?'키보드 버전 확인을 위한 모드 전환':'Enter firmware check mode'));
+  card.append(element('p',ko?'USB를 연결해 둔 채 아래에서 동의하고 진행하세요. 선택한 MK20의 키보드를 DFU로 전환한 뒤 실제 이미지를 비교합니다. 업데이트가 필요하면 별도의 백업 후 업데이트 버튼이 나타납니다.':'Keep this MK20 connected by USB, then confirm below. Its keyboard enters DFU so the installed image can be compared. If needed, a separate back up and update action appears.','muted'));
+  card.append(element('p',(ko?'대상 MK20: ':'Target MK20: ')+(device.deviceId??device.label)+(device.address?' · '+device.address:''),'muted'));
+  const check=element('label',undefined,'check'),confirm=element('input');confirm.type='checkbox';confirm.checked=approved.has(key);confirm.disabled=snapshot.busy;
+  check.append(confirm,element('span',ko?'위 MK20의 USB를 이 PC에 연결했으며 키보드 모드 전환에 동의합니다.':'This MK20 is connected to this PC by USB. Allow its keyboard to enter firmware check mode.'));card.append(check);
+  const button=element('button',ko?'키보드 펌웨어 확인 모드로 전환':'Enter keyboard firmware check mode');
+  const enabled=()=>{button.disabled=!confirm.checked||snapshot.busy;};confirm.addEventListener('change',()=>{confirm.checked?approved.add(key):approved.delete(key);enabled();});enabled();
+  button.addEventListener('click',()=>action({action:'prepare',port:device.port,version:snapshot.release.version,confirmBoard:true}));card.append(button);
+  card.append(element('p',ko?'모드를 바꾸는 단계이며 펌웨어는 아직 쓰지 않습니다. 일반 키보드 입력이 잠시 중단됩니다.':'This step changes mode without writing firmware. Normal keyboard input stops temporarily.','muted'));
+  if(device.lastAction==='prepare'&&device.phase==='identify')card.append(element('p',ko?'키보드의 DFU 연결을 확인하고 있습니다…':'Checking for the keyboard DFU connection…','progress'));
+  if(device.lastAction==='prepare'&&device.phase==='failed')card.append(element('p',ko?'DFU 연결을 확인하지 못했습니다. 펌웨어는 쓰지 않았습니다. 아래 수동 DFU 안내를 확인하세요.':'DFU attachment was not confirmed. Firmware was not written. See the manual DFU instructions below.','error'));
+  return card;
+}
 function componentCard(device,t){
   const ko=language==='ko',key=selectedProfile+device.port,component=snapshot.release.components[device.component];
-  const card=element('article',undefined,'device');card.append(element('strong',device.label));
-  if(device.transport==='lan')card.append(element('p',ko?'LAN에서 MK20을 찾았습니다. 업데이트 가능한 관리 연결은 별도 항목으로 표시합니다. 현재 버전 미확인은 버전 조회 응답이 없다는 뜻입니다.':'MK20 was discovered on LAN. An available maintenance connection appears separately. Unknown means the version query received no response.','muted'));
+  const card=element('article',undefined,'device');card.dataset.target=device.port;
+  const connection=device.transport==='maintenance'?(ko?'LAN 연결 · 관리 권한 확인됨':'LAN connected · maintenance authorized'):device.transport==='lan'?(ko?'LAN 연결 · 상태 조회':'LAN connected · status only'):device.component==='qmk'?(device.nextStep==='enter-dfu'?(ko?'USB 키보드 연결됨':'USB keyboard connected'):'USB · DFU'):(ko?'USB / 복구 매체':'USB / recovery storage');
+  card.append(element('strong',connection));
+  if(device.deviceId)card.append(element('p',device.deviceId+(device.address?' · '+device.address:''),'muted'));
+  else card.append(element('p',device.label,'muted'));
   const versions=element('div',undefined,'versions');
   for(const [label,version]of [[t.current,device.currentVersion??t.unknown],[t.available,component?.version??t.unknown]]){if(versions.childElementCount)versions.append(element('span','→','arrow'));const box=element('div',undefined,'version');box.append(element('small',label),element('strong',version));versions.append(box);}card.append(versions);
   const guidance={
-    'enter-dfu':device.prepareSupported?(ko?'아래 QMK 업데이트 준비를 선택하여 DFU로 전환하고 설치 이미지를 확인하세요.':'Choose Prepare QMK update below to enter DFU and check the installed image.'):(ko?'USB를 빼고 좌측 상단 키를 누른 채 다시 연결하세요. DFU 연결을 실제로 확인한 뒤 업데이트할 수 있습니다.':'Unplug USB, hold the top-left key and reconnect. Updating requires an actual DFU attachment.'),
+    'enter-dfu':ko?'일반 USB 키보드 모드에서는 정확한 설치 버전을 읽을 수 없습니다. 미확인은 구버전이라는 뜻이 아닙니다. 아래 확인 모드 전환 또는 수동 DFU 안내를 사용하세요.':'Normal USB keyboard mode cannot report the exact installed version. Unknown does not mean outdated. Use firmware check mode below or the manual DFU instructions.',
     'usb-driver':ko?'DFU 읽기 또는 드라이버 접근을 확인하지 못했습니다. 백업이 가능해질 때까지 쓰지 않습니다.':'DFU readback or driver access is unavailable. Writing is blocked until backup is possible.',
-    'usb-connect':ko?'이 항목은 LAN 발견 정보입니다. 최초 런타임 업데이트는 확인된 LAN 관리 연결 항목에서 진행합니다. 키보드 USB 연결만으로 런타임 업데이트가 가능해지지는 않습니다.':'This is LAN discovery information. Use a verified LAN maintenance entry for the initial runtime update. Keyboard USB alone does not enable runtime updating.',
+    'usb-connect':ko?'LAN에서 상태를 확인했습니다. 업데이트에는 허용된 관리 연결이 필요합니다.':'Status was read over LAN. Updating requires an authorized maintenance connection.',
     'maintenance':ko?'기존에 허용된 LAN 관리 연결을 확인했습니다. SD 카드를 기기에 둔 채 런타임 파티션 전체를 백업하고 제공 파일만 업데이트합니다. 기존 Wi-Fi·PC 등록을 보존하며 재부팅 후 실제 실행 파일을 확인합니다.':'An existing authorized LAN maintenance connection is verified. Leave the SD card in the device. The full runtime partition is backed up before updating the included files; saved Wi-Fi and PC registrations are preserved, and running images are checked after reboot.',
     'usb-bootstrap':ko?'USB 업데이트 수신기 응답을 기다립니다. 부팅 중일 수 있어 자동으로 다시 확인합니다. 수신기가 없는 구 펌웨어는 최초 이관이 필요하며 응답 전에는 쓰지 않습니다.':'Waiting for the USB update receiver; startup is retried automatically. Legacy firmware without the receiver needs initial migration. No writes before a valid response.',
     'insert-card':ko?'복구용 카드 리더 연결입니다. 일반 업데이트는 기기에 SD 카드를 둔 채 USB로 진행합니다.':'Recovery card-reader attachment. Normal updates use USB with the SD card left in the device.',
@@ -125,7 +173,7 @@ function componentCard(device,t){
         enable.addEventListener('change',()=>{manual.enabled=enable.checked;manualNetworks.set(key,manual);fields.hidden=!manual.enabled;if(importBox)importBox.checked=!manual.enabled&&!declinedWifi.has(key);});fields.append(ssid,password);card.append(fields);
       }
     }
-    const install=element('button',device.transport==='maintenance'?(ko?'백업 후 런타임 업데이트':'Back up and update runtime'):device.currentVersion?t.update:t.install);const enabled=()=>{install.disabled=!confirm.checked||snapshot.busy||snapshot.checking;};confirm.addEventListener('change',()=>{confirm.checked?approved.add(key):approved.delete(key);enabled();});enabled();
+    const install=element('button',device.transport==='maintenance'?(ko?'백업 후 런타임 업데이트':'Back up and update runtime'):device.currentVersion?t.update:t.install);const enabled=()=>{install.disabled=!confirm.checked||snapshot.busy;};confirm.addEventListener('change',()=>{confirm.checked?approved.add(key):approved.delete(key);enabled();});enabled();
     install.addEventListener('click',()=>{
       const network=manual.enabled?{ssid:manual.ssid,password:manual.password}:undefined;
       const request={action:'install',port:device.port,version:snapshot.release.version,confirmBoard:true,migrateWifi:importBox?.checked===true&&!network,...(importBox?.checked&&!network?{ssid:snapshot.network.ssid}:{}),...(network?{network}:{})};
@@ -133,32 +181,28 @@ function componentCard(device,t){
       void action(request);
     });card.append(install);
   }
-  if(device.prepareSupported&&device.online&&device.phase!=='awaiting-device'){
-    const prepareKey=key+':qmk',check=element('label',undefined,'check'),confirm=element('input');confirm.type='checkbox';confirm.checked=approved.has(prepareKey);confirm.disabled=snapshot.busy;check.append(confirm,element('span',t.confirm));card.append(check);
-    const prepare=element('button',ko?'QMK 업데이트 준비':'Prepare QMK update');
-    const enabled=()=>{prepare.disabled=!confirm.checked||snapshot.busy||snapshot.checking;};confirm.addEventListener('change',()=>{confirm.checked?approved.add(prepareKey):approved.delete(prepareKey);enabled();});enabled();
-    prepare.addEventListener('click',()=>action({action:'prepare',port:device.port,version:snapshot.release.version,confirmBoard:true}));card.append(prepare);
-    card.append(element('p',ko?'이 LAN 관리 연결의 MK20 키보드를 DFU로 전환합니다. USB도 연결해 두세요. 새 DFU 항목에서 이미지 비교 후 필요한 경우 백업 후 업데이트를 선택하세요. 아직 펌웨어를 쓰지 않습니다.':'This switches the keyboard of this LAN maintenance device to DFU. Keep its USB connected. In the new DFU entry, compare images and choose Back up and update if needed. Firmware is not written by this step.','muted'));
-  }
-  if(!device.writable&&device.online&&device.phase!=='awaiting-device'&&status!=='newer'){
+  if(!device.writable&&device.online&&device.phase!=='awaiting-device'&&status!=='newer'&&device.nextStep!=='enter-dfu'){
     const reason=device.transport==='lan'?(ko?'LAN 발견 · 관리 연결 확인 필요':'LAN discovered · maintenance connection required'):
       device.nextStep==='enter-dfu'?(ko?'키보드 USB 연결됨 · 업데이트에는 DFU 모드 필요':'Keyboard USB connected · DFU required to update'):
       device.nextStep==='usb-driver'?(ko?'DFU 백업 접근 불가':'DFU backup access unavailable'):
       device.nextStep==='usb-bootstrap'?(ko?'USB 업데이트 수신기 응답 없음':'USB updater did not respond'):
       (ko?'런타임 USB 연결 미확인':'Runtime USB connection not confirmed');
     card.append(element('p',reason,'muted'));
-    card.append(element('p',device.transport==='lan'?(ko?'LAN에서 발견했다는 정보만으로는 쓰지 않습니다. 기존에 허용된 관리 연결과 전체 백업 접근을 실제로 확인하면 별도 업데이트 항목이 나타납니다.':'Discovery alone does not allow writing. A separate update entry appears after an existing authorized maintenance connection and full backup access are verified.'):
-      device.nextStep==='enter-dfu'?(device.prepareSupported?(ko?'QMK 업데이트 준비 버튼으로 DFU에 진입할 수 있습니다. 이미지의 정확한 버전은 DFU 읽기로 확인합니다.':'Use Prepare QMK update to enter DFU. The exact image version is checked through DFU readback.'):(ko?'현재 키보드 USB에서는 설치 이미지의 정확한 버전을 읽을 수 없습니다. 위 DFU 연결 안내를 따라야 백업과 이미지 비교가 가능합니다. 다시 확인만 눌러서는 DFU 모드로 바뀌지 않습니다.':'The exact installed image cannot be identified through normal keyboard USB. Follow the DFU connection instructions above to enable readback and image comparison. Check again does not enter DFU mode.')):
+    card.append(element('p',device.transport==='lan'?(ko?'LAN 발견만으로 업데이트 권한이 생기지 않습니다. 관리 연결을 확인하면 이 런타임 항목에서 업데이트할 수 있습니다.':'LAN discovery does not grant update access. Updating becomes available here once maintenance access is verified.'):
       (ko?'다시 확인은 연결 상태만 조회합니다. 기기에 업데이트 수신기가 없는 경우, PC 미들웨어 업데이트나 반복 조회만으로 수신기가 설치되지 않습니다.':'Check again only reads connection state. Updating the PC middleware or repeatedly scanning cannot install a missing device-side updater.'),'muted'));
   }
   if(device.phase==='awaiting-device'){
-    const verify=element('button',ko?'부팅 확인':'Check boot');verify.disabled=snapshot.busy||snapshot.checking;verify.addEventListener('click',()=>action({action:'verify',port:device.port}));card.append(verify);
+    const verify=element('button',ko?'부팅 확인':'Check boot');verify.disabled=snapshot.busy;verify.addEventListener('click',()=>action({action:'verify',port:device.port}));card.append(verify);
   }
-  if(!['ready',undefined].includes(device.phase)){
+  if(device.component==='qmk'&&device.online&&device.writable&&device.nextStep==='ready'){
+    const resume=element('button',ko?'업데이트 없이 키보드로 돌아가기':'Return to keyboard without updating','secondary');resume.disabled=snapshot.busy;
+    resume.addEventListener('click',()=>action({action:'return-keyboard',port:device.port,version:snapshot.release.version,confirmBoard:true}));card.append(resume);
+  }
+  if(!['ready',undefined].includes(device.phase)&&device.lastAction!=='prepare'){
     const box=element('div',undefined,'progress');box.setAttribute('role','status');
-    const backupPhase=device.component==='runtime'?(ko?'런타임 파티션 전체를 USB로 백업 중…':'Backing up the complete runtime partition over USB…'):(ko?'QMK 앱·설정 영역 전체 백업 중…':'Backing up the complete QMK application/settings region…');
-    box.append(element('p',device.phase==='awaiting-device'?(ko?'고급 복구 후 실제 부팅 확인을 기다립니다.':'Waiting for actual boot after advanced recovery.'):device.phase==='backup'?backupPhase:device.phase==='complete'?t.complete:(t.phase[device.phase]??device.phase)));
-    if(device.phase==='failed')box.append(element('p',`${device.code==='qmk_dfu_unconfirmed'?(ko?'DFU 연결을 확인하지 못했습니다. 펌웨어는 쓰지 않았습니다. USB를 빼고 좌측 상단 키를 누른 채 다시 연결한 뒤 확인하세요.':'DFU attachment was not confirmed. Firmware was not written. Unplug USB, hold the top-left key and reconnect, then check again.'):t.failed} (${device.code??'device_setup_failed'})`,'error'));
+    const backupPhase=device.component==='runtime'?(ko?'런타임 파티션 전체 백업 중…':'Backing up the complete runtime partition…'):(ko?'QMK 앱·설정 영역 전체 백업 중…':'Backing up the complete QMK application/settings region…');
+    box.append(element('p',device.phase==='awaiting-device'?(ko?'고급 복구 후 실제 부팅 확인을 기다립니다.':'Waiting for actual boot after advanced recovery.'):device.phase==='identify'?(ko?'선택한 기기를 확인하고 있습니다…':'Checking the selected device…'):device.phase==='backup'?backupPhase:device.phase==='complete'?t.complete:(t.phase[device.phase]??device.phase)));
+    if(device.phase==='failed')box.append(element('p',`${t.failed} (${device.code??'device_setup_failed'})`,'error'));
     if(device.backup)box.append(element('p',(ko?'복구 백업: ':'Recovery backup: ')+device.backup,'muted'));card.append(box);
   }
   return card;
@@ -199,5 +243,9 @@ $('guide-back').addEventListener('click',()=>guideMove(-1));
 $('guide-next').addEventListener('click',()=>{const p=snapshot.presentation?.[language];const total=p?.walkthrough?.length??p?.steps?.length??0;if((guidePages.get(selectedProfile)??0)===total-1)guidePages.set(selectedProfile,-1);guideMove(1);});
 $('profile').addEventListener('change',event=>{selectedProfile=event.target.value;accept(hubState);render();if(snapshot.capabilities?.wifiImport)void action({action:'wifi'});});
 $('language').addEventListener('change',event=>{language=event.target.value;render();});$('refresh').addEventListener('click',()=>action({action:'refresh'}));$('read-wifi').addEventListener('click',()=>action({action:'wifi'}));
-window.snowballSetup.subscribe(state=>{accept(state);render();});
-window.snowballSetup.snapshot().then(state=>{accept(state);language=state.language==='en'?'en':'ko';$('language').value=language;render();if(snapshot.capabilities?.wifiImport)void action({action:'wifi'});});
+// Polling timestamps and the scan lease do not change visible device facts.
+// Keep the existing DOM (including focus, open instructions and consent) on those events.
+const visibleState=state=>JSON.stringify({...state,profiles:state.profiles.map(p=>p.contract===2?{...p,devices:visibleComponents(p.devices)}:p)},(key,value)=>['checking','checked','wasPresent'].includes(key)?undefined:value);
+let lastVisibleState;
+window.snowballSetup.subscribe(state=>{const signature=visibleState(state);accept(state);if(signature!==lastVisibleState){lastVisibleState=signature;render();}});
+window.snowballSetup.snapshot().then(state=>{lastVisibleState=visibleState(state);accept(state);language=state.language==='en'?'en':'ko';$('language').value=language;render();if(snapshot.capabilities?.wifiImport)void action({action:'wifi'});});

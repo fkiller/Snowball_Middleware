@@ -90,7 +90,6 @@ test('manual refresh joins discovery and coalesces one forced pass without concu
   const first=hub.action({profile:'scheduler',action:'refresh'});
   const second=hub.action({profile:'scheduler',action:'refresh'});
   await Promise.resolve();assert.equal(hub.view().checking,true);
-  await assert.rejects(hub.action({profile:'scheduler',action:'install'}),/usb_setup_busy/);
   assert.deepEqual(passes,[false]);waiting.shift()();
   await new Promise(resolve=>setImmediate(resolve));
   assert.deepEqual(passes,[false,true]);
@@ -99,6 +98,20 @@ test('manual refresh joins discovery and coalesces one forced pass without concu
   assert.equal(maximum,1);assert.deepEqual(passes,[false,true]);
   assert.equal(hub.view().checking,false);assert.deepEqual(checks,[true,false]);
   await hub.close();
+});
+
+test('an explicit action waits for discovery, reserves the lease, and checks the refreshed target',async()=>{
+  // Scheduler barriers only; no native response or device operation is simulated.
+  const hub=new DeviceSetupHub({adapters:[],backupDirectory:os.tmpdir()});
+  let finishRead,readDone=false,actions=0;
+  hub.setups.set('scheduler',{view:()=>({}),records:new Map(),close:async()=>{},scan:async()=>{await new Promise(resolve=>{finishRead=resolve;});readDone=true;},action:async()=>{actions++;assert.equal(readDone,true);throw Error('setup_target_disconnected');}});
+  const scan=hub.scan();await Promise.resolve();
+  const action=hub.action({profile:'scheduler',action:'install',port:'gone'});
+  assert.equal(hub.view().busy,true);assert.equal(actions,0);
+  await assert.rejects(hub.action({profile:'scheduler',action:'install',port:'gone'}),/usb_setup_busy/);
+  await hub.scan();assert.equal(actions,0,'another poll cannot steal the reserved action lease');
+  finishRead();await scan;await assert.rejects(action,/setup_target_disconnected/);
+  assert.equal(actions,1);assert.equal(hub.view().busy,false);await hub.close();
 });
 
 test('refresh still rejects an active update and validates its closed request shape',async()=>{

@@ -44,8 +44,14 @@ test('disconnected targets disappear, pending boot checks survive, and reconnect
   setup.records.set(port,{...record,prepareSupported:true,component:'runtime',transport:'lan'});
   await assert.rejects(setup.action({action:'prepare',port,version:setup.release.version,confirmBoard:true}),/review_required/,'LAN discovery grants no UART maintenance access');
   setup.records.set(port,{...record,prepareSupported:true,component:'runtime',transport:'maintenance'});
+  await assert.rejects(setup.action({action:'return-keyboard',port,version:setup.release.version,confirmBoard:true}),/review_required/);
   await assert.rejects(setup.action({action:'prepare',port,version:setup.release.version,confirmBoard:false}),/review_required/);
   await assert.rejects(setup.action({action:'prepare',port,version:setup.release.version,confirmBoard:true,network:{ssid:'never-used',password:'never-used'}}),/review_required/);
+  setup.records.set(port,{...record,component:'qmk',writable:true,nextStep:'ready'});
+  await assert.rejects(setup.action({action:'return-keyboard',port,version:setup.release.version,confirmBoard:false}),/review_required/);
+  await assert.rejects(setup.action({action:'return-keyboard',port,version:setup.release.version,confirmBoard:true,network:{ssid:'never-used',password:'never-used'}}),/review_required/);
+  setup.records.set(port,{...record,component:'qmk',writable:false,nextStep:'enter-dfu'});
+  await assert.rejects(setup.action({action:'return-keyboard',port,version:setup.release.version,confirmBoard:true}),/review_required/);
   assert.equal(setup.children.size,0);await hub.close();
 });
 
