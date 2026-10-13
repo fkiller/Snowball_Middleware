@@ -8,7 +8,46 @@ import {fileURLToPath} from 'node:url';
 import {approveDevicePreparations,installedDevicePreparations} from '../scripts/device-preparation.mjs';
 import {DeviceSetupHub} from '../apps/desktop/device-setup-hub.mjs';
 import {ComponentSetup} from '../apps/desktop/component-setup.mjs';
+import {preparationNeedsUpdate,preparationNeedsReview} from '../apps/desktop/device-setup.mjs';
 const control=process.env.SNOWBALL_TEST_MK20_COMPOSITION_ROOT??fileURLToPath(new URL('../../Snowball_Control',import.meta.url));
+
+test('review uses the component version and keeps current/newer images quiet',()=>{
+  const release={version:'0.2.6',components:{runtime:{version:'0.2.6'},qmk:{version:'2026.9.18'}}};
+  const runtime={component:'runtime',currentVersion:'0.2.6',online:true,phase:'ready',imageMatch:true};
+  assert.equal(preparationNeedsUpdate(runtime,release),false);
+  assert.equal(preparationNeedsReview(runtime,release),false);
+  assert.equal(preparationNeedsReview({...runtime,currentVersion:'0.2.5'},release),true);
+  assert.equal(preparationNeedsReview({...runtime,imageMatch:false},release),true);
+  assert.equal(preparationNeedsReview({...runtime,currentVersion:'0.2.7',imageMatch:false},release),false);
+  assert.equal(preparationNeedsReview({...runtime,currentVersion:'0.2.5',online:false},release),false);
+  assert.equal(preparationNeedsReview({...runtime,currentVersion:'0.2.5',phase:'failed'},release),false);
+  const qmk={component:'qmk',currentVersion:null,online:true,nextStep:'enter-dfu'};
+  assert.equal(preparationNeedsReview(qmk,release),false,'HID cannot prove an outdated image');
+  assert.equal(preparationNeedsReview({...qmk,currentVersion:'2026.9.17',nextStep:'ready'},release),true);
+  assert.equal(preparationNeedsUpdate({...qmk,currentVersion:'2026.9.18'},release),false);
+});
+
+test('disconnected targets disappear, pending boot checks survive, and reconnect re-arms attention',{skip:!fs.existsSync(path.join(control,'hardware/mk20/firmware/setup.json'))},async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-presence-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const hub=new DeviceSetupHub({adapters:[{profile:'mk20',device:{deviceRoot:path.join(control,'hardware/mk20'),python:path.join(root,'never-execute')}}],backupDirectory:root});
+  const setup=hub.setups.get('mk20'),port='t-'+'a'.repeat(32),pending='t-'+'b'.repeat(32);
+  const record={port,online:true,wasPresent:true,component:'qmk',currentVersion:'2026.9.17',phase:'ready'};
+  setup.records.set(port,record);setup.records.set(pending,{port:pending,online:false,phase:'awaiting-device'});
+  let announcements=0;hub.on('attached',()=>announcements++);
+  setup.emit('attached',record);setup.emit('attached',{...record});assert.equal(announcements,1,'forced probes do not reopen the same review');
+  // Enumeration-only fixture: no native firmware response or write is simulated.
+  setup.run=async command=>{assert.equal(command,'list');return {event:'ports',ports:[]};};
+  await setup.scan();assert.equal(setup.records.has(port),false);assert.equal(setup.records.has(pending),true);
+  record.online=true;setup.records.set(port,record);setup.emit('attached',record);assert.equal(announcements,2,'reconnection opens review again');
+  setup.records.set(port,{...record,currentVersion:setup.release.components.qmk.version,writable:true});
+  await assert.rejects(setup.action({action:'install',port,version:setup.release.version,confirmBoard:true}),/review_required/);
+  setup.records.set(port,{...record,prepareSupported:true,component:'runtime',transport:'lan'});
+  await assert.rejects(setup.action({action:'prepare',port,version:setup.release.version,confirmBoard:true}),/review_required/,'LAN discovery grants no UART maintenance access');
+  setup.records.set(port,{...record,prepareSupported:true,component:'runtime',transport:'maintenance'});
+  await assert.rejects(setup.action({action:'prepare',port,version:setup.release.version,confirmBoard:false}),/review_required/);
+  await assert.rejects(setup.action({action:'prepare',port,version:setup.release.version,confirmBoard:true,network:{ssid:'never-used',password:'never-used'}}),/review_required/);
+  assert.equal(setup.children.size,0);await hub.close();
+});
 
 test('legacy MK20 controlRoot enrolls its concrete component adapter without USB, ADB or any helper execution',{skip:!fs.existsSync(path.join(control,'hardware/mk20/firmware/setup.json'))},async t=>{
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-components-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));

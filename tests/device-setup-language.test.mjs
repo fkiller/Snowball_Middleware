@@ -35,14 +35,25 @@ test('an existing action failure follows ko/en/ko changes without retrying the d
   assert.equal(ui.node('notice').textContent,'');
 });
 
-test('incoming status codes and in-progress discovery use the currently selected language',async()=>{
+test('incoming errors follow the selected language while background discovery stays quiet',async()=>{
   const ui=setupRenderer();await new Promise(resolve=>setImmediate(resolve));
   vm.runInContext("snapshot.code='usb_setup_busy';render()",ui.context);
   assert.match(ui.node('notice').textContent,/기기 확인 또는 업데이트/);
   ui.language('en');assert.match(ui.node('notice').textContent,/A device check or update is in progress/);
   vm.runInContext('snapshot.code=null;snapshot.checking=true;render()',ui.context);
-  assert.equal(ui.node('notice').textContent,'Checking connected devices…');
-  ui.language('ko');assert.equal(ui.node('notice').textContent,'연결된 기기를 확인하고 있습니다…');
+  assert.equal(ui.node('notice').textContent,'');
+  ui.language('ko');assert.equal(ui.node('notice').textContent,'');
+});
+
+test('current component hides update, differing images allow repair, and newer versions never downgrade',async()=>{
+  const ui=setupRenderer();await new Promise(resolve=>setImmediate(resolve));
+  vm.runInContext("selectedProfile='mk20';snapshot={release:{version:'0.2.6',components:{runtime:{version:'0.2.6'}}},capabilities:{}}",ui.context);
+  const labels=extra=>vm.runInContext(`componentCard({port:'target',label:'MK20',component:'runtime',currentVersion:'0.2.6',writable:true,online:true,phase:'ready',${extra}},ui.ko).children.filter(c=>c.listeners.click).map(c=>c.textContent).join('|')`,ui.context);
+  assert.equal(labels('imageMatch:true'),'');
+  assert.match(labels('imageMatch:false'),/업데이트/);
+  assert.equal(labels("currentVersion:'0.3.0',imageMatch:false"),'');
+  const prepare=vm.runInContext("snapshot.release.components.qmk={version:'2026.9.18'};componentCard({port:'maintenance',label:'LAN maintenance',transport:'maintenance',component:'runtime',currentVersion:'0.2.6',writable:true,online:true,phase:'ready',nextStep:'maintenance',prepareSupported:true},ui.ko).children.find(c=>c.textContent==='QMK 업데이트 준비')",ui.context);
+  assert.ok(prepare);assert.equal(prepare.disabled,true);
 });
 
 test('a failed unverified backup is distinguished from later failures in either language',async()=>{

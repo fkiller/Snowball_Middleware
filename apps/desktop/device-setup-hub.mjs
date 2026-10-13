@@ -12,8 +12,18 @@ export class DeviceSetupHub extends EventEmitter {
       const Setup=readPreparation(device).descriptor.version===2?ComponentSetup:DeviceSetup;
       const setup=new Setup({device,profile,backupDirectory,uart:(action,port)=>uart(profile,action,port)});
       this.setups.set(profile,setup);
-      setup.on('change',()=>this.emit('change',this.view()));
-      setup.on('attached',record=>this.emit('attached',{profile,record}));
+      setup.on('rescan',()=>void this.scan(true));
+      const announced=new Map();
+      setup.on('change',()=>{
+        for(const port of announced.keys())if(!setup.records.get(port)?.online)announced.delete(port);
+        this.emit('change',this.view());
+      });
+      setup.on('attached',record=>{
+        if(!record.online||record.phase==='failed')return;
+        const signature=JSON.stringify([record.usbIdentity,record.hello?.firmware??record.currentVersion,record.imageMatch,record.writable,record.nextStep,record.pending,record.hello?.wifiConfigured??record.wifiConfigured]);
+        if(announced.get(record.port)===signature)return;
+        announced.set(record.port,signature);this.emit('attached',{profile,record});
+      });
     }
   }
   get job(){return [...this.setups.values()].find(s=>s.job)?.job;}

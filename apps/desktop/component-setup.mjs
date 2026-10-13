@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {createHash} from 'node:crypto';
 import {createReadStream} from 'node:fs';
-import {DeviceSetup,firmwareRelation} from './device-setup.mjs';
+import {DeviceSetup,preparationNeedsUpdate} from './device-setup.mjs';
 import {privateIpv4} from '../../scripts/setup-profile.mjs';
 
 const targetId=value=>typeof value==='string'&&/^t-[a-f0-9]{32}$/.test(value);
@@ -30,8 +30,9 @@ export class ComponentSetup extends DeviceSetup {
     if(value.wifiConfigured!==undefined&&typeof value.wifiConfigured!=='boolean')throw Error('invalid_device_response');
     if(value.pending!==undefined&&typeof value.pending!=='boolean')throw Error('invalid_device_response');
     if(value.imageMatch!==undefined&&typeof value.imageMatch!=='boolean')throw Error('invalid_device_response');
+    if(value.prepareSupported!==undefined&&typeof value.prepareSupported!=='boolean')throw Error('invalid_device_response');
     if(value.pendingVersion!==undefined&&!/^\d+\.\d+\.\d+$/.test(value.pendingVersion))throw Error('invalid_device_response');
-    return Object.fromEntries(['component','currentVersion','nextStep','writable','wifiConfigured','pending','pendingVersion','imageMatch'].filter(k=>value[k]!==undefined).map(k=>[k,value[k]]));
+    return Object.fromEntries(['component','currentVersion','nextStep','writable','wifiConfigured','pending','pendingVersion','imageMatch','prepareSupported'].filter(k=>value[k]!==undefined).map(k=>[k,value[k]]));
   }
   async scan(force=false){
     if(this.closed||this.scanning||this.job)return;this.scanning=true;
@@ -72,7 +73,7 @@ export class ComponentSetup extends DeviceSetup {
         if(!previous||!previous.wasPresent||previous.currentVersion!==record.currentVersion)this.emit('attached',record);
       }
       for(const record of this.records.values())record.wasPresent=record.online;
-      if(this.records.size>64)for(const [id,record]of this.records)if(!record.online&&record.phase!=='awaiting-device'){this.records.delete(id);if(this.records.size<=64)break;}
+      for(const [id,record]of this.records)if(!record.online&&record.phase!=='awaiting-device')this.records.delete(id);
       this.code=null;
     }catch(error){this.code=code(error);}finally{this.scanning=false;this.changed();}
   }
@@ -89,8 +90,10 @@ export class ComponentSetup extends DeviceSetup {
     if(this.closed||this.job||this.scanning)throw Error('usb_setup_busy');
     const record=this.records.get(request.port);
     if(!targetId(request.port)||!record)throw Error('setup_target_disconnected');
-    if(request.action==='install'){
-      if(!record.online||!record.writable||request.confirmBoard!==true||request.version!==this.release.version||firmwareRelation(record.currentVersion,this.release.components[record.component].version)==='newer')throw Error('firmware_review_required');
+    if(request.action==='prepare'){
+      if(!record.online||record.component!=='runtime'||record.transport!=='maintenance'||!this.descriptor.components.includes('qmk')||record.prepareSupported!==true||request.confirmBoard!==true||request.version!==this.release.version||request.network!==undefined||request.migrateWifi!==undefined||request.ssid!==undefined)throw Error('firmware_review_required');
+    }else if(request.action==='install'){
+      if(!record.online||!record.writable||request.confirmBoard!==true||request.version!==this.release.version||!preparationNeedsUpdate(record,this.release))throw Error('firmware_review_required');
       if(request.migrateWifi===true&&(record.component!=='runtime'||record.wifiConfigured===true||request.ssid!==this.network?.ssid||this.network.enterprise))throw Error('wifi_review_required');
       if(request.network!==undefined){
         const n=request.network;
@@ -107,14 +110,18 @@ export class ComponentSetup extends DeviceSetup {
             phases.add(event.phase);record.phase=event.phase;if(event.phase==='backup-verified'&&event.backup&&path.dirname(event.backup)===this.backupDirectory&&event.backup.endsWith('.bin'))record.backup=event.backup;this.changed();
           }
         });
+        if(request.action==='prepare'){
+          if(result.event!=='prepared'||result.component!=='qmk')throw Error('qmk_dfu_unconfirmed');
+          record.phase='ready';return;
+        }
         if(result.component!==record.component||!['awaiting-device','verified'].includes(result.event))throw Error('invalid_device_response');
         if(request.action==='install'&&!['backup-verified','flash','verify-settings'].every(p=>phases.has(p)))throw Error('firmware_verification_incomplete');
         await this.backup(result.backup,record.component,record.port);record.backup=result.backup;
         if(result.event==='verified'){
           if(result.version!==(request.action==='verify'?record.pendingVersion??this.release.components[record.component].version:this.release.components[record.component].version)||!phases.has('reboot'))throw Error('firmware_verification_incomplete');
-          record.currentVersion=result.version;record.phase='complete';record.nextStep='ready';
+          record.currentVersion=result.version;record.imageMatch=true;record.pending=false;record.phase='complete';record.nextStep='ready';
         }else{record.phase='awaiting-device';record.nextStep='return-card';record.pendingVersion=this.release.components[record.component].version;}
-      }catch(error){record.failedPhase=record.phase;record.phase='failed';record.code=code(error);}finally{this.job=null;this.changed();}
+      }catch(error){record.failedPhase=record.phase;record.phase='failed';record.code=code(error);}finally{this.job=null;this.changed();if(request.action==='prepare'&&record.phase!=='failed'&&!this.closed)this.emit('rescan');}
     })();this.changed();return this.view();
   }
 }

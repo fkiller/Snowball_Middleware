@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {DeviceSetupHub} from '../apps/desktop/device-setup-hub.mjs';
+import {preparationNeedsUpdate} from '../apps/desktop/device-setup.mjs';
 const [deviceRoot,python,output,mk20Root,mk20Python,mk20Adb]=process.argv.slice(2);
 if(![deviceRoot,python,output].every(value=>value&&path.isAbsolute(value)))throw Error('Supply absolute device root, Python, and output directory');
 void app.whenReady().then(async()=>{let setup,window;
@@ -34,6 +35,9 @@ try{
   // Exercise actual OS enumeration through the sandbox/preload while discovery owns USB.
   const background=setup.scan();
   if(!setup.view().checking)throw Error('Real discovery did not acquire the scan lease');
+  window.webContents.send('device-setup-state',view());
+  await window.webContents.executeJavaScript('error=null;render()');
+  if(await notice())throw Error('Background discovery displayed a transient notice');
   await window.webContents.executeJavaScript(`document.getElementById('refresh').click();`);
   await background;
   const waitUntil=Date.now()+60000;
@@ -67,8 +71,13 @@ try{
       const text=await window.webContents.executeJavaScript('document.body.innerText');
       if(!text.includes('MK20')||!text.includes(setup.setups.get('mk20').release.version)||!text.includes('QMK'))throw Error('MK20 setup UI did not render');
       if(mk20Adb){
-        if(![...setup.setups.get('mk20').records.values()].some(r=>r.transport==='maintenance'&&r.writable))throw Error('Actual MK20 maintenance connection missing');
-        if(!await window.webContents.executeJavaScript(`(()=>{const card=[...document.querySelectorAll('article.device')].find(c=>c.textContent.includes('LAN maintenance'));if(!card)return false;const check=card.querySelector('.check input'),button=[...card.querySelectorAll('button')].find(b=>b.textContent.includes('${language==='ko'?'런타임 업데이트':'update runtime'}'));if(!check||!button||!button.disabled)return false;check.checked=true;check.dispatchEvent(new Event('change'));const enabled=!button.disabled;check.checked=false;check.dispatchEvent(new Event('change'));return enabled&&button.disabled;})()`))throw Error('Real maintenance update review button missing');
+        const mk20=setup.setups.get('mk20'),maintenance=[...mk20.records.values()].find(r=>r.transport==='maintenance'&&r.writable);
+        if(!maintenance)throw Error('Actual MK20 maintenance connection missing');
+        const needed=preparationNeedsUpdate(maintenance,mk20.release);
+        if(!await window.webContents.executeJavaScript(`(()=>{const card=[...document.querySelectorAll('article.device')].find(c=>c.textContent.includes('LAN maintenance'));if(!card)return false;const check=card.querySelector('.check input'),button=[...card.querySelectorAll('button')].find(b=>b.textContent.includes('${language==='ko'?'런타임 업데이트':'update runtime'}'));if(!${needed})return !button&&card.textContent.includes('${language==='ko'?'최신 제공 버전':'Matches the included firmware'}');if(!check||!button||!button.disabled)return false;check.checked=true;check.dispatchEvent(new Event('change'));const enabled=!button.disabled;check.checked=false;check.dispatchEvent(new Event('change'));return enabled&&button.disabled;})()`))throw Error('Real maintenance update eligibility incorrect');
+      }
+      if([...setup.setups.get('mk20').records.values()].some(r=>r.prepareSupported)){
+        if(!await window.webContents.executeJavaScript(`(()=>{const card=[...document.querySelectorAll('article.device')].find(c=>c.textContent.includes('LAN maintenance'));const button=[...card.querySelectorAll('button')].find(b=>b.textContent==='${language==='ko'?'QMK 업데이트 준비':'Prepare QMK update'}');return button&&button.disabled;})()`))throw Error('Real QMK preparation button missing');
       }
       fs.writeFileSync(path.join(output,'mk20-'+language+'.png'),(await window.webContents.capturePage()).toPNG());
       await window.webContents.executeJavaScript('window.scrollTo(0,document.body.scrollHeight)');

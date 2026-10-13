@@ -12,7 +12,7 @@ import { labels, AttentionNotifications } from './presentation.mjs';
 import {sourceLogin} from './source-login.mjs';
 import {installedDevicePreparations} from '../../scripts/device-preparation.mjs';
 import {DeviceSetupHub} from './device-setup-hub.mjs';
-import {firmwareRelation} from './device-setup.mjs';
+import {preparationNeedsReview} from './device-setup.mjs';
 
 try {
 const args=process.argv.slice(app.isPackaged?1:2);const smoke=args.includes('--smoke-test');
@@ -63,7 +63,7 @@ function startDeviceSetup(){
     deviceSetup.on('change',()=>{if(setupWindow&&!setupWindow.isDestroyed())setupWindow.webContents.send('device-setup-state',setupState());updateMenu();});
     deviceSetup.on('attached',({profile,record})=>{
       const setup=deviceSetup.setups.get(profile);
-      const needsReview=setup.descriptor.version===2?!record.currentVersion||record.pending||record.imageMatch===false||firmwareRelation(record.currentVersion,setup.release.components[record.component]?.version)==='older'||record.wifiConfigured===false:!record.hello||firmwareRelation(record.hello.firmware,setup.release.version)==='older'||record.hello.wifiConfigured===false;
+      const needsReview=preparationNeedsReview(record,setup.release);
       console.log(`Device preparation observed: ${profile} / ${record.transport??'usb/storage'} / version=${record.hello?.firmware??record.currentVersion??'unknown'} / review=${needsReview}`);
       if(needsReview)void openDeviceSetup(profile,true).then(()=>console.log(`Device preparation window ready: ${profile}`)).catch(()=>console.warn(`Device preparation window unavailable: ${profile}`));
     });

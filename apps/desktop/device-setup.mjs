@@ -11,6 +11,18 @@ export function firmwareRelation(installed, available) {
   const a=parse(installed),b=parse(available);if(!a||!b)return 'unknown';
   for(let i=0;i<3;i++)if(a[i]!==b[i])return a[i]<b[i]?'older':'newer';return 'current';
 }
+export function preparationNeedsUpdate(record,release) {
+  const relation=firmwareRelation(record.hello?.firmware??record.currentVersion,release.components?.[record.component]?.version??release.version);
+  return relation!=='newer'&&(relation!=='current'||record.imageMatch===false);
+}
+export function preparationNeedsReview(record,release) {
+  if(!record.online||record.phase==='failed')return false;
+  if(record.pending===true)return true;
+  // Normal QMK HID cannot identify its installed image. Offer manual DFU
+  // preparation without claiming that a firmware update is available.
+  if(record.component==='qmk'&&record.nextStep==='enter-dfu'&&!record.currentVersion)return false;
+  return preparationNeedsUpdate(record,release);
+}
 export const validUsbPort=value=>typeof value==='string'&&/^(?:COM[1-9][0-9]*|\/dev\/(?:tty|cu\.)[a-zA-Z0-9._-]+)$/.test(value);
 export function readBackupProgress(event,previous){
   if(!Number.isSafeInteger(event.bytes)||event.bytes<=0||!Number.isSafeInteger(event.completedBytes)||event.completedBytes<0||event.completedBytes>event.bytes||!Number.isSafeInteger(event.elapsedSeconds)||event.elapsedSeconds<0)return previous;
@@ -62,7 +74,7 @@ export class DeviceSetup extends EventEmitter {
         });return termination;
       };
       child.stopOwned=terminate;
-      const timer=setTimeout(()=>{failure='usb_operation_timed_out';void terminate();},command==='install'?1500000:command==='migrate'?100000:command==='wifi'?70000:15000);
+      const timer=setTimeout(()=>{failure='usb_operation_timed_out';void terminate();},command==='install'?1500000:command==='migrate'?100000:command==='wifi'?70000:command==='prepare'?60000:15000);
       child.stdin.on('error',()=>{});child.stdin.end(JSON.stringify(payload)+'\n');child.stderr.resume();
       child.stdout.setEncoding('utf8');child.stdout.on('data',chunk=>{
         bytes+=chunk.length;buffer+=chunk.toString('utf8');if(bytes>1024*1024||buffer.length>65536){failure='usb_response_limit';void terminate();return;}
@@ -104,7 +116,7 @@ export class DeviceSetup extends EventEmitter {
         }
       }
       for(const record of this.records.values())record.wasPresent=record.online;
-      if(this.records.size>32)for(const [port,record]of this.records)if(!record.online)this.records.delete(port);
+      for(const [port,record]of this.records)if(!record.online)this.records.delete(port);
       this.code=null;
     }catch(error){this.code=errorCode(error);}finally{this.scanning=false;this.changed();}
   }
@@ -121,7 +133,7 @@ export class DeviceSetup extends EventEmitter {
     if((request.action==='migrate'||request.migrateWifi===true)&&!this.descriptor.capabilities.wifiImport)throw Error('wifi_import_unavailable');
     if(!validUsbPort(request.port)||!record?.online)throw Error('usb_device_disconnected');
     if(request.action==='install'){
-      if(request.version!==this.release.version||request.confirmBoard!==true||firmwareRelation(record.hello?.firmware,this.release.version)==='newer')throw Error('firmware_review_required');
+      if(request.version!==this.release.version||request.confirmBoard!==true||!preparationNeedsUpdate(record,this.release))throw Error('firmware_review_required');
       if(request.migrateWifi===true&&(typeof request.ssid!=='string'||request.ssid!==this.network?.ssid||this.network.enterprise))throw Error('wifi_review_required');
     }else if(request.action==='migrate'){
       if(record.hello?.usbSetup!==true||record.hello?.wifiConfigured!==false||typeof request.ssid!=='string'||request.ssid!==this.network?.ssid||this.network.enterprise)throw Error('wifi_review_required');
