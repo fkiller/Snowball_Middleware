@@ -178,7 +178,7 @@ Normal installation/update includes both devices and all three harnesses. If LAN
 
 </details>
 
-M5Stack **0.5.5** removes the unresolved “Previously paired PC” row from Machines without deleting its legacy key; only real host identities are selectable. Reader input moves already received native rows and the scrollbar immediately, with a loading row for content still awaiting the selected PC. The host also excludes recognized Hyper-V/WSL/VPN adapter names when automatically choosing a device LAN; explicit bind and target-subnet selection retain their precedence. A PC update fixes host discovery and includes the firmware candidate. Install firmware through Device setup with review, full backup and retained settings. Physical A/C acceptance of 0.5.5 remains pending; the pre-update diagnostic reader received actual 395 offsets 0, 12 and 24.
+M5Stack **0.5.6** removes the unresolved “Previously paired PC” row from Machines without deleting its legacy key; only real host identities are selectable. Reader input moves already received native rows and the scrollbar immediately, with a loading row for content still awaiting the selected PC. The host also excludes recognized Hyper-V/WSL/VPN adapter names when automatically choosing a device LAN; explicit bind and target-subnet selection retain their precedence. A PC update fixes host discovery and includes the firmware candidate. Install firmware through Device setup with review, full backup and retained settings. Physical A/C acceptance of 0.5.6 remains pending; the pre-update diagnostic reader received actual 395 offsets 0, 12 and 24.
 
 [Common architecture and verification limits](https://github.com/fkiller/Snowball_Control/blob/main/docs/ARCHITECTURE.md)
 
