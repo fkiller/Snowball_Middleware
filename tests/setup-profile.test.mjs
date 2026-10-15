@@ -31,6 +31,16 @@ test('LAN selection supports all private ranges and refuses ambiguous or public 
   assert.equal(privateIpv4('127.0.0.1'), false);
 });
 
+test('device LAN selection excludes Hyper-V and VPN defaults without hiding real ambiguity', () => {
+  const address = value => ({family:'IPv4',internal:false,address:value,netmask:'255.255.255.0'});
+  const virtual = {'vEthernet (Default Switch)':[address('172.27.64.1')],Tailscale:[address('10.1.2.3')]};
+  assert.equal(chooseLanAddress({...virtual,Ethernet:[address('192.168.1.225')]}),'192.168.1.225');
+  assert.throws(()=>chooseLanAddress(virtual));
+  assert.throws(()=>chooseLanAddress({...virtual,Ethernet:[address('192.168.1.225')],Ethernet2:[address('10.2.3.4')]}));
+  assert.equal(chooseLanAddress(virtual,undefined,'172.27.64.5'),'172.27.64.1');
+  assert.equal(chooseLanAddress(virtual,'10.1.2.3'),'10.1.2.3');
+});
+
 for (const profile of ['web', 'm5stack']) test(`${profile} native API starts and stops without Control or a hardware/STT process`, { timeout: 120000 }, async t => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'snowball-profile-'));
   const server = net.createServer();

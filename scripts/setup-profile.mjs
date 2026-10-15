@@ -40,9 +40,13 @@ export function chooseLanAddress(interfaces = os.networkInterfaces(), explicit, 
     const matching = addresses.filter(a => a.netmask && a.address.split('.').every((v, i) => (Number(v) & Number(a.netmask.split('.')[i])) === (n[i] & Number(a.netmask.split('.')[i]))));
     if (matching.length === 1) return matching[0].address;
   }
-  const wifi = Object.entries(interfaces).filter(([name]) => /wi-?fi|wlan/i.test(name)).flatMap(([, a]) => a).filter(a => addresses.includes(a));
+  // Hyper-V/WSL and VPN endpoints are not a physical device LAN. Keep target
+  // subnet selection above explicit, but never let a virtual-only adapter
+  // make an otherwise unambiguous Ethernet/Wi-Fi installation unavailable.
+  const physical = Object.entries(interfaces).filter(([name]) => !/vethernet|hyper-v|wsl|docker|virtualbox|vbox|vmware|vmnet|tailscale|wireguard|vpn|^(?:utun|tun|tap|virbr|br-)\d*/i.test(name)).flatMap(([, a]) => a).filter(a => addresses.includes(a));
+  const wifi = Object.entries(interfaces).filter(([name]) => /wi-?fi|wlan/i.test(name)).flatMap(([, a]) => a).filter(a => physical.includes(a));
   if (wifi.length === 1) return wifi[0].address;
-  if (addresses.length === 1) return addresses[0].address;
+  if (physical.length === 1) return physical[0].address;
   throw Error('Cannot choose a LAN adapter unambiguously. Supply --bind YOUR_PRIVATE_PC_IP');
 }
 
