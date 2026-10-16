@@ -81,3 +81,20 @@ test('a real failing helper retains the failed phase without advertising a plann
   assert.equal(fs.existsSync(planned),false);assert.equal(setup.children.size,0);
   await setup.close();
 });
+
+test('a pre-write settings refusal retains its distinct phase and does not advertise completion',{
+  skip:!process.env.SNOWBALL_M5_PYTHON,timeout:20000
+},async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-usb-prewrite-refusal-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  guardPreparation(root);
+  // Failure-only real child protocol. No backup, flash, board or success is simulated.
+  fs.writeFileSync(path.join(root,'scripts/usb_setup.py'),`import json,sys\nprint(json.dumps({'event':'progress','phase':'verify-backup-settings'}),flush=True)\nprint(json.dumps({'event':'error','code':'nvs_changed_before_flash_no_write'}),flush=True)\nsys.exit(1)\n`);
+  const setup=new M5StackSetup({device:{deviceRoot:root,python:process.env.SNOWBALL_M5_PYTHON},backupDirectory:root});
+  const record={port:'COM7',online:true,hello:{firmware:'0.4.0'}};
+  setup.records.set('COM7',record);
+  await setup.action({action:'install',port:'COM7',version:'0.5.0',confirmBoard:true});await setup.job;
+  assert.equal(record.phase,'failed');assert.equal(record.failedPhase,'verify-backup-settings');
+  assert.equal(record.code,'nvs_changed_before_flash_no_write');assert.equal(record.backup,undefined);
+  await setup.close();
+});

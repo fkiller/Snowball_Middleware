@@ -145,7 +145,7 @@ export class DeviceSetup extends EventEmitter {
       try{
         await this.withUart(record.port,async()=>{
         const result=await this.run(request.action,record.port,{version:request.version,confirmBoard:request.confirmBoard,deviceId:record.hello?.deviceId,usbIdentity:record.usbIdentity,ssid:request.ssid},event=>{
-          if(event.event==='progress'&&['identify','backup','backup-verified','build','flash','verify-settings','verify-nvs','reboot'].includes(event.phase)){
+          if(event.event==='progress'&&['identify','backup','backup-verified','build','verify-backup-settings','flash','verify-settings','verify-nvs','reboot'].includes(event.phase)){
             completed.add(event.phase);record.phase=event.phase;if(event.phase==='backup-verified'&&event.backup&&path.dirname(event.backup)===this.backupDirectory&&event.backup.endsWith('.bin'))record.backup=event.backup;
             if(event.phase==='backup')record.backupProgress=readBackupProgress(event,record.backupProgress);
             this.changed();
