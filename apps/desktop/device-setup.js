@@ -22,6 +22,7 @@ function backupProgressView(device){
 function actionFailureCode(cause){return String(cause?.message??'').match(/(?:^|[\s:])([a-z][a-z0-9_]{0,79})$/)?.[1]??'';}
 function operationFailure(device,t){
   const ko=language==='ko';
+  if(device.code==='insufficient_runtime_storage')return ko?'런타임 파일시스템의 여유 공간이 부족합니다. 기존 런타임을 보존했으며 전체 백업은 아래 위치에 유지됩니다.':'The runtime filesystem has insufficient free space. The existing runtime is retained and the full backup remains at the location below.';
   if(device.code==='backup_read_failed_reboot_unconfirmed')return ko?'전체 플래시 백업 읽기에 실패했고 기존 펌웨어의 재기동도 확인하지 못했습니다. 펌웨어 쓰기는 시작하지 않았습니다. USB를 다시 연결한 뒤 기기를 확인하세요.':'Full flash backup reading failed, and the existing firmware did not confirm its restart. Firmware writing did not start. Reconnect USB and check the device.';
   if(device.code==='backup_read_failed')return ko?'전체 플래시 백업 읽기에 실패했습니다. 펌웨어 쓰기는 시작하지 않았으며 기존 펌웨어의 재기동을 확인했습니다. USB 연결을 확인한 뒤 다시 시도하세요.':'Full flash backup reading failed. Firmware writing did not start, and the existing firmware restarted successfully. Check USB before trying again.';
   if(device.failedPhase==='backup'&&!device.backup)return ko?'전체 플래시 백업 읽기에 실패했습니다. 이번 백업은 완료되지 않았으며 펌웨어 쓰기는 시작하지 않았습니다. USB 연결을 확인한 뒤 다시 시도하세요.':'Full flash backup reading failed. This backup did not complete and firmware writing did not start. Check USB before trying again.';

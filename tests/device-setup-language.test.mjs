@@ -5,6 +5,13 @@ import vm from 'node:vm';
 
 const source=fs.readFileSync(new URL('../apps/desktop/device-setup.js',import.meta.url),'utf8');
 
+test('runtime storage failures identify filesystem space in both languages',async()=>{
+  const ui=setupRenderer();await new Promise(resolve=>setImmediate(resolve));
+  assert.match(vm.runInContext("operationFailure({code:'insufficient_runtime_storage'},ui.ko)",ui.context),/여유 공간이 부족/);
+  ui.language('en');
+  assert.match(vm.runInContext("operationFailure({code:'insufficient_runtime_storage'},ui.en)",ui.context),/filesystem has insufficient free space/);
+});
+
 function setupRenderer(){
   // Presentation-only DOM/IPC fixtures; no device operation or success is simulated.
   const element=()=>({textContent:'',value:'',dataset:{},children:[],listeners:{},append(...children){this.children.push(...children);},replaceChildren(...children){this.children=children;},setAttribute(){},addEventListener(name,callback){this.listeners[name]=callback;}});
