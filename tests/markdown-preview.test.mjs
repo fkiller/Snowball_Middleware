@@ -8,6 +8,7 @@ test('MK20 Markdown preview renders headings, prose, links, lists and tables', (
   assert.deepEqual(preview.lines, ['제목', '강조 및 문서', '- (x) 완료', '  인용', '', '항목: 한글', '결과: 정상']);
   assert.equal(preview.styles.join(''), 'htlqrtt');
   assert.equal(inlinePreview('snake_case a_b_c **굵게** `a ** b` \\*literal\\*'), 'snake_case a_b_c 굵게 a ** b *literal*');
+  assert.equal(inlinePreview('`C:\\src\\*` and \\`literal\\` and ``a`b``'), 'C:\\src\\* and `literal` and a`b');
 });
 
 test('MK20 Markdown preview preserves code and fence state through wrapping and viewport slicing', () => {

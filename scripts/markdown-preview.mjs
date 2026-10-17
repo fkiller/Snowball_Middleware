@@ -3,8 +3,29 @@
 export function inlinePreview(source) {
   const literals = [];
   const hold = value => `\u0000${literals.push(value) - 1}\u0000`;
-  let text = String(source).replace(/\\([\\`*_{}\[\]()#+.!>|~-])/g, (_, ch) => hold(ch));
-  text = text.replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, (_, ticks, code) => hold(code.replace(/\n/g, ' ')));
+  // Protect spans before handling prose escapes: backslashes inside code are
+  // literal source characters, including before Markdown punctuation.
+  const raw = String(source);
+  let text = '';
+  for (let i = 0; i < raw.length;) {
+    if (raw[i] === '\\' && /[\\`*_{}\[\]()#+.!>|~-]/.test(raw[i + 1] || '')) {
+      text += hold(raw[i + 1]); i += 2; continue;
+    }
+    if (raw[i] === '`') {
+      let count = 1;
+      while (raw[i + count] === '`') count++;
+      const ticks = '`'.repeat(count);
+      let end = raw.indexOf(ticks, i + count);
+      while (end >= 0 && (raw[end - 1] === '`' || raw[end + count] === '`')) end = raw.indexOf(ticks, end + count);
+      if (end >= 0) {
+        let code = raw.slice(i + count, end).replace(/\n/g, ' ');
+        if (/^ .+ $/.test(code) && code.trim()) code = code.slice(1, -1);
+        text += hold(code); i = end + count; continue;
+      }
+      text += ticks; i += count; continue;
+    }
+    text += raw[i++];
+  }
   text = text.replace(/!?\[([^\]]+)\]\((?:[^()\n]|\([^()\n]*\))*\)/g, '$1');
   text = text.replace(/<((?:https?:\/\/|mailto:)[^>]+)>/g, '$1');
   text = text.replace(/(\*\*|__|~~)(?=\S)(.+?\S|\S)\1/g, '$2');
