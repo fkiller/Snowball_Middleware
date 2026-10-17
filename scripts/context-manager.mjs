@@ -131,13 +131,18 @@ export class GitProvider {
   }
 
   static async getFileDiff(filePath, cwd = process.cwd()) {
-    const root = path.resolve(cwd);
+    if (typeof filePath !== 'string' || filePath.includes('\0')) return ['File is outside the selected project'];
+    // macOS temporary directories and user-selected aliases can resolve to a
+    // different spelling. Compare the file and project in the same namespace.
+    let root;
+    try { root = syncFs.realpathSync(path.resolve(cwd)); }
+    catch { return ['Project directory is unavailable']; }
     const fullPath = path.resolve(root, filePath);
     const within = target => {
       const rel = path.relative(root, target);
       return rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel);
     };
-    if (typeof filePath !== 'string' || filePath.includes('\0') || !within(fullPath)) return ['File is outside the selected project'];
+    if (!within(fullPath)) return ['File is outside the selected project'];
     try { if (!within(syncFs.realpathSync(fullPath))) return ['File is outside the selected project']; } catch {}
     return new Promise(resolve => {
       const options = { cwd: root, windowsHide: true, maxBuffer: 1024 * 1024, timeout: 10000 };

@@ -4,10 +4,15 @@ import dgram from 'node:dgram';
 import os from 'node:os';
 import { once } from 'node:events';
 import { startMk20Lan } from '../scripts/mk20-lan.mjs';
-import { chooseLanAddress } from '../scripts/setup-profile.mjs';
+import { chooseLanAddress, privateIpv4 } from '../scripts/setup-profile.mjs';
 
 test('real LAN UDP selection renews, releases, expires and fences stale operations', {timeout:20000}, async t => {
-  const bind = chooseLanAddress(os.networkInterfaces());
+  // Exercise actual UDP on an attached private NIC. Automatic user-facing LAN
+  // selection is tested separately; cloud runners can have multiple adapters.
+  const interfaces = os.networkInterfaces();
+  const adapter = Object.values(interfaces).flat().find(a => a?.family === 'IPv4' && !a.internal && privateIpv4(a.address));
+  assert.ok(adapter, 'The real UDP integration test requires an attached private IPv4 adapter');
+  const bind = chooseLanAddress(interfaces, adapter.address);
   const peer = dgram.createSocket('udp4');
   await new Promise(resolve => peer.bind(7701, bind, resolve));
   t.after(() => peer.close());
