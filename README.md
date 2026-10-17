@@ -102,6 +102,8 @@ The update preserves device settings, pairing keys, controller state, speech cac
 <a id="update-device"></a>
 ### 2. Update device firmware
 
+MK20 runtime **0.2.7** adds a compact conversation Markdown preview and crisp 16×16 bitmap Hangul based on NeoDunggeunmo. Titles, lists, quotes, code blocks and tables fit the reader width; the original transcript and file/diff source remain intact. Update PC software first, then review and install the runtime through Device setup below. QMK is independent; physical acceptance remains pending.
+
 1. After the PC update, connect the device with a USB data cable and open **Device setup…** from the tray.
 2. Select the device and compare **Installed → Included** and the listed improvements.
 3. Confirm the device, then choose **Install / Update**. The window verifies a recovery backup and preserves settings before writing.

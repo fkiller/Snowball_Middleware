@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as syncFs from 'node:fs';
 import * as cp from 'node:child_process';
+import { markdownPreview } from './markdown-preview.mjs';
 
 export function stringDisplayWidth(str) {
   let w = 0;
@@ -831,6 +832,7 @@ export class ContextManager {
   }
 
   updateReaderForCurrentSession() {
+    this.readerStyles = [];
     const m = this.getCurrentMachine();
     const h = this.getCurrentHarness();
     const p = this.getCurrentProject();
@@ -1022,6 +1024,13 @@ export class ContextManager {
 
       if (this.currentTurns.length > 0) {
         const lines = [];
+        const styles = [];
+        const append = (text, prefix, continuation, preview) => {
+          const result = preview ? markdownPreview(text, prefix, continuation) : { lines: wrapWithPrefix(text, prefix, continuation, 50) };
+          lines.push(...result.lines);
+          styles.push(...(result.styles || result.lines.map(() => 't')));
+          return result.lines.length;
+        };
         const promptIndices = [];
         for (const turn of this.currentTurns) {
           const userPrompt = turn.userPrompt || (turn.role === 'user' ? turn.text : '');
@@ -1030,33 +1039,34 @@ export class ContextManager {
 
           const beforeCount = lines.length;
           if (userPrompt) {
-            const promptLines = wrapWithPrefix(userPrompt, '[USER] ', '> ', 50);
-            if (promptLines.length > 0) {
+            if (String(userPrompt).trim()) {
               promptIndices.push(lines.length);
-              lines.push(...promptLines);
+              append(userPrompt, '[USER] ', '> ', true);
             }
           }
           if (this.showDetails && processDetails.length > 0) {
             for (const proc of processDetails) {
-              const procLines = wrapWithPrefix(proc, '[PROCESS] ', '  ', 50);
-              lines.push(...procLines);
+              append(proc, '[PROCESS] ', '  ', false);
             }
           }
           if (agentResponse) {
-            const respLines = wrapWithPrefix(agentResponse, '[AGENT] ', '  ', 50);
-            lines.push(...respLines);
+            append(agentResponse, '[AGENT] ', '  ', true);
           }
           if (lines.length > beforeCount && lines[lines.length - 1] !== '') {
             lines.push('');
+            styles.push('t');
           }
         }
         while (lines.length > 0 && lines[lines.length - 1] === '') {
           lines.pop();
+          styles.pop();
         }
         this.userPromptLineIndices = promptIndices;
         this.readerTitle = `${m.name} | [${h.name.toUpperCase()}]`;
         this.readerSubtitle = `${p.name} -> ${s.title} (${this.currentTurns.length} turns)`;
         this.readerLines = lines.length > 0 ? lines : ['No messages in session.'];
+        this.readerStyles = styles;
+        this.readerStyleLines = this.readerLines;
       } else {
         this.userPromptLineIndices = [];
         this.readerTitle = `${m.name} | [${h.name.toUpperCase()}]`;
@@ -1733,6 +1743,7 @@ export class ContextManager {
       title: safeText(state.title, 63),
       subtitle: safeText(state.subtitle, 63),
       lines: visibleLines,
+      ...(this.readerStyleLines === this.readerLines ? { styles: visibleLines.map((_, i) => this.readerStyles?.[state.scroll + i] || 't').join('') } : {}),
       scroll: state.scroll,
       totalLines: Math.max(1, state.totalLines),
       volume: state.volume,
