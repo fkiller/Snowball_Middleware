@@ -102,7 +102,7 @@ The update preserves device settings, pairing keys, controller state, speech cac
 <a id="update-device"></a>
 ### 2. Update device firmware
 
-MK20 runtime **0.2.7** adds a compact conversation Markdown preview and crisp 16×16 bitmap Hangul based on NeoDunggeunmo. Titles, lists, quotes, code blocks and tables fit the reader width; the original transcript and file/diff source remain intact. Update PC software first, then review and install the runtime through Device setup below. Legacy LAN updates retain unchanged files and verify actual filesystem space. QMK is independent; physical acceptance remains pending.
+MK20 runtime **0.2.7** adds a compact conversation Markdown preview and crisp 16×16 bitmap Hangul based on NeoDunggeunmo. Titles, lists, quotes, code blocks and tables fit the reader width; the original transcript and file/diff source remain intact. Update Snowball on each PC used with MK20, then review and install the runtime through Device setup below. Legacy LAN updates retain unchanged files and verify actual filesystem space. The physical Windows/LAN update, full backup, retained settings, running image hashes and bitmap Hangul were verified on 2026-10-17. Preview on the selected SNOWBALL-395 awaits its PC software update. QMK is independent.
 
 1. After the PC update, connect the device with a USB data cable and open **Device setup…** from the tray.
 2. Select the device and compare **Installed → Included** and the listed improvements.
