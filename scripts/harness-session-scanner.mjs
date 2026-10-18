@@ -3,6 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import cp from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import {readCodexNavigation, codexSessionProject, orderCodexSessions} from './codex-navigation.mjs';
 
 /**
  * Discovers real sessions and conversation turns for Codex, Antigravity, and OpenCode.
@@ -49,10 +50,10 @@ export function scanAllHarnessSessions() {
     indexRollouts(sessionsDir);
 
     if (fs.existsSync(indexPath)) {
-      const indexLines = fs.readFileSync(indexPath, 'utf8').split('\n').filter(Boolean);
-      for (const line of indexLines) {
+      const navigation = readCodexNavigation();
+      const items = fs.readFileSync(indexPath, 'utf8').split('\n').flatMap(line => {try{return [JSON.parse(line)];}catch{return [];}});
+      for (const item of orderCodexSessions(items, navigation)) {
         try {
-          const item = JSON.parse(line);
           const rollout = rolloutMap.get(item.id);
           let cwd = '';
           const turns = [];
@@ -107,7 +108,8 @@ export function scanAllHarnessSessions() {
           }
 
           if (!cwd || !path.isAbsolute(cwd)) continue;
-          const projName = path.basename(cwd);
+          const membership = codexSessionProject(navigation, item.id);
+          const projName = membership?.projectName || path.basename(cwd);
 
           if (!result['snowball.codex'][projName]) {
             result['snowball.codex'][projName] = [];
@@ -117,6 +119,7 @@ export function scanAllHarnessSessions() {
           result['snowball.codex'][projName].push({
             id: item.id,
             cwd,
+            ...membership,
             sessionKey,
             title: item.thread_name,
             updatedAt: item.updated_at,

@@ -44,6 +44,8 @@ import { chooseLanAddress, privateIpv4 } from './setup-profile.mjs';
 import { loadSuitePlugins } from './suite-plugins.mjs';
 import {desktopBridge} from './desktop-bridge.mjs';
 import {loadSettings,saveSettings} from '../apps/supervisor/settings-store.mjs';
+import {NavigationHistory} from './navigation-history.mjs';
+import {nativeNavigation, projectHistoryKey, sessionHistoryKey} from './native-navigation.mjs';
 
 const profile = process.env.SNOWBALL_PROFILE ?? 'web';
 if (!['web', 'mk20', 'm5stack'].includes(profile)) throw Error('Invalid Snowball profile');
@@ -64,12 +66,15 @@ let controlPaused=savedSettings.controlPaused;
 const sources = new NativeSourceService();
 const controllerPersistence = await loadControllerStore(directory);
 const controllerStates = controllerPersistence.store;
+const navigationHistory = new NavigationHistory(directory);
+let observedProjects = {};
 const hostIdFile = path.join(directory, 'host.v1.json');
 let hostId;
 try {
   const data = JSON.parse(fs.readFileSync(hostIdFile, 'utf8'));
   hostId = parseHostId(data.hostId);
-} catch {
+} catch (error) {
+  if (error.code !== 'ENOENT') throw Error('Saved host identity is invalid; restore it instead of creating another PC identity');
   hostId = createHostId();
   fs.writeFileSync(hostIdFile, JSON.stringify({ version: 1, hostId }) + '\n', {mode:0o600});
 }
@@ -121,6 +126,7 @@ for (const ws of store.list()) {
 // Scan and report real project candidates for each harness
 try {
   const harnessProjectsMap = await sources.read('projects');
+  observedProjects = harnessProjectsMap;
   const allCandidates = [
     ...harnessProjectsMap['snowball.codex'],
     ...harnessProjectsMap['snowball.antigravity'],
@@ -135,6 +141,21 @@ try {
 // Register real sessions discovered from Codex, Antigravity, and OpenCode
 let realSessionsData = {};
 let realTurnsData = {};
+const navigationSelections = new Map();
+controllerStates.subscribe(() => {
+  for (const state of controllerStates.snapshot().states) {
+    const current = controllerStates.get(state.controllerId);
+    const marker = JSON.stringify([current.selection,current.preferences.projectName]);
+    const previous = navigationSelections.get(state.controllerId);
+    navigationSelections.set(state.controllerId,marker);
+    if (previous === undefined || previous === marker) continue;
+    const harness = current.selection.harnessPluginId;
+    const projects = nativeNavigation(realSessionsData,observedProjects)[harness] || [];
+    const project = projects.find(p => p.sessions.some(s => s.sessionKey === current.selection.sessionKey))
+      || projects.find(p => p.id === current.preferences.projectName || p.root === current.preferences.projectName);
+    if (project) navigationHistory.touch([projectHistoryKey(harness,project.root),current.selection.sessionKey && sessionHistoryKey(current.selection.sessionKey)]);
+  }
+});
 try {
   const { sessionsByHarness, turnsStore } = await sources.read('sessions');
   realSessionsData = sessionsByHarness;
@@ -288,6 +309,7 @@ const api = new LocalApi({
     }
   },
   realSessions: realSessionsData,
+  navigationCatalog: () => nativeNavigation(realSessionsData, observedProjects, navigationHistory),
   harnessPresentations:suite?.presentations ?? {'snowball.codex':codexPresentation,'snowball.antigravity':agyPresentation,'snowball.opencode':ocodePresentation},
   turnsStore: realTurnsData,
   connectedHarnesses,
@@ -624,6 +646,9 @@ async function stopSpeaking() {
 let cachedContext=mk20Contexts.get(mk20ControllerId);
 if(!cachedContext&&mk20Contexts.size>=16)throw Error('MK20 controller context capacity reached');
 const context = cachedContext?.context ?? new ContextManager();
+context.readerRows = 4;
+context.navigationHistory = navigationHistory;
+context.harnessPresentations = suite?.presentations ?? {'snowball.codex':codexPresentation,'snowball.antigravity':agyPresentation,'snowball.opencode':ocodePresentation};
 const nativeDispatches = cachedContext?.nativeDispatches ?? new Map();
 if(!cachedContext)mk20Contexts.set(mk20ControllerId,{context,nativeDispatches});
 updateDeviceSession = (nativeSessionId, resultSessionId) => {
@@ -669,7 +694,9 @@ context.accessLevels = ['Native policy'];
 // Observe this PC again on every selection; saved controller objects retain
 // drafts and owned dispatch handles while native additions remain discoverable.
 const [nativeSessions,nativeProjects]=await Promise.all([sources.read('sessions'),sources.read('projects')]);
-realSessionsData=nativeSessions.sessionsByHarness;
+for (const key of Object.keys(realSessionsData)) delete realSessionsData[key];
+Object.assign(realSessionsData,nativeSessions.sessionsByHarness);
+observedProjects=nativeProjects;
 Object.assign(realTurnsData,nativeSessions.turnsStore);
 for(const [pluginId,groups] of Object.entries(realSessionsData))for(const list of Object.values(groups))for(const native of list){
   native.sessionKey=formatSessionKey({hostId,harness:{pluginId,instanceId:'default'},nativeSessionId:native.id});
@@ -1114,6 +1141,7 @@ async function handleMk20Input(input) {
       const newSessionId = `s-${Date.now().toString(36)}`;
       const newSession = {
         id: newSessionId,
+        cwd: context.getCurrentWorkspacePath(),
         title: 'New task',
         preview: 'Start fresh conversation',
         createdAt: Date.now(),
@@ -1146,7 +1174,7 @@ async function handleMk20Input(input) {
       context.openEditor('access');
     } else if (kid === 6) {
       context.activeEditor = 'none';
-      await context.readWorkspaceFiles(context.getCurrentProject().path || process.cwd());
+      await context.readWorkspaceFiles(context.getCurrentWorkspacePath());
     } else if (kid === 2) {
       context.activeEditor = 'none';
       context.viewMode = 'settings';
@@ -1167,10 +1195,11 @@ async function handleMk20Input(input) {
         } else if (kid === 11) {
           context.toggleDetails();
         } else if (kid === 7) {
-          const files = await GitProvider.getChangedFiles(context.getCurrentProject().path || process.cwd());
+          if(!context.getCurrentWorkspacePath()||!path.isAbsolute(context.getCurrentWorkspacePath())){context.readerTitle='No project selected';context.readerLines=['Select a native project before reading changes.'];void paintMk20();return;}
+          const files = await GitProvider.getChangedFiles(context.getCurrentWorkspacePath());
           context.openChangesView(files);
           if (files.length > 0) {
-            const diffLines = await GitProvider.getFileDiff(files[0].path, context.getCurrentProject().path || process.cwd());
+            const diffLines = await GitProvider.getFileDiff(files[0].path, context.getCurrentWorkspacePath());
             context.selectChangesFile(0, diffLines);
           }
         }
@@ -1268,7 +1297,7 @@ async function handleMk20Input(input) {
         const targetSessionId = curSess?.id;
         const model = context.models[context.selectedModelIdx];
         const effort = context.efforts[context.selectedEffortIdx];
-        const cwd = curProj.path;
+        const cwd = curSess.cwd || curProj.path;
 
         if (curSess) {
           curSess.voiceSubmission = 'sending';
@@ -1484,7 +1513,11 @@ async function handleMk20Input(input) {
 let mk20InputQueue=Promise.resolve(),mk20Pending=0;
 mk20.on('lab.input',input=>{
   if(!isActive())return;
-  if(input.kind==='presence'||mk20Pending>=100)return;
+  if(input.kind==='presence') {
+    if([4,6].includes(input.topRows)&&context.readerRows!==input.topRows){context.readerRows=input.topRows;context.updateReaderForCurrentSession();void paintMk20();}
+    return;
+  }
+  if(mk20Pending>=100)return;
   mk20Pending++;
   mk20InputQueue=mk20InputQueue.then(()=>handleMk20Input(input)).catch(error=>console.error('MK20 input failed:',error.code??error.message)).finally(()=>{mk20Pending--;});
 });

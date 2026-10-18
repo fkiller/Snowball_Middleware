@@ -23,6 +23,7 @@ export interface Snapshot {
   hostname?: string;
   workspaceCandidates?: (ProjectCandidate & { workspaceId?: string })[];
   realSessions?: Record<string, unknown> | null;
+  navigationCatalog?: Record<string, {id:string;root:string;displayName:string;sessions:Record<string,unknown>[]}[]> | null;
   turnsStore?: Record<string, unknown> | null;
   cursor: string; sessions: SessionRecord[];
   commands: { commandId: string; actorId: string; sessionKey: string; ownerId: string; operation: string; status: CommandRecord['status']; revision: number; order: number; updatedAt: number }[];

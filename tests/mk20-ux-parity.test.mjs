@@ -39,6 +39,7 @@ test('MK20 UX Parity: text wrapping and line chunking match hardware HUD metrics
 
 test('MK20 UX Parity: Changes modal 24-line dense diff canvas with syntax coloring', () => {
   const context = new ContextManager();
+  context.readerRows = 6;
   const mockFiles = [
     { name: 'context.ts', path: 'src/context.ts', status: 'M' },
     { name: 'hud.c', path: 'hardware/hud.c', status: 'M' },
@@ -50,8 +51,10 @@ test('MK20 UX Parity: Changes modal 24-line dense diff canvas with syntax colori
     '+ // Added line with cyan color',
     '- // Removed line with rose color',
     '  // Unchanged context line with white color and syntax',
-    '+ const newline = true;',
-    '- const oldline = false;',
+    '+ const newline = true; // Source continues across all four physical key columns',
+    '- const oldline = false; // Source continues across all four physical key columns',
+    '+ const visibleOnKey5 = true;',
+    '- const visibleOnKey1 = false;',
   ];
 
   context.openChangesView(mockFiles);
@@ -368,17 +371,20 @@ test('MK20 UX Parity: New task empty session displays [NEW TASK READY] prompt', 
 
 test('MK20 UX Parity: Viewer scrolling emits KEY_FLAG_DISABLED (flags: 8) for empty keys', async () => {
   const context = new ContextManager();
+  context.readerRows = 6;
   context.viewMode = 'workspace';
   context.isWorkspaceViewerActive = true;
   context.workspaceSelectedFileIdx = 0;
-  // File with only 6 lines: first 4 on top screen, lines 4..5 on Row 0 (key 13)
+  // Six content rows use the full top display; rows 6..7 continue onto key 13.
   context.workspaceFileContentLines = [
     'Line 0: header',
     'Line 1: info',
     'Line 2: setup',
     'Line 3: start',
     'Line 4: code row 0',
-    'Line 5: code row 0 end'
+    'Line 5: header end',
+    'Line 6: code row 0',
+    'Line 7: code row 0 end'
   ];
   context.readerScrollLine = 0;
 

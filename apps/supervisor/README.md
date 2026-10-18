@@ -1,5 +1,7 @@
 # Local Supervisor
 
+The task screen uses a project/session sidebar, one-row icon breadcrumb, conversation and bottom composer. Native model/effort controls sit beside input; IDs and command receipts are collapsed under Session details. Workspaces Overview is removed. The installed suite groups sessions by actual native project membership, retains each worktree's execution directory and orders recent Snowball selections before untouched native order. Each browser tab keeps its own selection and drafts. See the central EN/KO architecture for device negotiation and verification scope.
+
 Build with npm run build, then run npm run start:local. Normal startup prints a loopback URL and requires no login or PIN. Optional --require-auth explicitly selects memory-token mode and its interactive terminal bootstrap. This does not change separate MK20/device pairing.
 
 The native folder picker is enabled by default; --no-native-picker disables it. --data-dir ABSOLUTE_PATH selects private local state. --codex-executable ABSOLUTE_PATH selects discovery metadata only; --codex-control-config ABSOLUTE_JSON_PATH explicitly starts the reviewed Codex worker using its pinned executable and selected credential home. See docs/middleware/CONTROL_REALITY.md. Discovery never automatically starts or logs into a provider.

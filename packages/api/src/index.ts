@@ -55,6 +55,7 @@ export interface LocalApiOptions {
   hostname?: string;
   harnessPresentations?: Record<string,PluginPresentation>;
   realSessions?: unknown;
+  navigationCatalog?: () => unknown;
   turnsStore?: unknown;
   connectedHarnesses?: Array<{
     pluginId: string;
@@ -317,6 +318,7 @@ export class LocalApi {
       harness: this.options.harness?.describe() ?? null,
       hostname: this.options.hostname || os.hostname(),
       realSessions: this.options.realSessions ?? null,
+      navigationCatalog: this.options.navigationCatalog?.() ?? null,
       harnessPresentations: structuredClone(this.options.harnessPresentations??{}),
       turnsStore: this.options.turnsStore ?? null,
     };

@@ -54,19 +54,11 @@ test('same-named provider folders stay separate unless exact root is associated'
  assert.equal(projects[1].displayName,'Snowball_Control · 발견됨');
  assert.equal(ctx.getSessionsForProject('snowball.codex',root).length,1);
 });
-test('overview counts only registered workspaces and their real associated sessions',()=>{
- const ctx={};vm.runInNewContext(helpers,ctx);
- const rows=ctx.getOverviewRows({workspaceDetails:[
-  {workspaceId:'ws_aaaaaaaaaaaaaaaa',displayName:'First',status:'ready'},
-  {workspaceId:'ws_bbbbbbbbbbbbbbbb',displayName:'Second',status:'missing'}
- ],sessionDetails:[
-  {workspaceId:'ws_aaaaaaaaaaaaaaaa',harnessPluginId:'snowball.codex',readOnly:true,ownerId:null},
-  {workspaceId:'ws_aaaaaaaaaaaaaaaa',harnessPluginId:'snowball.opencode',readOnly:false,ownerId:'owned'},
-  {cwd:'C:\\other',harnessPluginId:'snowball.codex',readOnly:true,ownerId:null}
- ]});
- assert.equal(rows.length,2);
- assert.equal(rows[0].sessions,2);assert.equal(rows[0].readOnly,1);assert.equal(rows[0].harnesses.length,2);
- assert.equal(rows[1].sessions,0);assert.equal(rows[1].status,'missing');
+test('canonical native project catalog replaces duplicate registered, candidate and worktree rows',()=>{
+ const ctx={snapshot:{workspaceDetails:[{workspaceId:'legacy',displayName:'Same'}],navigationCatalog:{'snowball.codex':[{id:'canonical',displayName:'Same',root:'actual',sessions:[{id:'real',sessionKey:'actual-session',cwd:'worktree',readOnly:true}]}]},sessions:[]}};
+ vm.runInNewContext(helpers,ctx);
+ assert.equal(ctx.getProjectsForHarness('snowball.codex').length,1);
+ const session=ctx.getSessionsForProject('snowball.codex','canonical')[0];assert.equal(session.cwd,'worktree');assert.equal(session.readOnly,true);
 });
 test('provider, transcript and device strings never enter interpolated HTML sinks',()=>{
  assert.ok(!/\.innerHTML\s*=\s*`[^`]*\$\{/s.test(source));

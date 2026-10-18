@@ -2,6 +2,7 @@ import cp from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import path from 'node:path';
+import {readCodexNavigation, codexProjects} from './codex-navigation.mjs';
 
 export function scanHarnessProjects() {
   const result = {
@@ -14,28 +15,8 @@ export function scanHarnessProjects() {
   try {
     const p = path.join(process.env.USERPROFILE || '', '.codex', '.codex-global-state.json');
     if (fs.existsSync(p)) {
-      const data = JSON.parse(fs.readFileSync(p, 'utf8'));
-      const localProjects = data['local-projects'] || {};
-      for (const [id, proj] of Object.entries(localProjects)) {
-        const root = proj.rootPaths?.[0] || '';
-        result['snowball.codex'].push({
-          candidateId: `codex_${id}`,
-          nativeProjectId: id,
-          displayName: proj.name || path.basename(root) || 'Codex Project',
-          root: root,
-          harness: { pluginId: 'snowball.codex', instanceId: 'default' }
-        });
-      }
-      const remoteProjects = data['remote-projects'] || [];
-      for (const r of remoteProjects) {
-        result['snowball.codex'].push({
-          candidateId: `codex_${r.id}`,
-          nativeProjectId: r.id,
-          displayName: r.label || 'Snowball',
-          root: r.remotePath || r.hostId || 'remote',
-          harness: { pluginId: 'snowball.codex', instanceId: 'default' }
-        });
-      }
+      const data = readCodexNavigation();
+      result['snowball.codex'] = codexProjects(data);
     }
   } catch (e) {
     console.error('Error scanning Codex projects:', e);

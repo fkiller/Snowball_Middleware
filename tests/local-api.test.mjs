@@ -336,7 +336,8 @@ test('served supervisor assets reference no remote origin; Internet-off keeps lo
   const client = fs.readFileSync(new URL('../packages/client-sdk/dist/index.js', import.meta.url), 'utf8');
   for (const [name, text] of [['index.html', supervisor.html], ['app.js', supervisor.script], ['style.css', supervisor.style], ['client.js', client]]) {
     assert.ok(!text.includes('https://'), name);
-    assert.ok(!/http:\/\/(?!127\.0\.0\.1)/.test(text), name);
+    // SVG's XML namespace identifies locally created vector elements; it never fetches a resource.
+    assert.ok(!/http:\/\/(?!127\.0\.0\.1)/.test(text.replaceAll('http://www.w3.org/2000/svg','')), name);
     assert.ok(!text.includes('wss://'), name);
   }
 });

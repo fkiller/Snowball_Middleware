@@ -4,6 +4,7 @@ import * as fs from 'node:fs/promises';
 import * as syncFs from 'node:fs';
 import * as cp from 'node:child_process';
 import { markdownPreview } from './markdown-preview.mjs';
+import {projectHistoryKey,sessionHistoryKey} from './native-navigation.mjs';
 
 export function stringDisplayWidth(str) {
   let w = 0;
@@ -228,6 +229,7 @@ export class ContextManager {
     this.readerSubtitle = 'Session Active';
     this.readerLines = ['Connecting to local middleware...'];
     this.readerScrollLine = 0;
+    this.readerRows = 4; // Legacy until this selected device advertises its actual viewport.
     this.lastReaderModeKey = '';
 
     // Scope Memory
@@ -356,13 +358,15 @@ export class ContextManager {
     return sess[this.selectedSessionIdx % sess.length] || sess[0] || { id: 'none', title: 'Empty', preview: '', createdAt: 0 };
   }
 
+  getCurrentWorkspacePath() { return this.getCurrentSession().cwd || this.getCurrentProject().path; }
+
   setSessionTurns(turns) {
     this.currentTurns = Array.isArray(turns) ? turns : [];
     this.updateReaderForCurrentSession();
     if (this.userPromptLineIndices.length > 0) {
       this.readerScrollLine = this.userPromptLineIndices[this.userPromptLineIndices.length - 1];
     } else {
-      this.readerScrollLine = Math.max(0, this.readerLines.length - 4);
+      this.readerScrollLine = Math.max(0, this.readerLines.length - this.readerRows);
     }
   }
 
@@ -387,7 +391,7 @@ export class ContextManager {
     if (nexts.length > 0) {
       this.readerScrollLine = nexts[0];
     } else {
-      this.readerScrollLine = Math.max(0, this.readerLines.length - 4);
+      this.readerScrollLine = Math.max(0, this.readerLines.length - this.readerRows);
     }
   }
 
@@ -412,19 +416,26 @@ export class ContextManager {
   snapshotUi() {
     this.saveActiveSessionState();
     const fields=['model','effort','access','voiceDraftText','voiceSubmission','lastDispatchError','voiceDestinationLabel','readerScrollLine','showDetails'];
-    const sessions={};
-    for(const [scope,list] of Object.entries(this.sessionsByScope))sessions[scope]=list.map(session=>({id:session.id,...(session.id.startsWith('s-')?{localDraft:true,title:session.title,createdAt:session.createdAt}:{}),...Object.fromEntries(fields.filter(key=>session[key]!==undefined).map(key=>[key,session[key]]))}));
+    const sessions=structuredClone(this.unresolvedUiSessions||{});
+    for(const [scope,list] of Object.entries(this.sessionsByScope))sessions[scope]=[...list.map(session=>({id:session.id,...(session.id.startsWith('s-')?{localDraft:true,title:session.title,createdAt:session.createdAt,cwd:session.cwd}:{}),...Object.fromEntries(fields.filter(key=>session[key]!==undefined).map(key=>[key,session[key]]))})),...(sessions[scope]||[]).filter(record=>!list.some(session=>session.id===record.id))];
     return {schema:1,machine:this.getCurrentMachine().id,harness:this.getCurrentHarness().id,project:this.getCurrentProject().id,session:this.getCurrentSession().id,view:this.viewMode,volume:this.volume,muted:this.isMuted,sessions,memory:{harness:[...this.memoryHarnessPerMachine],project:[...this.memoryProjectPerHarness],session:[...this.memorySessionPerProject]}};
   }
 
   restoreUi(saved) {
     if(!saved||saved.schema!==1||typeof saved.sessions!=='object')throw Error('invalid_ui_state');
+    this.unresolvedUiSessions={};
     for(const [scope,records] of Object.entries(saved.sessions)){
-      const list=this.sessionsByScope[scope];if(!list||!Array.isArray(records))continue;
+      if(!Array.isArray(records))continue;
+      const namespace=scope.split('/').slice(0,2).join('/')+'/';
+      const candidates=Object.entries(this.sessionsByScope).filter(([key])=>key.startsWith(namespace));
+      const mapped=candidates.filter(([,list])=>records.some(record=>list.some(session=>session.id===record.id)));
+      const targetScope=this.sessionsByScope[scope]?scope:mapped.length===1?mapped[0][0]:null;
+      const nativeCwds=[...new Set(mapped.flatMap(([,list])=>list.filter(session=>records.some(record=>record.id===session.id)).map(session=>session.cwd)).filter(Boolean))];
       for(const record of records){
-        let session=list.find(item=>item.id===record.id);
-        if(!session&&record.localDraft===true&&/^s-[a-z0-9]+$/.test(record.id)&&typeof record.title==='string') {session={id:record.id,title:record.title.slice(0,128),createdAt:record.createdAt,preview:'',turnCount:0};list.push(session);}
-        if(!session)continue;
+        let session=candidates.flatMap(([,list])=>list).find(item=>item.id===record.id);
+        const cwd=typeof record.cwd==='string'&&path.isAbsolute(record.cwd)?record.cwd:nativeCwds.length===1?nativeCwds[0]:undefined;
+        if(!session&&targetScope&&record.localDraft===true&&/^s-[a-z0-9]+$/.test(record.id)&&typeof record.title==='string') {session={id:record.id,title:record.title.slice(0,128),createdAt:record.createdAt,cwd,preview:'',turnCount:0};this.sessionsByScope[targetScope].push(session);}
+        if(!session){(this.unresolvedUiSessions[scope]||=[]).push(record);continue;}
         for(const key of ['model','effort','access','voiceDraftText','voiceDestinationLabel'])if(typeof record[key]==='string'&&Buffer.byteLength(record[key])<=8192)session[key]=record[key];
         if(Number.isSafeInteger(record.readerScrollLine)&&record.readerScrollLine>=0)session.readerScrollLine=record.readerScrollLine;
         session.showDetails=record.showDetails===true;
@@ -440,7 +451,9 @@ export class ContextManager {
     ])for(const pair of saved.memory?.[kind]??[])if(Array.isArray(pair)&&pair.length===2&&pair.every(value=>typeof value==='string')&&valid(...pair))map.set(...pair);
     const index=(list,id)=>Math.max(0,list.findIndex(item=>item.id===id));
     this.selectedMachineIdx=index(this.machines,saved.machine);this.selectedHarnessIdx=index(this.harnesses,saved.harness);
-    this.selectedProjectIdx=index(this.getProjectsForCurrentScope(),saved.project);this.selectedSessionIdx=index(this.getSessionsForCurrentScope(),saved.session);
+    const projects=this.getProjectsForCurrentScope();
+    const retainedProject=projects.find(p=>(this.sessionsByScope[`${this.getScopeKey()}/${p.id}`]||[]).some(s=>s.id===saved.session));
+    this.selectedProjectIdx=index(projects,retainedProject?.id||saved.project);this.selectedSessionIdx=index(this.getSessionsForCurrentScope(),saved.session);
     if(['session','workspace','changes','question','settings'].includes(saved.view))this.viewMode=saved.view;
     if(Number.isInteger(saved.volume)&&saved.volume>=0&&saved.volume<=100)this.volume=saved.volume;
     this.isMuted=saved.muted===true;this.restoreActiveSessionState();const scroll=this.readerScrollLine;this.updateReaderForCurrentSession();this.readerScrollLine=scroll;
@@ -549,6 +562,15 @@ export class ContextManager {
   }
 
   openEditor(field) {
+    if(this.navigationHistory && ['project','session'].includes(field)) {
+      const project=this.getCurrentProject(),session=this.getCurrentSession(),fullScope=this.getFullScopeKey();
+      this.memoryProjectPerHarness.set(this.getScopeKey(),project.id);this.memorySessionPerProject.set(this.getFullScopeKey(),session.id);
+      const projects=this.projectsByScope[this.getScopeKey()];
+      if(projects)this.projectsByScope[this.getScopeKey()]=this.navigationHistory.order(projects,p=>projectHistoryKey(this.getCurrentHarness().id,p.path));
+      const sessions=this.sessionsByScope[fullScope];
+      if(sessions)this.sessionsByScope[fullScope]=this.navigationHistory.order(sessions,s=>sessionHistoryKey(s.sessionKey));
+      this.resolveProjectAndSession();
+    }
     if (this.activeEditor === field) {
       this.activeEditor = 'none';
     } else {
@@ -636,11 +658,11 @@ export class ContextManager {
   }
 
   // --- Files Modal ---
-  async readWorkspaceFiles(directory = this.getCurrentProject().path) {
+  async readWorkspaceFiles(directory = this.getCurrentWorkspacePath()) {
     try {
       const project = this.getCurrentProject();
       if (project.id === 'none' || !project.path || !path.isAbsolute(project.path)) throw new Error('Select a real project before browsing files');
-      const root = await fs.realpath(project.path);
+      const root = await fs.realpath(this.getCurrentWorkspacePath());
       let target = directory;
       try { target = await fs.realpath(directory); } catch { target = root; }
       
@@ -766,14 +788,14 @@ export class ContextManager {
       if (!this.isChangesFileSelected) {
         this.scrollChangesFiles(delta);
       } else {
-        const maxScroll = Math.max(0, this.readerLines.length - 4);
+        const maxScroll = Math.max(0, this.readerLines.length - this.readerRows);
         this.readerScrollLine = Math.max(0, Math.min(maxScroll, this.readerScrollLine + delta));
         this.updateReaderForCurrentSession();
       }
     } else if (this.viewMode === 'workspace') {
       if (this.isWorkspaceViewerActive) {
         const total = this.workspaceFileContentLines.length;
-        this.readerScrollLine = Math.max(0, Math.min(Math.max(0, total - 4), this.readerScrollLine + delta));
+        this.readerScrollLine = Math.max(0, Math.min(Math.max(0, total - this.readerRows), this.readerScrollLine + delta));
         this.updateReaderForCurrentSession();
       } else {
         this.moveWorkspaceCursor(delta);
@@ -789,7 +811,7 @@ export class ContextManager {
         }
         this.updateReaderForCurrentSession();
       } else {
-        const maxScroll = Math.max(0, this.readerLines.length - 4);
+        const maxScroll = Math.max(0, this.readerLines.length - this.readerRows);
         this.readerScrollLine = Math.max(0, Math.min(maxScroll, this.readerScrollLine + delta));
         this.updateReaderForCurrentSession();
       }
@@ -920,8 +942,8 @@ export class ContextManager {
 
       if (focusIdx < this.readerScrollLine) {
         this.readerScrollLine = focusIdx;
-      } else if (focusIdx >= this.readerScrollLine + 4) {
-        this.readerScrollLine = focusIdx - 3;
+      } else if (focusIdx >= this.readerScrollLine + this.readerRows) {
+        this.readerScrollLine = focusIdx - this.readerRows + 1;
       }
       return;
     } else if (this.viewMode === 'changes') {
@@ -1098,7 +1120,7 @@ export class ContextManager {
       this.lastReaderModeKey = currentModeKey;
       this.readerScrollLine = 0;
     } else {
-      const maxScroll = Math.max(0, this.readerLines.length - 4);
+      const maxScroll = Math.max(0, this.readerLines.length - this.readerRows);
       this.readerScrollLine = Math.min(this.readerScrollLine, maxScroll);
     }
   }
@@ -1242,7 +1264,7 @@ export class ContextManager {
 
         for (let r = 0; r < 4; r++) {
           const rowKeys = viewerRows[r];
-          const lineBase = this.readerScrollLine + 4 + r * 6;
+          const lineBase = this.readerScrollLine + this.readerRows + r * 6;
           const rowLines = [];
           for (let i = 0; i < 6; i++) {
             const lIdx = lineBase + i;
@@ -1330,7 +1352,7 @@ export class ContextManager {
       ];
       for (let r = 0; r < 4; r++) {
         const rowKeys = diffRows[r];
-        const lineBase = this.readerScrollLine + 4 + r * 6;
+        const lineBase = this.readerScrollLine + this.readerRows + r * 6;
         const rowLines = [];
         for (let i = 0; i < 6; i++) {
           const lIdx = lineBase + i;
@@ -1662,7 +1684,7 @@ export class ContextManager {
 
   toPreviewPayload() {
     const state = this.getDeviceState();
-    let visibleLines = state.lines.slice(state.scroll, state.scroll + 4).map(l => safeText(l, 160));
+    let visibleLines = state.lines.slice(state.scroll, state.scroll + this.readerRows).map(l => safeText(l, 160));
 
     const buildKeys = (includeSub) => {
       const out = [];
@@ -1742,6 +1764,12 @@ export class ContextManager {
       mode: state.viewMode || 'session',
       title: safeText(state.title, 63),
       subtitle: safeText(state.subtitle, 63),
+      breadcrumb: {
+        project: safeText(this.getCurrentProject().name, 96),
+        session: safeText(state.viewMode === 'session' && state.activeEditor === 'none' ? this.getCurrentSession().title || '' : state.title, 160),
+        harness: safeText(this.getCurrentHarness().name, 24),
+        ...(this.harnessPresentations?.[this.getCurrentHarness().id]?.icon?.rows ? {icon:this.harnessPresentations[this.getCurrentHarness().id].icon.rows,rgb565:this.harnessPresentations[this.getCurrentHarness().id].icon.rgb565} : {})
+      },
       lines: visibleLines,
       ...(this.readerStyleLines === this.readerLines ? { styles: visibleLines.map((_, i) => this.readerStyles?.[state.scroll + i] || 't').join('') } : {}),
       scroll: state.scroll,

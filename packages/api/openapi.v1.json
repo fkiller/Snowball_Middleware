@@ -2153,6 +2153,23 @@
             ],
             "description": "Legacy observation-only projection; never ownership evidence."
           },
+          "navigationCatalog": {
+            "type": ["object", "null"],
+            "description": "Trusted native project membership and sidebar order, promoted by actual Snowball navigation recency. Presentation only; session cwd and control ownership stay independent.",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "root", "displayName", "sessions"],
+                "properties": {
+                  "id": {"type": "string"},
+                  "root": {"type": "string"},
+                  "displayName": {"type": "string"},
+                  "sessions": {"type": "array", "items": {"type": "object"}}
+                }
+              }
+            }
+          },
           "turnsStore": {
             "type": [
               "object",

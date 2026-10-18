@@ -66,6 +66,7 @@ const I18N = {
     btn_rescan_harness: 'Rescan Harnesses',
     btn_rerun_wizard: 'Rerun Setup Wizard',
     footer_notice: 'You can start without devices or voice features. Connections and commands are never executed automatically.'
+    ,session_details:'Session details'
   },
   ko: {
     settings_btn: '설정',
@@ -97,6 +98,7 @@ const I18N = {
     btn_rescan_harness: 'Harness 다시 찾기',
     btn_rerun_wizard: '초기 설정 마법사 다시 실행',
     footer_notice: '장치와 음성 기능 없이도 시작할 수 있습니다. 연결이나 명령은 자동으로 실행하지 않습니다.'
+    ,session_details:'세션 상세'
   }
 };
 
@@ -160,6 +162,7 @@ function checkpointController() {
       // Clearing a previous destination is explicit and only affects this tab.
       if(controllerState.draft&&draft&&controllerState.draft.destinationKey!==draft.destinationKey)controllerState=await client.updateController(controllerState.revision,{draft:null});
       controllerState=await client.updateController(controllerState.revision,patch);
+      queueLiveRefresh();
     }).catch(async()=>{lastControllerPatch='';try{controllerState=await client.controller();}catch{};});
   },250);
 }
@@ -179,6 +182,7 @@ let voiceSessionKey = null;
 const sessionTurns = {};
 const executionBySession = new Map();
 const modelCatalogs = new Map();
+const modelCatalogRequests = new Set();
 let creatingSession = false;
 
 function openNewSession() {
@@ -243,7 +247,7 @@ function openNewSession() {
       snapshot = result.snapshot;
       const created = snapshot.sessionDetails.find(s => s.sessionKey === result.sessionKey);
       activeHarness = binding.pluginId; activeProject = created.workspaceId || created.cwd; activeSessionKey = created.sessionKey;
-      historyByScope[activeHarness] = activeProject; historyByScope[activeProject] = activeSessionKey;
+      historyByScope[activeHarness] = activeProject; historyByScope[activeHarness+'/'+activeProject] = activeSessionKey;
       try { sessionStorage.removeItem(pendingKey); } catch {}
       activeDropdown = null; close(); render();
     } catch (error) {
@@ -278,8 +282,9 @@ function openNewSession() {
   dialog.addEventListener('cancel', () => dialog.remove()); document.body.append(dialog); dialog.showModal();
 }
 
-const node = (tag, text) => {
+const node = (tag, text, className) => {
   const element = document.createElement(tag);
+  if (className) element.className = className;
   if (text !== undefined) element.textContent = text;
   return element;
 };
@@ -386,10 +391,12 @@ function getAvailableHarnesses() {
       }
     }
   }
-  return found;
+  return found.filter((h,index)=>found.findIndex(other=>(other.providerId||other.id)===(h.providerId||h.id))===index);
 }
 
 function getProjectsForHarness(harnessPluginId) {
+  const catalog = snapshot?.navigationCatalog?.[harnessPluginId];
+  if (Array.isArray(catalog)) return catalog.map(p => ({...p,displayName:p.displayName,id:p.id,status:'observed'}));
   // Registered local workspaces are project destinations independent of the
   // harness. A provider candidate is only observation and grants no file access.
   const found = (snapshot?.workspaceDetails ?? []).map(w => ({ id: w.workspaceId, displayName: w.displayName, status: w.status, local: true }));
@@ -414,6 +421,8 @@ function getProjectsForHarness(harnessPluginId) {
 }
 
 function getSessionsForProject(harnessPluginId, projectId) {
+  const project = snapshot?.navigationCatalog?.[harnessPluginId]?.find(p => p.id === projectId);
+  if (project) return project.sessions.map(s => ({...s,harnessPluginId,harnessInstanceId:'default',workspaceId:projectId,...((snapshot.sessions || []).find(j=>j.sessionKey===s.sessionKey)||{})}));
   const ws = (snapshot?.workspaceDetails ?? []).find(w => w.workspaceId === projectId);
   const targetKey = ws ? ws.displayName : projectId;
   const observed = snapshot?.realSessions?.[harnessPluginId]?.[targetKey];
@@ -438,104 +447,66 @@ function projectDisplayName(projectId) {
   return getProjectsForHarness(activeHarness).find(p => p.id === projectId)?.displayName || projectId;
 }
 
-function getOverviewRows(state) {
-  const details = state?.sessionDetails ?? [];
-  return (state?.workspaceDetails ?? []).map(workspace => {
-    let sessions = details.filter(s => s.workspaceId === workspace.workspaceId);
-    let realCount = 0;
-    const harnessesSet = new Set(sessions.map(s => s.harnessPluginId));
-    if (state?.realSessions) {
-      for (const [hId, pMap] of Object.entries(state.realSessions)) {
-        const sList = pMap[workspace.displayName] || pMap[workspace.workspaceId];
-        if (Array.isArray(sList) && sList.length > 0) {
-          realCount += sList.length;
-          harnessesSet.add(hId);
-        }
-      }
-    }
-    const totalSessions = sessions.length > 0 ? sessions.length : realCount;
-    return {
-      workspaceId: workspace.workspaceId,
-      displayName: workspace.displayName,
-      status: workspace.status,
-      sessions: totalSessions,
-      harnesses: [...harnessesSet],
-      readOnly: sessions.filter(s => s.readOnly || !s.ownerId).length
-    };
-  });
+function uiIcon(kind) {
+  const paths = {machine:'M3 4h18v12H3z M8 21h8 M12 16v5', project:'M3 6h7l2 2h9v12H3z', arrow:'M8 5l7 7-7 7'};
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.classList.add('ui-icon');
+  const shape=document.createElementNS(svg.namespaceURI,'path');shape.setAttribute('d',paths[kind]||paths.arrow);shape.setAttribute('fill','none');shape.setAttribute('stroke','currentColor');shape.setAttribute('stroke-width','1.5');svg.append(shape);return svg;
 }
-
-function workspaceStatusLabel(status) {
-  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
-  if (isEn) {
-    return ({ ready: 'Ready', empty: 'Empty Folder', missing: 'Missing',
-      needs_permission: 'Permission Needed', needs_review: 'Review Needed', unavailable: 'Unavailable' })[status] || 'Unknown';
-  }
-  return ({ ready: '사용 가능', empty: '빈 폴더', missing: '찾을 수 없음',
-    needs_permission: '권한 필요', needs_review: '검토 필요', unavailable: '사용 불가' })[status] || '상태 미확인';
+function harnessIcon(id) {
+  const icon=snapshot?.harnessPresentations?.[id]?.icon;
+  if(!icon || icon.size!==16)return uiIcon('machine');
+  const canvas=node('canvas');canvas.width=canvas.height=16;canvas.className='harness-icon';canvas.setAttribute('aria-hidden','true');
+  const ctx=canvas.getContext('2d'),rgb=icon.rgb565?atob(icon.rgb565):null;
+  for(let y=0;y<16;y++)for(let x=0;x<16;x++){
+    const i=y*16+x;if(!((icon.rows?.[y]||0)&(1<<(15-x))))continue;
+    const c=rgb?(rgb.charCodeAt(i*2)<<8)|rgb.charCodeAt(i*2+1):65535;
+    ctx.fillStyle=`rgb(${((c>>11)&31)*255/31},${((c>>5)&63)*255/63},${(c&31)*255/31})`;ctx.fillRect(x,y,1,1);
+  }return canvas;
 }
-
-function renderOverview() {
-  const root = $('overview-container');
-  if (!root) return;
-  root.replaceChildren();
-  const rows = getOverviewRows(snapshot);
-  const connected = (snapshot?.connectedHarnesses ?? []).filter(h => h.connected && !h.disabled);
-  const readyDevices = (snapshot?.devices ?? []).filter(d => d.state === 'ready');
-  const pending = (snapshot?.decisions ?? []).filter(d => d.status === 'pending');
-  const uncertain = (snapshot?.commands ?? []).filter(c => c.status === 'unknown' || c.status === 'failed');
-  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
-  const heading = node('div'); heading.className = 'overview-heading';
-  const title = node('h2', isEn ? 'Workspaces Overview' : '전체 작업 현황');
-  const counts = node('p', isEn
-    ? `Projects ${rows.length} · Connected Harnesses ${connected.length} · Control Devices ${readyDevices.length} · Attention ${pending.length + uncertain.length}`
-    : `프로젝트 ${rows.length} · 연결된 Harness ${connected.length} · 제어 장치 ${readyDevices.length} · 주의 ${pending.length + uncertain.length}`);
-  heading.append(title, counts); root.append(heading);
-  const grid = node('div'); grid.className = 'overview-projects';
-  if (!rows.length) grid.append(node('p', isEn ? 'No registered projects. You can add workspace folders in Settings.' : '등록된 프로젝트가 없습니다. 설정에서 작업 폴더를 추가할 수 있습니다.'));
-  for (const row of rows) {
-    const card = node('button'); card.type = 'button';
-    card.className = `overview-project ${row.workspaceId === activeProject ? 'selected' : ''}`;
-    const cardStatus = isEn
-      ? `Folder ${workspaceStatusLabel(row.status)} · ${row.sessions} sessions · ${row.readOnly} read-only`
-      : `폴더 ${workspaceStatusLabel(row.status)} · 세션 ${row.sessions}개 · 조회 전용 ${row.readOnly}개`;
-    const cardHarnesses = row.harnesses.length
-      ? `Harness: ${row.harnesses.map(id => id.replace('snowball.', '')).join(', ')}`
-      : (isEn ? 'No observed harness sessions' : '관찰된 Harness 세션 없음');
-    card.append(node('strong', row.displayName),
-      node('span', cardStatus),
-      node('span', cardHarnesses));
-    card.addEventListener('click', () => {
-      const first = (snapshot?.sessionDetails ?? []).find(s => s.workspaceId === row.workspaceId);
-      if (first) activeHarness = first.harnessPluginId;
-      activeProject = row.workspaceId; historyByScope[activeHarness] = activeProject;
-      if (first) activeSessionKey = first.sessionKey;
-      activeDropdown = null; render();
-    });
-    grid.append(card);
-  }
-  root.append(grid);
-  if (pending.length || uncertain.length) {
-    const attention = node('div'); attention.className = 'overview-attention';
-    attention.append(node('strong', isEn ? `Total Attention Items ${pending.length + uncertain.length}` : `전체 주의 항목 ${pending.length + uncertain.length}건`));
-    const pendingLabel = isEn ? 'Pending Approval' : '승인 대기';
-    const unknownLabel = isEn ? 'Delivery Check' : '전달 상태 확인';
-    const errorLabel = isEn ? 'Command Error' : '명령 오류';
-    for (const item of [...pending.map(d => ({ sessionKey: d.sessionKey, label: pendingLabel })),
-      ...uncertain.map(c => ({ sessionKey: c.sessionKey, label: c.status === 'unknown' ? unknownLabel : errorLabel }))].slice(0, 8)) {
-      const session = (snapshot?.sessionDetails ?? []).find(s => s.sessionKey === item.sessionKey);
-      const label = `${item.label} · ${session?.title || item.sessionKey}`;
-      if (!session || !(session.workspaceId || session.cwd)) { attention.append(node('p', label)); continue; }
-      const jump = node('button', label); jump.type = 'button'; jump.className = 'secondary';
-      jump.addEventListener('click', () => {
-        activeHarness = session.harnessPluginId; activeProject = session.workspaceId || session.cwd;
-        activeSessionKey = session.sessionKey; historyByScope[activeHarness] = activeProject;
-        historyByScope[activeProject] = activeSessionKey; activeDropdown = null; render();
-      });
-      attention.append(jump);
+function renderNavigation() {
+  const root=$('session-navigation');if(!root)return;const isEn=currentLanguage==='en';root.replaceChildren();
+  const newTask=button(isEn?'+ New task':'+ 새 작업',openNewSession,true);newTask.className='new-task';
+  newTask.disabled=!(snapshot?.connectedHarnesses||[]).some(h=>h.pluginId===activeHarness&&h.canCreate&&h.connected&&!h.disabled);
+  newTask.title=newTask.disabled?(isEn?'Create a task in the native harness, then select it here.':'네이티브 하네스에서 만든 작업을 이 목록에서 선택하세요.'):'';root.append(newTask);
+  const harnesses=node('div');harnesses.className='harness-tabs';
+  for(const h of getAvailableHarnesses()){
+    const id=h.providerId||h.id,name=snapshot?.harnessPresentations?.[id]?.name||h.displayName;
+    const tab=button('',()=>{activeHarness=id;activeDropdown=null;ensureHierarchy();render();},true);
+    tab.className='harness-tab'+(id===activeHarness?' selected':'');tab.title=name;tab.setAttribute('aria-label',name);tab.append(harnessIcon(id),node('span',name));harnesses.append(tab);
+  }root.append(harnesses,node('p',isEn?'Projects':'프로젝트','navigation-label'));
+  const projects=getProjectsForHarness(activeHarness),list=node('div');list.className='project-tree';
+  for(const p of projects){
+    const project=button('',()=>{activeProject=p.id;historyByScope[activeHarness]=p.id;ensureHierarchy();render();},true);
+    project.className='project-row'+(p.id===activeProject?' selected':'');project.title=p.root||p.id;project.append(uiIcon('project'),node('span',p.displayName));list.append(project);
+    if(p.id!==activeProject)continue;
+    for(const session of getSessionsForProject(activeHarness,p.id)){
+      const row=button(session.title||session.nativeSessionId||session.id,()=>{activeSessionKey=session.sessionKey;historyByScope[activeHarness+'/'+activeProject]=activeSessionKey;activeDropdown=null;render();},true);
+      row.className='session-row'+(session.sessionKey===activeSessionKey?' selected':'');row.title=session.title||'';row.setAttribute('aria-current',session.sessionKey===activeSessionKey?'page':'false');list.append(row);
     }
-    root.append(attention);
   }
+  if(!projects.length)list.append(node('p',isEn?'No local projects found.':'발견된 로컬 프로젝트가 없습니다.','navigation-empty'));
+  root.append(list);
+}
+function messageContent(text) {
+  const container=node('div');container.className='message-text';
+  let code=null,list=null;
+  const inline=(element,value)=>{
+    const pattern=/(`[^`]+`|\*\*[^*]+\*\*|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\))/g;let start=0;
+    for(const match of value.matchAll(pattern)){
+      element.append(document.createTextNode(value.slice(start,match.index)));
+      const token=match[0];const part=node(token[0]==='`'?'code':token.startsWith('**')?'strong':'a',token[0]==='`'?token.slice(1,-1):token.startsWith('**')?token.slice(2,-2):match[2]);
+      if(part.tagName==='A'){part.href=match[3];part.target='_blank';part.rel='noopener noreferrer';}element.append(part);start=match.index+token.length;
+    }element.append(document.createTextNode(value.slice(start)));
+  };
+  for(const line of String(text||'').replace(/\r/g,'').split('\n')){
+    if(/^\s*(```|~~~)/.test(line)){if(code){code=null;}else{const pre=node('pre');code=node('code');pre.append(code);container.append(pre);}list=null;continue;}
+    if(code){code.append(document.createTextNode(line+'\n'));continue;}
+    const heading=line.match(/^(#{1,6})\s+(.+)$/),bullet=line.match(/^\s*(?:[-*+] |\d+[.)] )(.+)$/);
+    if(bullet){if(!list){list=node('ul');container.append(list);}const item=node('li');inline(item,bullet[1]);list.append(item);continue;}
+    list=null;if(!line.trim())continue;
+    const element=node(heading?'h'+Math.min(heading[1].length+1,6):line.startsWith('> ')?'blockquote':'p');inline(element,heading?heading[2]:line.startsWith('> ')?line.slice(2):line);container.append(element);
+  }return container;
 }
 
 // Ensure valid active hierarchy
@@ -555,7 +526,7 @@ function ensureHierarchy() {
   }
 
   const sessions = getSessionsForProject(activeHarness, activeProject);
-  const lastSession = historyByScope[activeProject];
+  const lastSession = historyByScope[activeHarness+'/'+activeProject];
   if (lastSession && sessions.some(s => s.sessionKey === lastSession)) {
     activeSessionKey = lastSession;
   } else if (!sessions.some(s => s.sessionKey === activeSessionKey)) {
@@ -575,7 +546,9 @@ function renderBreadcrumbs() {
   const hostItem = node('div');
   hostItem.className = 'breadcrumb-item';
   const hostLabel = activeHost || (isEn ? 'This Computer' : '이 컴퓨터');
-  const hostBtn = node('button', `🖥️ ${hostLabel} `);
+  const hostBtn = node('button', '');
+  hostBtn.append(uiIcon('machine'));
+  hostBtn.title=hostLabel;hostBtn.setAttribute('aria-label',hostLabel);
   hostBtn.className = `breadcrumb-btn ${activeDropdown === 'host' ? 'active' : ''}`;
   hostBtn.append(node('span', '▾'));
   hostBtn.addEventListener('click', e => {
@@ -606,7 +579,8 @@ function renderBreadcrumbs() {
   const harnessItem = node('div');
   harnessItem.className = 'breadcrumb-item';
   const curHarnessName = activeHarness.replace('snowball.', '').toUpperCase();
-  const harnessBtn = node('button', `⚡ ${curHarnessName} `);
+  const harnessBtn = node('button', '');
+  harnessBtn.append(harnessIcon(activeHarness));harnessBtn.title=curHarnessName;harnessBtn.setAttribute('aria-label',curHarnessName);
   harnessBtn.className = `breadcrumb-btn ${activeDropdown === 'harness' ? 'active' : ''}`;
   harnessBtn.append(node('span', '▾'));
   harnessBtn.addEventListener('click', e => {
@@ -633,7 +607,6 @@ function renderBreadcrumbs() {
       item.addEventListener('click', () => {
         activeHarness = pId;
         activeDropdown = null;
-        historyByScope[activeHarness] = activeProject;
         ensureHierarchy();
         render();
       });
@@ -645,7 +618,9 @@ function renderBreadcrumbs() {
   // 3. Project Segment
   const projectItem = node('div');
   projectItem.className = 'breadcrumb-item';
-  const projectBtn = node('button', `📁 ${projectDisplayName(activeProject)} `);
+  const projectBtn = node('button', '');
+  projectBtn.append(uiIcon('project'),node('span',projectDisplayName(activeProject),'crumb-label'));
+  projectBtn.title=projectDisplayName(activeProject);
   projectBtn.className = `breadcrumb-btn ${activeDropdown === 'project' ? 'active' : ''}`;
   projectBtn.append(node('span', '▾'));
   projectBtn.addEventListener('click', e => {
@@ -686,8 +661,10 @@ function renderBreadcrumbs() {
   const curSession = sessions.find(s => s.sessionKey === activeSessionKey) || sessions[0];
   const curSessionTitle = curSession?.title || curSession?.sessionKey?.split('/').pop() || (isEn ? 'No connected session' : '연결된 세션 없음');
 
-  const sessionBtn = node('button', `💬 ${curSessionTitle} `);
+  const sessionBtn = node('button', '');
+  sessionBtn.append(node('span',curSessionTitle,'crumb-label'));sessionBtn.title=curSessionTitle;
   sessionBtn.className = `breadcrumb-btn ${activeDropdown === 'session' ? 'active' : ''}`;
+  sessionItem.classList.add('session-crumb');
   sessionBtn.append(node('span', '▾'));
   sessionBtn.addEventListener('click', e => {
     e.stopPropagation();
@@ -711,7 +688,7 @@ function renderBreadcrumbs() {
       item.className = `dropdown-item ${isSel ? 'selected' : ''}`;
       item.addEventListener('click', () => {
         activeSessionKey = s.sessionKey;
-        historyByScope[activeProject] = activeSessionKey;
+        historyByScope[activeHarness+'/'+activeProject] = activeSessionKey;
         activeDropdown = null;
         render();
       });
@@ -765,6 +742,8 @@ function renderWorkspace() {
     $('session-messages')?.replaceChildren();
     const send = $('btn-send'); if (send) { send.disabled = true; send.onclick = null; }
     const input = $('prompt-input'); if (input) input.onkeydown = null;
+    if(input){if(promptDestination)promptDrafts.set(promptDestination,input.value);promptDestination=null;input.value='';input.disabled=true;input.oninput=null;}
+    $('session-details')?.replaceChildren();$('attention-container')?.replaceChildren();
     const voice = $('btn-voice'); if (voice) { voice.disabled = true; voice.onclick = null; }
     return;
   }
@@ -777,34 +756,19 @@ function renderWorkspace() {
   const headerEl = $('session-header');
   if (headerEl) {
     headerEl.replaceChildren();
-    const left = node('div');
-    left.className = 'session-title-group';
-    const h2 = node('h2', curSession.title || projectDisplayName(activeProject));
-    const hBadge = node('span', curHarnessName+' / '+curSession.harnessInstanceId);
-    hBadge.className = 'badge';
-    const pBadge = node('span', projectDisplayName(activeProject));
-    pBadge.className = 'badge badge-neutral';
-    const statusText = isOwned
-      ? (isEn ? 'Active Control' : '활성 제어')
-      : liveBinding && !liveBinding.connected
-        ? (isEn ? 'Disconnected' : '연결 끊김')
-        : (isEn ? 'Read Only' : '조회 전용');
-    const statusBadge = node('span', statusText);
-    statusBadge.className = isOwned ? 'badge' : 'badge badge-gold';
-    left.append(h2, hBadge, pBadge, statusBadge);
-
-    const right = node('div');
-    right.className = 'session-meta-details';
-    const ownerLabel = curSession.ownerId || (isEn ? 'system' : '시스템');
-    right.textContent = isEn
-      ? `Session: ${curSession.sessionKey} · Owner: ${ownerLabel}`
-      : `세션: ${curSession.sessionKey} · 소유자: ${ownerLabel}`;
-    headerEl.append(left, right);
+    const statusText=isOwned?(isEn?'Connected':'연결됨'):(isEn?'Read only':'조회 전용');
+    const statusBadge=node('span',statusText,'control-status'+(isOwned?' connected':''));headerEl.append(statusBadge);
+    const details=$('session-details');
+    if(details){details.replaceChildren(node('p',curSession.title||''),node('p',`${curHarnessName} / ${curSession.harnessInstanceId}`),node('p',curSession.cwd||''),node('p',`Session: ${curSession.sessionKey}`),node('p',`Owner: ${curSession.ownerId||'—'}`));}
     if (liveBinding?.sessionListTruncated) headerEl.append(node('p', isEn ? 'Showing partial session history. View full history in native app.' : '세션 목록 일부만 표시됩니다. 네이티브 앱에서 전체 기록을 확인할 수 있습니다.'));
     const binding = snapshot?.connectedHarnesses?.find(h => h.pluginId === curSession.harnessPluginId && h.instanceId === curSession.harnessInstanceId && h.connected && !h.disabled);
     if (!isOwned && binding?.canAttach) headerEl.append(button(isEn ? 'Attach Session' : '이 세션 연결', () => void run(signal => client.attachSession(curSession.sessionKey, signal))));
     if (binding?.canListModels) {
       const catalogKey = JSON.stringify([binding.pluginId, binding.instanceId]);
+      if (!modelCatalogs.has(catalogKey) && !modelCatalogRequests.has(catalogKey)) {
+        modelCatalogRequests.add(catalogKey);
+        void client.models(binding.pluginId,binding.instanceId).then(result=>{modelCatalogs.set(catalogKey,result.models);renderWorkspace();}).catch(()=>{}).finally(()=>modelCatalogRequests.delete(catalogKey));
+      }
       headerEl.append(button(isEn ? 'Refresh Models' : '모델 목록 갱신', () => void run(async signal => {
         const result = await client.models(binding.pluginId, binding.instanceId, signal);
         modelCatalogs.set(catalogKey, result.models); return client.snapshot(signal);
@@ -818,12 +782,12 @@ function renderWorkspace() {
       const defaultOption = node('option', isEn ? 'Harness Default Model' : 'Harness 기본 모델'); defaultOption.value = ''; modelSelect.append(defaultOption);
       for (const m of models) { const option = node('option', m.displayName); option.value = m.model; modelSelect.append(option); }
       modelSelect.value = selected?.model ?? ''; modelSelect.disabled = !models.length;
-      modelSelect.onchange = () => { executionBySession.set(curSession.sessionKey, modelSelect.value ? { model: modelSelect.value } : {}); renderWorkspace(); };
+      modelSelect.onchange = () => { executionBySession.set(curSession.sessionKey, modelSelect.value ? { model: modelSelect.value } : {}); renderWorkspace(); checkpointController(); };
       const effortSelect = node('select'); effortSelect.setAttribute('aria-label', isEn ? 'Reasoning Effort' : '추론 강도');
       const effortDefault = node('option', isEn ? 'Harness Default Effort' : 'Harness 기본 effort'); effortDefault.value = ''; effortSelect.append(effortDefault);
       for (const effort of selected?.efforts ?? []) { const option = node('option', effort); option.value = effort; effortSelect.append(option); }
       effortSelect.value = selected?.efforts.includes(chosen.effort) ? chosen.effort : ''; effortSelect.disabled = !selected;
-      effortSelect.onchange = () => { executionBySession.set(curSession.sessionKey, { model: selected.model, ...(effortSelect.value ? { effort: effortSelect.value } : {}) }); };
+      effortSelect.onchange = () => { executionBySession.set(curSession.sessionKey, { model: selected.model, ...(effortSelect.value ? { effort: effortSelect.value } : {}) }); checkpointController(); };
       headerEl.append(modelSelect, effortSelect);
     }
   }
@@ -871,6 +835,8 @@ function renderWorkspace() {
   // 3. Session Messages / Turns
   const messagesEl = $('session-messages');
   if (messagesEl) {
+    const atBottom=messagesEl.scrollHeight-messagesEl.scrollTop-messagesEl.clientHeight<60;
+    const previousScroll=messagesEl.scrollTop,previousSession=messagesEl.dataset.session;messagesEl.dataset.session=curSession.sessionKey;
     messagesEl.replaceChildren();
     const truncatedPrefix = isEn ? '[Earlier content truncated] ' : '[이전 내용 생략] ';
     const turns = [...(snapshot?.turnsStore?.[curSession.sessionKey] ?? sessionTurns[curSession.sessionKey] ?? []), ...(snapshot?.sessionMessages?.[curSession.sessionKey] ?? []).map(m => ({ ...m, text: (m.truncated ? truncatedPrefix : '') + m.text, time: new Date(m.receivedAt).toLocaleTimeString() }))];
@@ -898,17 +864,15 @@ function renderWorkspace() {
             : `⚡ ${curHarnessName}`;
         meta.replaceChildren(node('span', roleLabel), node('span', turn.time || ''));
         
-        const content = node('div');
-        content.className = 'message-text';
-        content.textContent = turn.text;
+        const content = messageContent(turn.text);
 
         bubble.append(meta, content);
         messagesEl.append(bubble);
       }
     }
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    messagesEl.scrollTop = previousSession!==curSession.sessionKey||atBottom?messagesEl.scrollHeight:previousScroll;
     for (const command of commands.filter(c => c.sessionKey === curSession.sessionKey).slice(-8)) {
-      messagesEl.append(node('p', `${command.operation} · ${command.status} · ${command.commandId}`));
+      $('session-details')?.append(node('p', `${command.operation} · ${command.status} · ${command.commandId}`));
     }
   }
 
@@ -919,6 +883,7 @@ function renderWorkspace() {
   const voiceBanner = $('voice-draft-banner');
 
   if (sendBtn && promptInput) {
+    promptInput.disabled=false;
     if(promptDestination!==curSession.sessionKey){
       if(promptDestination)promptDrafts.set(promptDestination,promptInput.value);
       promptDestination=curSession.sessionKey;promptInput.value=promptDrafts.get(promptDestination)??'';
@@ -1411,18 +1376,16 @@ function render() {
   const wsContainer = $('workspace-container');
   const wizContainer = $('wizard-container');
   const breadcrumbs = $('breadcrumb-bar');
-  const overview = $('overview-container');
+  const shell=$('harness-shell');if(shell)shell.hidden=viewMode!=='workspace';
 
   if (viewMode === 'workspace') {
-    if (overview) overview.style.display = 'block';
     if (wsContainer) wsContainer.style.display = 'flex';
     if (wizContainer) wizContainer.hidden = true;
     if (breadcrumbs) breadcrumbs.style.display = 'flex';
     renderBreadcrumbs();
-    renderOverview();
+    renderNavigation();
     renderWorkspace();
   } else {
-    if (overview) overview.style.display = 'none';
     if (wsContainer) wsContainer.style.display = 'none';
     if (wizContainer) wizContainer.hidden = false;
     if (breadcrumbs) breadcrumbs.style.display = 'none';
