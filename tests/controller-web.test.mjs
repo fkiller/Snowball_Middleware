@@ -4,6 +4,16 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync(new URL('../apps/supervisor/app.js',import.meta.url),'utf8');
 const checkpoint=source.slice(source.indexOf('function checkpointController()'),source.indexOf('let selectedDevices'));
+
+test('CLI readiness is distinguished from a disconnected desktop adapter without granting control',()=>{
+  const scope={};
+  vm.runInNewContext(source.slice(source.indexOf('function harnessControlLabel('),source.indexOf('function renderWorkspace()')),scope);
+  assert.equal(scope.harnessControlLabel(false,{controlSurface:'native-cli',connected:false,unavailableReason:'cli_missing'},true),'Control CLI not installed');
+  assert.equal(scope.harnessControlLabel(false,{controlSurface:'native-cli',connected:false,unavailableReason:'cli_probe_failed'},false),'제어 CLI 확인 실패');
+  assert.equal(scope.harnessControlLabel(false,{connected:false},true),'Disconnected');
+  assert.equal(scope.harnessControlLabel(false,{connected:true},true),'Read only');
+  assert.equal(scope.harnessControlLabel(true,{connected:true},false),'사용 가능');
+});
 test('a reload immediately after typing or navigation observes this tab latest memory before network debounce',()=>{
   const memory=new Map();const tab={controllerReady:true,controllerTimer:undefined,webControllerId:'ctl_aaaaaaaaaaaaaaaa',activeHarness:'snowball.codex',activeProject:'actual',activeSessionKey:'actual-session',viewMode:'workspace',currentLanguage:'ko',promptDrafts:new Map([['actual-session','한글 unsent']]),executionBySession:new Map(),activeDraft:null,clearTimeout(){},setTimeout(){return 1;},sessionStorage:{setItem:(key,value)=>memory.set(key,value)}};
   vm.runInNewContext(checkpoint,tab);tab.checkpointController();

@@ -4,12 +4,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {codexProjects,codexSessionProject,orderCodexSessions} from '../scripts/codex-navigation.mjs';
-import {nativeNavigation,projectHistoryKey,sessionHistoryKey} from '../scripts/native-navigation.mjs';
-import {NavigationHistory} from '../scripts/navigation-history.mjs';
+import {nativeNavigation,nativeTranscriptProjection} from '../scripts/native-navigation.mjs';
 import {ContextManager} from '../scripts/context-manager.mjs';
 import {reconcileNativeContext} from '../scripts/native-context.mjs';
 
-test('native membership groups worktrees under their actual project without changing dispatch cwd; saved order and recent access survive restart',()=>{
+test('native membership and order survive Snowball navigation and legacy recency without changing dispatch cwd',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-nav-'));
  try{
   const a=path.join(root,'a'),b=path.join(root,'b'),worktree=path.join(root,'worktree');for(const dir of [a,b,worktree])fs.mkdirSync(dir);
@@ -18,13 +17,17 @@ test('native membership groups worktrees under their actual project without chan
   const membership=codexSessionProject(state,'s1');assert.equal(membership.projectRoot,a);
   assert.equal(codexSessionProject(state,'unassigned'),null);
   const sessions={'snowball.codex':{Same:[{id:'s1',sessionKey:'one',cwd:worktree,...membership},{id:'s2',sessionKey:'two',cwd:a}]}};
-  const history=new NavigationHistory(root,()=>1000),catalog=nativeNavigation(sessions,{'snowball.codex':projects},history)['snowball.codex'];
+  const catalog=nativeNavigation(sessions,{'snowball.codex':projects})['snowball.codex'];
   assert.equal(catalog.length,2);assert.equal(catalog[0].root,b);assert.equal(catalog[1].sessions.length,2);assert.equal(catalog[1].sessions[0].cwd,worktree);
-  history.touch([projectHistoryKey('snowball.codex',a),sessionHistoryKey('two')]);
-  const restored=new NavigationHistory(root),ordered=nativeNavigation(sessions,{'snowball.codex':projects},restored)['snowball.codex'];
-  assert.equal(ordered[0].root,a);assert.equal(ordered[0].sessions[0].id,'s2');assert.equal(ordered[1].root,b);
-  const context=new ContextManager();context.navigationHistory=restored;reconcileNativeContext(context,sessions,{'snowball.codex':projects});
-  context.selectProject(0);context.selectSession(1);const selected=context.getCurrentSession();context.openEditor('session');assert.equal(context.getCurrentSession(),selected);
+  fs.writeFileSync(path.join(root,'navigation-history.v1.json'),JSON.stringify({records:{'s:two':Date.now()}}));
+  const obsoleteHistory={order(){throw Error('Snowball recency must not affect native order');}};
+  const ordered=nativeNavigation(sessions,{'snowball.codex':projects},obsoleteHistory)['snowball.codex'];
+  assert.equal(ordered[0].root,b);assert.equal(ordered[1].sessions[0].id,'s1');
+  const context=new ContextManager();context.navigationHistory=obsoleteHistory;reconcileNativeContext(context,sessions,{'snowball.codex':projects});
+  context.selectProject(1);context.selectSession(1);const selected=context.getCurrentSession();context.openEditor('session');assert.equal(context.getCurrentSession(),selected);
+  assert.deepEqual(context.getSessionsForCurrentScope().map(s=>s.id),['s1','s2']);
+  reconcileNativeContext(context,{'snowball.codex':{Same:[sessions['snowball.codex'].Same[1],sessions['snowball.codex'].Same[0]]}},{'snowball.codex':projects});
+  assert.equal(context.getCurrentSession(),selected);assert.equal(context.getSessionsForCurrentScope()[context.editorFocusIdx].id,selected.id);
   const legacy=new ContextManager(),scope=legacy.getScopeKey();
   const pending={id:'s1',sessionKey:'one',title:'Before regrouping',cwd:worktree},draft={id:'s-draft',title:'Unsubmitted'};
   legacy.projectsByScope[scope]=[{id:'old-main',name:'Same',path:a},{id:'old-tree',name:'Same',path:worktree}];
@@ -46,4 +49,12 @@ test('Codex append-only index deduplicates IDs and honors native manual order be
  assert.deepEqual(orderCodexSessions(items,{}).map(s=>s.id),['a','b']);
  const state={'thread-project-assignments':{a:{projectId:'p'},b:{projectId:'p'}},'sidebar-project-thread-orders':{p:['b','a']}};
  const ordered=orderCodexSessions(items,state);assert.deepEqual(ordered.map(s=>s.id),['b','a']);assert.equal(ordered[1].thread_name,'renamed');
+});
+
+test('full transcripts publish once per actual scoped session, without source/ID alias duplication',()=>{
+ const turns=[{role:'agent',text:'Complete content beyond 800 characters: '+ '한글'.repeat(1000)}];
+ const sessions={'snowball.antigravity':{project:[{id:'native-id',sessionKey:'actual/scoped/key'}]}};
+ const projected=nativeTranscriptProjection(sessions,{'native-id':turns,'antigravity/native-id':turns,'actual/scoped/key':turns,stale:[{text:'not in native navigation'}]});
+ assert.deepEqual(Object.keys(projected),['actual/scoped/key']);assert.equal(projected['actual/scoped/key'],turns);
+ assert.equal(projected['actual/scoped/key'][0].text,turns[0].text);
 });

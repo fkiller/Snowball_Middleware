@@ -4,7 +4,6 @@ import * as fs from 'node:fs/promises';
 import * as syncFs from 'node:fs';
 import * as cp from 'node:child_process';
 import { markdownPreview } from './markdown-preview.mjs';
-import {projectHistoryKey,sessionHistoryKey} from './native-navigation.mjs';
 
 export function stringDisplayWidth(str) {
   let w = 0;
@@ -562,15 +561,6 @@ export class ContextManager {
   }
 
   openEditor(field) {
-    if(this.navigationHistory && ['project','session'].includes(field)) {
-      const project=this.getCurrentProject(),session=this.getCurrentSession(),fullScope=this.getFullScopeKey();
-      this.memoryProjectPerHarness.set(this.getScopeKey(),project.id);this.memorySessionPerProject.set(this.getFullScopeKey(),session.id);
-      const projects=this.projectsByScope[this.getScopeKey()];
-      if(projects)this.projectsByScope[this.getScopeKey()]=this.navigationHistory.order(projects,p=>projectHistoryKey(this.getCurrentHarness().id,p.path));
-      const sessions=this.sessionsByScope[fullScope];
-      if(sessions)this.sessionsByScope[fullScope]=this.navigationHistory.order(sessions,s=>sessionHistoryKey(s.sessionKey));
-      this.resolveProjectAndSession();
-    }
     if (this.activeEditor === field) {
       this.activeEditor = 'none';
     } else {

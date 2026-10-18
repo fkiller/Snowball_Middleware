@@ -33,6 +33,17 @@ async function login(api) { const grant = api.issueBootstrap(); const res = awai
 const input = (journal, commandId, extra = {}) => ({ commandId, sessionKey, ownerId, expectedRevision: journal.session(sessionKey).revision, operation: 'sessions.send', payload: { text: 'private-payload' }, ...extra });
 const matches = (status, code) => error => error.status === status && (!code || error.code === code);
 
+test('trusted native refresh publishes complete current transcript data without commands or selection changes',async t=>{
+  let turns={[sessionKey]:[{role:'agent',text:'before'}]};
+  const {api,journal}=await setup(t,{turnsStore:()=>turns});const auth=await login(api);
+  const before=(await request(api,'/v1/snapshot',{auth})).body;
+  turns={[sessionKey]:[{role:'agent',text:'한글'.repeat(1500)+' final line'}]};
+  api.notifyNativeObservations();
+  const after=(await request(api,'/v1/snapshot',{auth})).body;
+  assert.notEqual(after.cursor,before.cursor);assert.equal(after.turnsStore[sessionKey][0].text,turns[sessionKey][0].text);
+  assert.deepEqual(after.sessions,before.sessions);assert.deepEqual(journal.listCommands(),[]);
+});
+
 test('native access catalog keeps request validation and native failures closed',async t=>{
   let calls=0;const {api}=await setup(t,{listAccess:async(plugin,instance)=>{calls++;assert.equal(instance,'default');if(plugin==='failed')throw Error('native failure');return ['observed-policy'];}});
   const auth=await login(api);

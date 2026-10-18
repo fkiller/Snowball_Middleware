@@ -18,7 +18,7 @@ export interface Snapshot {
   hostId?: string;
   desktopCapabilities?: {tray: boolean; autostart: boolean; codexSelection?: boolean};
   sessionDetails?: SessionSummary[];
-  connectedHarnesses?: {pluginId: string; instanceId: string | null; disabled: boolean; connected: boolean; auth: string; sessionListTruncated: boolean; canAttach: boolean; canCreate: boolean; canListModels: boolean}[];
+  connectedHarnesses?: {pluginId: string; instanceId: string | null; disabled: boolean; connected: boolean; auth: string; sessionListTruncated: boolean; canAttach: boolean; canCreate: boolean; canListModels: boolean; controlSurface?: 'native-cli'; unavailableReason?: 'cli_missing' | 'cli_probe_failed' | null}[];
   sessionMessages?: Record<string, {role: 'agent'; text: string; turnId: string; receivedAt: number; truncated: boolean}[]>;
   hostname?: string;
   workspaceCandidates?: (ProjectCandidate & { workspaceId?: string })[];

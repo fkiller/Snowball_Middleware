@@ -47,7 +47,9 @@ export function readHarnessCli(kind, args) {
 
 export function installedHarnessVersions() {
   return Object.fromEntries(['codex', 'antigravity', 'opencode'].map(kind => {
-    try { return [kind, { available: true, version: readHarnessCli(kind, ['--version']).trim() }]; }
-    catch { return [kind, { available: false, version: null }]; }
+    try { resolveHarnessExecutable(kind); }
+    catch { return [kind, { available: false, version: null, unavailableReason: 'cli_missing' }]; }
+    try { return [kind, { available: true, version: readHarnessCli(kind, ['--version']).trim(), unavailableReason: null }]; }
+    catch { return [kind, { available: false, version: null, unavailableReason: 'cli_probe_failed' }]; }
   }));
 }

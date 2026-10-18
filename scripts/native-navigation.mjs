@@ -10,10 +10,7 @@ export function canonicalProjectRoot(root) {
   // Filesystem identity also preserves distinct case-sensitive Windows folders.
   return stat.ino ? `${stat.dev}:${stat.ino}` : resolved;
 }
-export const projectHistoryKey = (harness, root) => `p:${harness}:${canonicalProjectRoot(root)}`;
-export const sessionHistoryKey = sessionKey => `s:${sessionKey}`;
-
-export function nativeNavigation(sessions, projects = {}, history) {
+export function nativeNavigation(sessions, projects = {}) {
   const result = {};
   for (const harness of new Set([...Object.keys(projects), ...Object.keys(sessions)])) {
     const roots = new Map();
@@ -31,12 +28,17 @@ export function nativeNavigation(sessions, projects = {}, history) {
       if (!project) continue;
       seen.add(session.id); project.sessions.push({...session, projectRoot:project.root, projectName:project.displayName});
     }
-    let ordered = [...roots.values()];
-    if (history) {
-      ordered = history.order(ordered, p => projectHistoryKey(harness,p.root));
-      for (const project of ordered) project.sessions = history.order(project.sessions, s => sessionHistoryKey(s.sessionKey));
-    }
-    result[harness] = ordered;
+    result[harness] = [...roots.values()];
+  }
+  return result;
+}
+
+// Publish one copy of each native transcript, using the real host-scoped key.
+// Internal ID/source aliases are lookup conveniences, not separate messages.
+export function nativeTranscriptProjection(sessions, turns) {
+  const result = {};
+  for(const groups of Object.values(sessions))for(const list of Object.values(groups))for(const session of list) {
+    if(session.sessionKey)result[session.sessionKey]=turns[session.sessionKey]??turns[session.id]??[];
   }
   return result;
 }

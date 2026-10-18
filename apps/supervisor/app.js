@@ -731,6 +731,16 @@ document.addEventListener('click', e => {
 });
 
 // --- Workspace View (MK20 Session Workspace) ---
+function harnessControlLabel(ready,binding,isEn) {
+  if(ready)return isEn?'Ready':'사용 가능';
+  if(binding?.controlSurface==='native-cli' && !binding.connected) {
+    return binding.unavailableReason==='cli_missing'
+      ? (isEn?'Control CLI not installed':'제어 CLI 미설치')
+      : (isEn?'Control CLI check failed':'제어 CLI 확인 실패');
+  }
+  return binding?.connected===false?(isEn?'Disconnected':'연결 끊김'):(isEn?'Read only':'조회 전용');
+}
+
 function renderWorkspace() {
   ensureHierarchy();
   const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
@@ -759,8 +769,9 @@ function renderWorkspace() {
   const headerEl = $('session-header');
   if (headerEl) {
     headerEl.replaceChildren();
-    const statusText=isOwned?(isEn?'Ready':'사용 가능'):liveBinding?.connected===false?(isEn?'Disconnected':'연결 끊김'):(isEn?'Read only':'조회 전용');
+    const statusText=harnessControlLabel(isOwned,liveBinding,isEn);
     const statusBadge=node('span',statusText,'control-status'+(isOwned?' connected':''));headerEl.append(statusBadge);
+    if(liveBinding?.controlSurface==='native-cli')statusBadge.title=isEn?'Snowball control uses the native CLI. The desktop app running does not establish this control connection.':'Snowball 제어는 네이티브 CLI를 사용합니다. Desktop 앱 실행 여부와 별개의 상태입니다.';
     const details=$('session-details');
     if(details){details.replaceChildren(node('p',curSession.title||''),node('p',`${curHarnessName} / ${curSession.harnessInstanceId}`),node('p',curSession.cwd||''),node('p',`Session: ${curSession.sessionKey}`),node('p',`Owner: ${curSession.ownerId||'—'}`));}
     if (liveBinding?.sessionListTruncated) headerEl.append(node('p', isEn ? 'Showing partial session history. View full history in native app.' : '세션 목록 일부만 표시됩니다. 네이티브 앱에서 전체 기록을 확인할 수 있습니다.'));

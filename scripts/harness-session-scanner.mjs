@@ -87,12 +87,12 @@ export function scanAllHarnessSessions() {
                       .join('\n')
                       .trim();
                     if (text && text.length > 5) {
-                      turns.push({ role: 'user', text: text.slice(0, 800), userPrompt: text.slice(0, 800), time: '최근' });
+                      turns.push({ role: 'user', text: text, userPrompt: text, time: '최근' });
                     }
                   } else if (role === 'assistant') {
                     const text = p.payload.content?.map(c => c.text).filter(Boolean).join('\n').trim();
                     if (text && text.length > 5) {
-                      turns.push({ role: 'agent', text: text.slice(0, 800), agentResponse: text.slice(0, 800), time: '최근', processDetails: [] });
+                      turns.push({ role: 'agent', text: text, agentResponse: text, time: '최근', processDetails: [] });
                     }
                   }
                 } else if (p.type === 'response_item' && p.payload && (p.payload.type === 'function_call' || p.payload.type === 'tool_call' || p.payload.name)) {
@@ -130,7 +130,7 @@ export function scanAllHarnessSessions() {
             access: sessAccess || 'on-request'
           });
 
-          const savedTurns = turns.slice(-15);
+          const savedTurns = turns;
           turnsStore[sessionKey] = savedTurns;
           turnsStore[item.id] = savedTurns;
         } catch {}

@@ -44,8 +44,7 @@ import { chooseLanAddress, privateIpv4 } from './setup-profile.mjs';
 import { loadSuitePlugins } from './suite-plugins.mjs';
 import {desktopBridge} from './desktop-bridge.mjs';
 import {loadSettings,saveSettings} from '../apps/supervisor/settings-store.mjs';
-import {NavigationHistory} from './navigation-history.mjs';
-import {nativeNavigation, projectHistoryKey, sessionHistoryKey} from './native-navigation.mjs';
+import {nativeNavigation, nativeTranscriptProjection} from './native-navigation.mjs';
 
 const profile = process.env.SNOWBALL_PROFILE ?? 'web';
 if (!['web', 'mk20', 'm5stack'].includes(profile)) throw Error('Invalid Snowball profile');
@@ -66,7 +65,6 @@ let controlPaused=savedSettings.controlPaused;
 const sources = new NativeSourceService();
 const controllerPersistence = await loadControllerStore(directory);
 const controllerStates = controllerPersistence.store;
-const navigationHistory = new NavigationHistory(directory);
 let observedProjects = {};
 const hostIdFile = path.join(directory, 'host.v1.json');
 let hostId;
@@ -141,21 +139,6 @@ try {
 // Register real sessions discovered from Codex, Antigravity, and OpenCode
 let realSessionsData = {};
 let realTurnsData = {};
-const navigationSelections = new Map();
-controllerStates.subscribe(() => {
-  for (const state of controllerStates.snapshot().states) {
-    const current = controllerStates.get(state.controllerId);
-    const marker = JSON.stringify([current.selection,current.preferences.projectName]);
-    const previous = navigationSelections.get(state.controllerId);
-    navigationSelections.set(state.controllerId,marker);
-    if (previous === undefined || previous === marker) continue;
-    const harness = current.selection.harnessPluginId;
-    const projects = nativeNavigation(realSessionsData,observedProjects)[harness] || [];
-    const project = projects.find(p => p.sessions.some(s => s.sessionKey === current.selection.sessionKey))
-      || projects.find(p => p.id === current.preferences.projectName || p.root === current.preferences.projectName);
-    if (project) navigationHistory.touch([projectHistoryKey(harness,project.root),current.selection.sessionKey && sessionHistoryKey(current.selection.sessionKey)]);
-  }
-});
 try {
   const { sessionsByHarness, turnsStore } = await sources.read('sessions');
   realSessionsData = sessionsByHarness;
@@ -189,8 +172,46 @@ const installedVersions = await sources.read('installations');
 console.log('Harness installations:', installedVersions);
 const connectedHarnesses = Object.entries(installedVersions).map(([kind, info]) => ({
   pluginId: `snowball.${kind}`, instanceId: 'default', connected: info.available,
+  controlSurface: 'native-cli', unavailableReason: info.unavailableReason,
   canCreate: false, canAttach: info.available, canListModels: info.available,
 }));
+
+let nativeRefresh, nativeFingerprint='';
+function refreshNativeObservations() {
+  if(nativeRefresh)return nativeRefresh;
+  nativeRefresh=(async()=>{
+    const [observed,projects,versions]=await Promise.all([sources.read('sessions'),sources.read('projects'),sources.read('installations')]);
+    const fingerprint=JSON.stringify([observed,projects,versions]);
+    if(fingerprint===nativeFingerprint)return;
+    for(const [pluginId,groups] of Object.entries(observed.sessionsByHarness))for(const list of Object.values(groups))for(const session of list) {
+      session.sessionKey=formatSessionKey({hostId,harness:{pluginId,instanceId:'default'},nativeSessionId:session.id});
+      const registered=journal.registerSession(session.sessionKey,'user');
+      session.ownerId=registered.ownerId;session.readOnly=false;
+      observed.turnsStore[session.sessionKey]=observed.turnsStore[session.id]||[];
+    }
+    for(const key of Object.keys(realSessionsData))delete realSessionsData[key];
+    Object.assign(realSessionsData,observed.sessionsByHarness);
+    Object.assign(realTurnsData,observed.turnsStore);
+    observedProjects=projects;Object.assign(installedVersions,versions);
+    for(const binding of connectedHarnesses) {
+      const info=versions[binding.pluginId.replace('snowball.','')];
+      binding.connected=info.available;binding.canAttach=info.available;binding.canListModels=info.available;binding.unavailableReason=info.unavailableReason;
+    }
+    for(const {context,nativeDispatches} of mk20Contexts.values()) {
+      reconcileNativeContext(context,realSessionsData,projects);
+      for(const harness of context.harnesses)harness.isEnabled=versions[harness.id.replace('snowball.','')]?.available===true;
+      const selected=context.getCurrentSession();
+      if(!nativeDispatches.size&&!selected.id.startsWith('s-')) {
+        const turns=realTurnsData[selected.sessionKey]??realTurnsData[selected.id];
+        if(turns) {
+          const scroll=context.readerScrollLine;selected.turns=turns;context.setSessionTurns(turns);context.readerScrollLine=scroll;
+        }
+      }
+    }
+    nativeFingerprint=fingerprint;api.notifyNativeObservations();
+  })().finally(()=>{nativeRefresh=undefined;});
+  return nativeRefresh;
+}
 
 async function handleListModels(pluginId, instanceId) {
   const list = await sources.read('catalog', pluginId);
@@ -309,9 +330,9 @@ const api = new LocalApi({
     }
   },
   realSessions: realSessionsData,
-  navigationCatalog: () => nativeNavigation(realSessionsData, observedProjects, navigationHistory),
+  navigationCatalog: () => nativeNavigation(realSessionsData, observedProjects),
   harnessPresentations:suite?.presentations ?? {'snowball.codex':codexPresentation,'snowball.antigravity':agyPresentation,'snowball.opencode':ocodePresentation},
-  turnsStore: realTurnsData,
+  turnsStore: () => nativeTranscriptProjection(realSessionsData,realTurnsData),
   connectedHarnesses,
   listModels: handleListModels,
   listAccess: listNativeAccess,
@@ -340,6 +361,8 @@ function refreshCode() {
 
 const currentBootstrap = refreshCode();
 const bootstrapTimer = setInterval(refreshCode, 30_000);
+// Observe actual native changes; browsing Snowball never changes this order.
+const nativeObservationTimer=setInterval(()=>void refreshNativeObservations().catch(error=>console.warn('Native observation refresh failed:',error.message)),30_000);
 
 console.log('====================================================');
 console.log('  SNOWBALL MIDDLEWARE IS ONLINE');
@@ -647,7 +670,6 @@ let cachedContext=mk20Contexts.get(mk20ControllerId);
 if(!cachedContext&&mk20Contexts.size>=16)throw Error('MK20 controller context capacity reached');
 const context = cachedContext?.context ?? new ContextManager();
 context.readerRows = 4;
-context.navigationHistory = navigationHistory;
 context.harnessPresentations = suite?.presentations ?? {'snowball.codex':codexPresentation,'snowball.antigravity':agyPresentation,'snowball.opencode':ocodePresentation};
 const nativeDispatches = cachedContext?.nativeDispatches ?? new Map();
 if(!cachedContext)mk20Contexts.set(mk20ControllerId,{context,nativeDispatches});
@@ -693,17 +715,8 @@ context.accessLevels = ['Native policy'];
 
 // Observe this PC again on every selection; saved controller objects retain
 // drafts and owned dispatch handles while native additions remain discoverable.
-const [nativeSessions,nativeProjects]=await Promise.all([sources.read('sessions'),sources.read('projects')]);
-for (const key of Object.keys(realSessionsData)) delete realSessionsData[key];
-Object.assign(realSessionsData,nativeSessions.sessionsByHarness);
-observedProjects=nativeProjects;
-Object.assign(realTurnsData,nativeSessions.turnsStore);
-for(const [pluginId,groups] of Object.entries(realSessionsData))for(const list of Object.values(groups))for(const native of list){
-  native.sessionKey=formatSessionKey({hostId,harness:{pluginId,instanceId:'default'},nativeSessionId:native.id});
-  const registered=journal.registerSession(native.sessionKey,'user');
-  native.ownerId=registered.ownerId;native.readOnly=false;
-}
-reconcileNativeContext(context,realSessionsData,nativeProjects);
+await refreshNativeObservations();
+reconcileNativeContext(context,realSessionsData,observedProjects);
 
 // Function to load turns for currently selected session
 async function loadCurrentSessionTurns() {
@@ -1551,6 +1564,7 @@ const cleanup = async (code = 0) => {
   if (closing) return; closing = true;
   clearInterval(discoveryRetry);
   clearInterval(bootstrapTimer);
+  clearInterval(nativeObservationTimer);
   speechAbort.abort();
   for(const cached of mk20Contexts.values())for(const operation of cached.nativeDispatches.values())operation.abort();
   await closeDevice();

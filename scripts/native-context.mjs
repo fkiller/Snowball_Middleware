@@ -6,12 +6,14 @@ import {nativeNavigation, canonicalProjectRoot} from './native-navigation.mjs';
 // Refresh actual local observations without replacing objects owned by a
 // pending native turn or transcription. Separate identically named directories.
 export function reconcileNativeContext(context, sessions, projects = {}) {
+  const focusedItems=context.activeEditor==='project'?context.getProjectsForCurrentScope():context.activeEditor==='session'?context.getSessionsForCurrentScope():[];
+  const focusedId=focusedItems[context.editorFocusIdx]?.id;
   context.saveActiveSessionState();
   const project = context.getCurrentProject(), session = context.getCurrentSession();
   if (project.id !== 'none') context.memoryProjectPerHarness.set(context.getScopeKey(), project.id);
   if (session.id !== 'none') context.memorySessionPerProject.set(context.getFullScopeKey(), session.id);
   const canonical = canonicalProjectRoot;
-  const catalog = nativeNavigation(sessions, projects, context.navigationHistory);
+  const catalog = nativeNavigation(sessions, projects);
   for (const harness of context.harnesses) {
     const scope = `dev-pc/${harness.id}`, roots = new Map();
     const observe = (root, name) => {
@@ -56,4 +58,9 @@ export function reconcileNativeContext(context, sessions, projects = {}) {
   const retainedProject=(context.projectsByScope[activeScope]||[]).find(p=>(context.sessionsByScope[`${activeScope}/${p.id}`]||[]).some(s=>s.id===session.id));
   if(retainedProject){context.memoryProjectPerHarness.set(activeScope,retainedProject.id);context.memorySessionPerProject.set(`${activeScope}/${retainedProject.id}`,session.id);}
   context.resolveProjectAndSession();
+  if(focusedId) {
+    const refreshed=context.activeEditor==='project'?context.getProjectsForCurrentScope():context.getSessionsForCurrentScope();
+    context.editorFocusIdx=Math.max(0,refreshed.findIndex(item=>item.id===focusedId));
+    context.editorChoiceWindowStart=Math.max(0,context.editorFocusIdx-2);
+  }
 }

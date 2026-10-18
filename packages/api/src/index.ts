@@ -66,6 +66,8 @@ export interface LocalApiOptions {
     canAttach?: boolean;
     canListModels?: boolean;
     sessionListTruncated?: boolean;
+    controlSurface?: 'native-cli';
+    unavailableReason?: 'cli_missing' | 'cli_probe_failed' | null;
   }>;
   listModels?: (pluginId: string, instanceId: string) => Promise<Array<{ model: string; displayName: string; efforts: string[] }>>;
   listAccess?: (pluginId: string, instanceId: string) => Promise<string[]>;
@@ -202,6 +204,8 @@ export class LocalApi {
     for (const [hash, session] of this.sessions) if (session.expiresAt <= this.now()) this.sessions.delete(hash);
     for (const stream of this.streams) if (stream.session.expiresAt <= this.now()) { stream.response.end(); this.streams.delete(stream); }
   }
+  /** Trusted local observation refresh; carries no command or controller mutation. */
+  notifyNativeObservations(): void { if (!this.closed) this.changed(); }
   private changed(): void {
     this.sequence++;
     const event = { cursor: this.cursor, data: JSON.stringify({ cursor: this.cursor }) };
@@ -320,7 +324,7 @@ export class LocalApi {
       realSessions: this.options.realSessions ?? null,
       navigationCatalog: this.options.navigationCatalog?.() ?? null,
       harnessPresentations: structuredClone(this.options.harnessPresentations??{}),
-      turnsStore: this.options.turnsStore ?? null,
+      turnsStore: typeof this.options.turnsStore === 'function' ? this.options.turnsStore() : this.options.turnsStore ?? null,
     };
   }
   private async route(req: IncomingMessage, res: ServerResponse): Promise<void> {

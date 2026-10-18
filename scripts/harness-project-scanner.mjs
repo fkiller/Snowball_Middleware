@@ -22,46 +22,13 @@ export function scanHarnessProjects() {
     console.error('Error scanning Codex projects:', e);
   }
 
-  // 2. ANTIGRAVITY
-  try {
-    const agProjects = new Map();
-    // Also scan APPDATA/Antigravity storage.json
-    const appData = process.env.APPDATA || '';
-    const storageJson = path.join(appData, 'Antigravity', 'User', 'globalStorage', 'storage.json');
-    if (fs.existsSync(storageJson)) {
-      try {
-        const data = JSON.parse(fs.readFileSync(storageJson, 'utf8'));
-        const ws = data?.profileAssociations?.workspaces || {};
-        for (const uri of Object.keys(ws)) {
-          let p = decodeURIComponent(uri.replace(/^file:\/\/\/?/, ''));
-          p = path.normalize(p);
-          if (fs.existsSync(p)) {
-            agProjects.set(p, path.basename(p) || p);
-          }
-        }
-      } catch {}
-    }
-
-    let idx = 1;
-    for (const [root, name] of agProjects.entries()) {
-      result['snowball.antigravity'].push({
-        candidateId: `ag_${idx++}`,
-        nativeProjectId: name,
-        displayName: name,
-        root: root,
-        harness: { pluginId: 'snowball.antigravity', instanceId: 'default' }
-      });
-    }
-  } catch (e) {
-    console.error('Error scanning Antigravity projects:', e);
-  }
-
-  // 3. OPENCODE
+  // 2. ANTIGRAVITY and OPENCODE from the same actual native scan
   try {
     const ocProjects = new Map();
     const pyScript = path.join(path.dirname(fileURLToPath(import.meta.url)), 'harness-db-scanner.py');
-    const data = JSON.parse(cp.execFileSync('python', [pyScript], { encoding: 'utf8', timeout: 12000,
+    const data = JSON.parse(cp.execFileSync('python', [pyScript, '--projects-only'], { encoding: 'utf8', timeout: 12000,
       windowsHide: true, maxBuffer: 20 * 1024 * 1024, env: { ...process.env, PYTHONIOENCODING: 'utf-8' } }));
+    result['snowball.antigravity'] = data.antigravityProjects || [];
     for (const [name, sessions] of Object.entries(data.opencode || {})) {
       const cwd = sessions.find(session => session.cwd && path.isAbsolute(session.cwd))?.cwd;
       if (cwd) ocProjects.set(name, { displayName: name, root: cwd });
