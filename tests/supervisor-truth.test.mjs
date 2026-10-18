@@ -59,6 +59,10 @@ test('canonical native project catalog replaces duplicate registered, candidate 
  vm.runInNewContext(helpers,ctx);
  assert.equal(ctx.getProjectsForHarness('snowball.codex').length,1);
  const session=ctx.getSessionsForProject('snowball.codex','canonical')[0];assert.equal(session.cwd,'worktree');assert.equal(session.readOnly,true);
+ ctx.snapshot.navigationCatalog['snowball.codex'][0].sessions[0].readOnly=false;
+ assert.equal(ctx.getSessionsForProject('snowball.codex','canonical')[0].readOnly,true);
+ ctx.snapshot.sessions=[{sessionKey:'actual-session',ownerId:'registered-owner',revision:3}];
+ const registered=ctx.getSessionsForProject('snowball.codex','canonical')[0];assert.equal(registered.readOnly,false);assert.equal(registered.ownerId,'registered-owner');
 });
 test('provider, transcript and device strings never enter interpolated HTML sinks',()=>{
  assert.ok(!/\.innerHTML\s*=\s*`[^`]*\$\{/s.test(source));

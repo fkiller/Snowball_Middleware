@@ -700,7 +700,8 @@ observedProjects=nativeProjects;
 Object.assign(realTurnsData,nativeSessions.turnsStore);
 for(const [pluginId,groups] of Object.entries(realSessionsData))for(const list of Object.values(groups))for(const native of list){
   native.sessionKey=formatSessionKey({hostId,harness:{pluginId,instanceId:'default'},nativeSessionId:native.id});
-  journal.registerSession(native.sessionKey,'user');
+  const registered=journal.registerSession(native.sessionKey,'user');
+  native.ownerId=registered.ownerId;native.readOnly=false;
 }
 reconcileNativeContext(context,realSessionsData,nativeProjects);
 

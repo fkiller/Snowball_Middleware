@@ -422,7 +422,10 @@ function getProjectsForHarness(harnessPluginId) {
 
 function getSessionsForProject(harnessPluginId, projectId) {
   const project = snapshot?.navigationCatalog?.[harnessPluginId]?.find(p => p.id === projectId);
-  if (project) return project.sessions.map(s => ({...s,harnessPluginId,harnessInstanceId:'default',workspaceId:projectId,...((snapshot.sessions || []).find(j=>j.sessionKey===s.sessionKey)||{})}));
+  if (project) return project.sessions.map(s => {
+    const registered=(snapshot.sessions || []).find(j=>j.sessionKey===s.sessionKey);
+    return {...s,harnessPluginId,harnessInstanceId:'default',workspaceId:projectId,...registered,ownerId:registered?.ownerId??null,readOnly:!registered?.ownerId||s.readOnly!==false,revision:registered?.revision??0};
+  });
   const ws = (snapshot?.workspaceDetails ?? []).find(w => w.workspaceId === projectId);
   const targetKey = ws ? ws.displayName : projectId;
   const observed = snapshot?.realSessions?.[harnessPluginId]?.[targetKey];
@@ -756,7 +759,7 @@ function renderWorkspace() {
   const headerEl = $('session-header');
   if (headerEl) {
     headerEl.replaceChildren();
-    const statusText=isOwned?(isEn?'Connected':'연결됨'):(isEn?'Read only':'조회 전용');
+    const statusText=isOwned?(isEn?'Ready':'사용 가능'):liveBinding?.connected===false?(isEn?'Disconnected':'연결 끊김'):(isEn?'Read only':'조회 전용');
     const statusBadge=node('span',statusText,'control-status'+(isOwned?' connected':''));headerEl.append(statusBadge);
     const details=$('session-details');
     if(details){details.replaceChildren(node('p',curSession.title||''),node('p',`${curHarnessName} / ${curSession.harnessInstanceId}`),node('p',curSession.cwd||''),node('p',`Session: ${curSession.sessionKey}`),node('p',`Owner: ${curSession.ownerId||'—'}`));}
