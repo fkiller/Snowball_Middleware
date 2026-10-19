@@ -13,18 +13,44 @@ const control=process.env.SNOWBALL_TEST_MK20_COMPOSITION_ROOT??fileURLToPath(new
 
 test('review uses the component version and keeps current/newer images quiet',()=>{
   const release={version:'0.2.6',components:{runtime:{version:'0.2.6'},qmk:{version:'2026.9.18'}}};
-  const runtime={component:'runtime',currentVersion:'0.2.6',online:true,phase:'ready',imageMatch:true};
+  const runtime={component:'runtime',currentVersion:'0.2.6',online:true,phase:'ready',imageMatch:true,transport:'usb',usbIdentity:'verified-runtime',writable:true,nextStep:'ready'};
   assert.equal(preparationNeedsUpdate(runtime,release),false);
   assert.equal(preparationNeedsReview(runtime,release),false);
   assert.equal(preparationNeedsReview({...runtime,currentVersion:'0.2.5'},release),true);
-  assert.equal(preparationNeedsReview({...runtime,imageMatch:false},release),true);
+  assert.equal(preparationNeedsReview({...runtime,imageMatch:false},release),false,'same-version repair remains a manual choice');
   assert.equal(preparationNeedsReview({...runtime,currentVersion:'0.2.7',imageMatch:false},release),false);
   assert.equal(preparationNeedsReview({...runtime,currentVersion:'0.2.5',online:false},release),false);
   assert.equal(preparationNeedsReview({...runtime,currentVersion:'0.2.5',phase:'failed'},release),false);
-  const qmk={component:'qmk',currentVersion:null,online:true,nextStep:'enter-dfu'};
+  const qmk={...runtime,component:'qmk',currentVersion:null,nextStep:'enter-dfu'};
   assert.equal(preparationNeedsReview(qmk,release),false,'HID cannot prove an outdated image');
   assert.equal(preparationNeedsReview({...qmk,currentVersion:'2026.9.17',nextStep:'ready'},release),true);
   assert.equal(preparationNeedsUpdate({...qmk,currentVersion:'2026.9.18'},release),false);
+});
+
+test('automatic review requires a supported versioned USB update, never LAN/SD/pending/unknown observations',()=>{
+  const release={version:'0.5.7'};
+  const usb={transport:'usb',usbIdentity:'usb-one',online:true,phase:'ready',status:'snowball',hello:{firmware:'0.5.6'}};
+  assert.equal(preparationNeedsReview(usb,release),true);
+  for(const changed of [{transport:'lan'},{transport:'maintenance'},{transport:'storage'},{transport:undefined},{usbIdentity:''},{online:false},{phase:'failed'},{phase:'checking'},{pending:true},{status:'unknown'},{hello:{firmware:'unknown'}},{hello:{firmware:'0.5.7'}},{hello:{firmware:'0.5.8'}}])assert.equal(preparationNeedsReview({...usb,...changed},release),false,JSON.stringify(changed));
+});
+
+test('startup inventory stays quiet; eligible USB hotplug opens once until real disconnect',{skip:!fs.existsSync(path.join(control,'hardware/mk20/firmware/setup.json'))},async t=>{
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-usb-attention-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const hub=new DeviceSetupHub({adapters:[{profile:'mk20',device:{deviceRoot:path.join(control,'hardware/mk20'),python:path.join(root,'not-run')}}],backupDirectory:root});
+  const setup=hub.setups.get('mk20'),reviews=[];hub.on('review',value=>reviews.push(value));
+  const usb={port:'usb-one',transport:'usb',usbIdentity:'supported-one',online:true,phase:'ready',component:'runtime',writable:true,nextStep:'ready',currentVersion:'0.0.1'};
+  setup.records.set(usb.port,usb);hub.reviewUsbAttachments('mk20',setup);
+  assert.equal(reviews.length,0,'existing devices at startup do not reopen a window');
+  setup.records.clear();hub.reviewUsbAttachments('mk20',setup);
+  setup.records.set(usb.port,{...usb,currentVersion:null});hub.reviewUsbAttachments('mk20',setup);
+  assert.equal(reviews.length,0,'presence without a version is insufficient');
+  setup.records.set(usb.port,usb);hub.reviewUsbAttachments('mk20',setup);assert.equal(reviews.length,1);
+  for(let i=0;i<4;i++){setup.records.set(usb.port,{...usb,wifiConfigured:!!(i%2)});hub.reviewUsbAttachments('mk20',setup);}
+  assert.equal(reviews.length,1,'refresh and metadata changes do not reopen a dismissed window');
+  setup.code='usb_operation_failed';setup.records.clear();hub.reviewUsbAttachments('mk20',setup);
+  setup.code=null;setup.records.set(usb.port,usb);hub.reviewUsbAttachments('mk20',setup);assert.equal(reviews.length,1,'failed enumeration is not unplugging');
+  setup.records.clear();hub.reviewUsbAttachments('mk20',setup);setup.records.set(usb.port,usb);hub.reviewUsbAttachments('mk20',setup);assert.equal(reviews.length,2);
+  const empty=new DeviceSetupHub({adapters:[],backupDirectory:root});assert.deepEqual(empty.view().profiles,[]);await empty.scan();await empty.close();await hub.close();
 });
 
 test('disconnected targets disappear, pending boot checks survive, and reconnect re-arms attention',{skip:!fs.existsSync(path.join(control,'hardware/mk20/firmware/setup.json'))},async t=>{

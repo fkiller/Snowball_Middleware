@@ -96,6 +96,50 @@
         }
       }
     },
+    "/v1/transcript": {
+      "post": {
+        "operationId": "readTranscriptChunk",
+        "description": "Read-only selected registered-session history. Join JSON chunks in offset order and parse after the final chunk. Echo revision on subsequent chunks; 409 transcript_changed requires a fresh read. No paths, commands or automatic mutation retries.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["sessionKey", "offset"],
+                "properties": {
+                  "sessionKey": {"type": "string", "maxLength": 1024},
+                  "offset": {"type": "integer", "minimum": 0},
+                  "revision": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "At most 262144 UTF-16 code units from the serialized complete transcript; nextOffset null completes the read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["sessionKey", "revision", "offset", "chunk", "nextOffset"],
+                  "properties": {
+                    "sessionKey": {"type": "string"},
+                    "revision": {"type": "string"},
+                    "offset": {"type": "integer"},
+                    "chunk": {"type": "string", "maxLength": 262144},
+                    "nextOffset": {"type": ["integer", "null"]}
+                  }
+                }
+              }
+            }
+          },
+          "default": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
     "/v1/commands": {
       "post": {
         "operationId": "submitCommand",
@@ -2194,7 +2238,11 @@
               "object",
               "null"
             ],
-            "description": "Legacy transcript projection; production runtime uses bounded sessionMessages."
+            "description": "Complete native history when its serialized projection is at most 2 MiB; otherwise null and transcriptsDeferred is true. The source is retained for selected-session chunk reads."
+          },
+          "transcriptsDeferred": {
+            "type": "boolean",
+            "description": "Fetch complete native history for the selected session through /v1/transcript instead of loading every transcript and alias into the control snapshot."
           },
           "harnessPresentations": {
             "type": "object",

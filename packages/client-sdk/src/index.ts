@@ -25,6 +25,7 @@ export interface Snapshot {
   realSessions?: Record<string, unknown> | null;
   navigationCatalog?: Record<string, {id:string;root:string;displayName:string;sessions:Record<string,unknown>[]}[]> | null;
   turnsStore?: Record<string, unknown> | null;
+  transcriptsDeferred?: boolean;
   cursor: string; sessions: SessionRecord[];
   commands: { commandId: string; actorId: string; sessionKey: string; ownerId: string; operation: string; status: CommandRecord['status']; revision: number; order: number; updatedAt: number }[];
   decisions: Pick<DecisionRecord, 'decisionId' | 'sessionKey' | 'ownerId' | 'status' | 'revision' | 'expiresAt' | 'allowedAnswers'>[];
@@ -68,6 +69,20 @@ export class LocalClient {
     return { controllerId: this.credentials.controllerId, expiresAt: this.credentials.expiresAt };
   }
   snapshot(signal?: AbortSignal): Promise<Snapshot> { return this.request('/v1/snapshot', undefined, signal); }
+  async transcript(sessionKey: string, signal?: AbortSignal): Promise<unknown[]> {
+    let offset = 0, revision: string | undefined;
+    const chunks: string[] = [];
+    for (;;) {
+      const page = await this.request<{sessionKey:string;revision:string;offset:number;chunk:string;nextOffset:number|null}>('/v1/transcript', {sessionKey, offset, ...(revision ? {revision} : {})}, signal);
+      if (page.sessionKey !== sessionKey || page.offset !== offset || !/^[a-f0-9]{64}$/.test(page.revision) || revision && page.revision !== revision || typeof page.chunk !== 'string' || page.chunk.length > 256 * 1024 || page.nextOffset !== null && (page.chunk.length === 0 || page.nextOffset !== offset + page.chunk.length)) throw new Error('Invalid transcript page');
+      chunks.push(page.chunk); revision = page.revision;
+      if (page.nextOffset === null) break;
+      offset = page.nextOffset;
+    }
+    const turns: unknown = JSON.parse(chunks.join(''));
+    if (!Array.isArray(turns)) throw new Error('Invalid transcript');
+    return turns;
+  }
   controller(signal?:AbortSignal):Promise<ControllerState>{return this.request('/v1/controller',undefined,signal);}
   updateController(expectedRevision:number,patch:{selection?:ControllerSelection|null;preferences?:ControllerPreferences;draft?:{destinationKey:string;text:string}|null},signal?:AbortSignal):Promise<ControllerState>{return this.request('/v1/controller',{expectedRevision,patch},signal);}
   /** Explicit user-triggered metadata rescan. Runs no probes and grants nothing. */

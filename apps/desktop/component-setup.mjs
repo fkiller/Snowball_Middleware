@@ -47,7 +47,7 @@ export class ComponentSetup extends DeviceSetup {
         const retryUsb=record?.nextStep==='usb-bootstrap'&&Date.now()-(record.checked??0)>15000;
         if(!record||record.usbIdentity!==identity||(!record.wasPresent&&candidate.present!==false)||force||retryUsb){
           const previous=record;
-          record={port:candidate.port,label:String(candidate.label??this.descriptor.name).slice(0,128),usbIdentity:identity,...(candidate.transport==='maintenance'?{transport:'maintenance'}:{}),online:candidate.present!==false,wasPresent:true,phase:'checking',status:'unknown',checked:Date.now()};
+          record={port:candidate.port,label:String(candidate.label??this.descriptor.name).slice(0,128),usbIdentity:identity,...(['usb','storage','maintenance'].includes(candidate.transport)?{transport:candidate.transport}:{}),online:candidate.present!==false,wasPresent:true,phase:'checking',status:'unknown',checked:Date.now()};
           const suffix=String(candidate.deviceId??'').slice(this.descriptor.identity.prefix.length);
           if(candidate.transport==='maintenance'&&typeof candidate.deviceId==='string'&&candidate.deviceId.startsWith(this.descriptor.identity.prefix)&&new RegExp('^[a-f0-9]{'+this.descriptor.identity.hexLength+'}$').test(suffix)&&privateIpv4(candidate.address))Object.assign(record,{deviceId:candidate.deviceId,address:candidate.address});
           this.records.set(record.port,record);

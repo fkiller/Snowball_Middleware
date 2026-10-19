@@ -44,6 +44,31 @@ test('trusted native refresh publishes complete current transcript data without 
   assert.deepEqual(after.sessions,before.sessions);assert.deepEqual(journal.listCommands(),[]);
 });
 
+test('large native history does not block startup and selected transcripts transfer without truncation',async t=>{
+  const text='한글😀'.repeat(400000)+' final line';
+  const turns=[{role:'agent',text,agentResponse:text}];
+  const {api,journal}=await setup(t,{noAuth:true,turnsStore:{[sessionKey]:turns,legacyAlias:turns}});
+  const response=await request(api,'/v1/snapshot');
+  assert.equal(response.status,200);
+  assert.equal(response.body.transcriptsDeferred,true);
+  assert.equal(response.body.turnsStore,null);
+  const client=new LocalClient(api.origin);
+  assert.deepEqual(await client.transcript(sessionKey),turns);
+  assert.deepEqual(journal.listCommands(),[]);
+  assert.equal((await request(api,'/v1/transcript',{method:'POST',body:{sessionKey:'__proto__',offset:0}})).status,404);
+});
+
+test('transcript paging rejects invalid cursors and source changes instead of combining different histories',async t=>{
+  let turns={[sessionKey]:[{text:'first'}]};
+  const {api}=await setup(t,{turnsStore:()=>turns});const auth=await login(api);
+  const read=body=>request(api,'/v1/transcript',{method:'POST',auth,body});
+  const first=await read({sessionKey,offset:0});assert.equal(first.status,200);
+  turns={[sessionKey]:[{text:'changed'}]};
+  assert.equal((await read({sessionKey,offset:0,revision:first.body.revision})).status,409);
+  for(const body of [{sessionKey,offset:-1},{sessionKey,offset:0,path:'/etc/passwd'},{sessionKey,offset:999999}])assert.equal((await read(body)).status,400);
+  assert.equal((await request(api,'/v1/transcript',{method:'POST',body:{sessionKey,offset:0}})).status,401);
+});
+
 test('native access catalog keeps request validation and native failures closed',async t=>{
   let calls=0;const {api}=await setup(t,{listAccess:async(plugin,instance)=>{calls++;assert.equal(instance,'default');if(plugin==='failed')throw Error('native failure');return ['observed-policy'];}});
   const auth=await login(api);
@@ -215,7 +240,8 @@ test('malformed, compressed and oversized bodies cannot admit work', async t => 
 test('published OpenAPI routes and SDK operations describe the implemented v1 surface', () => {
   const spec = JSON.parse(fs.readFileSync(new URL('../packages/api/openapi.v1.json', import.meta.url)));
   assert.equal(spec.openapi, '3.1.0');
-  assert.equal(Object.keys(spec.paths).length, 23);
+  assert.equal(Object.keys(spec.paths).length, 24);
+  assert.equal(spec.paths['/v1/transcript'].post.operationId,'readTranscriptChunk');
   assert.equal(spec.paths['/v1/controller'].get.operationId,'controller');
   assert.equal(spec.paths['/v1/controller'].post.operationId,'updateController');
   assert.equal(spec.paths['/v1/sessions/create-status'].post.operationId, 'readHarnessSessionCreateReceipt');

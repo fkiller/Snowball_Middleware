@@ -102,6 +102,8 @@ The update preserves device settings, pairing keys, controller state, speech cac
 <a id="update-device"></a>
 ### 2. Update device firmware
 
+Automatic Device setup opens once for a newly attached supported USB device with a confirmed older installed firmware. Existing startup devices, LAN observations and unknown versions stay quiet. Open **Device setup…** from the tray for manual checks, recovery or repair.
+
 MK20 runtime **0.2.8** adds a single-row icon breadcrumb, six content rows and a three-second volume overlay. Machines keeps stale same-name registrations under **Saved PCs (K12)** without merging identities. The PC update provides a conversation-first Web UI and native project/worktree grouping, ordered only by the native harness project/session order. Update each PC first, then review and install the runtime in Device setup with its full backup and retained-settings checks. The 16×16 pixel Hangul from 0.2.7 remains included; QMK is independent. Physical 0.2.8 acceptance is separate from source verification.
 
 Antigravity Desktop navigation uses its own top-level conversations, native project definitions and saved order; separate CLI archives and child agents do not become extra sidebar sessions. Native transcript text is preserved without the old 800-character/fifteen-message cuts. CLI control readiness is reported separately from desktop-window presence. For a read-only count/status report, run `node scripts/diagnose-native-navigation.mjs` from the middleware package using the installation’s Node runtime. No firmware update is required for these PC changes.

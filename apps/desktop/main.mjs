@@ -61,7 +61,7 @@ function startDeviceSetup(){
     const backupDirectory=ensurePrivateStateDirectory(path.join(dataDir,'firmware-backups'));
     deviceSetup=new DeviceSetupHub({adapters,backupDirectory,uart:maintainUart});
     deviceSetup.on('change',()=>{if(setupWindow&&!setupWindow.isDestroyed())setupWindow.webContents.send('device-setup-state',setupState());updateMenu();});
-    deviceSetup.on('attached',({profile,record})=>{
+    deviceSetup.on('review',({profile,record})=>{
       const setup=deviceSetup.setups.get(profile);
       const needsReview=preparationNeedsReview(record,setup.release);
       console.log(`Device preparation observed: ${profile} / ${record.transport??'usb/storage'} / version=${record.hello?.firmware??record.currentVersion??'unknown'} / review=${needsReview}`);
@@ -181,7 +181,7 @@ worker.on('message',async message=>{
         console.log(JSON.stringify({test:'native-tray',platform:process.platform,trayCreated:!tray.isDestroyed(),mainWindows:BrowserWindow.getAllWindows().length,loopbackNoPin:true,pauseRoundtrip:true,corePid:worker.pid,autostartChanged:false}));await stop();
       }
     }catch{console.error('Native tray/runtime verification failed');process.exitCode=1;await stop();}
-  }else if(message?.kind==='failed'){console.error(message.code,smoke?message.detail??'':'');startupFailed=true;client=undefined;updateMenu();if(!origin){process.send?.({kind:'desktop-failed'});process.exitCode=1;await stop();}}
+  }else if(message?.kind==='failed'){console.error(message.code,smoke?message.detail??'':'');startupFailed=true;client=undefined;updateMenu();if(!origin){process.send?.({kind:'desktop-failed',code:message.code});process.exitCode=1;await stop();}}
 });
 worker.on('exit',()=>{client=undefined;startupFailed=true;enrollmentBusy=false;clearInterval(poll);updateMenu();if(!stopping){console.error('Local core exited; no commands retried');if(smoke){process.exitCode=1;void stop();}}});
 worker.postMessage({kind:'start',dataDir,suiteConfig,codexConfig:argument('--codex-control-config'),opencodeConfig:argument('--opencode-observer-config'),smoke});

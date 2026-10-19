@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-let child,started=false,stopping=false;
+let child,started=false,stopping=false,failureReported=false;
 const send=value=>process.parentPort.postMessage(value);
 process.parentPort.on('message',({data})=>{
   if(data?.kind==='stop'){
@@ -20,11 +20,12 @@ process.parentPort.on('message',({data})=>{
     for(const stream of [child.stdout,child.stderr])stream.on('data',bytes=>process.stdout.write(bytes));
     child.on('message',message=>{
       if(message?.kind==='suite-ready')send({kind:'ready',origin:message.origin});
+      else if(message?.kind==='suite-failed'&&/^[a-z0-9_]{1,80}$/.test(message.code??'')){failureReported=true;send({kind:'failed',code:message.code});}
       else if(message?.kind==='native')send(message);
       else if(message?.kind==='device-observed')send(message);
       else if(['m5-usb-result','device-usb-result'].includes(message?.kind))send(message);
     });
     child.on('error',()=>{send({kind:'failed',code:'suite_process_failed'});process.exitCode=1;});
-    child.on('exit',code=>{if(!stopping)send({kind:'failed',code:'suite_exited'});process.exit(stopping?0:code||1);});
+    child.on('exit',code=>{if(!stopping&&!failureReported)send({kind:'failed',code:'suite_exited'});process.exit(stopping?0:code||1);});
   }catch(error){send({kind:'failed',code:'suite_start_failed',detail:error.message});process.exitCode=1;}
 });

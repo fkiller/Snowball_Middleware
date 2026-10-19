@@ -292,6 +292,10 @@ export class LocalApi {
     } finally { if (timer) clearTimeout(timer); }
   }
   private snapshot(): unknown {
+    const turns = this.nativeTurns();
+    // Histories have aliases and can be much larger than a control snapshot.
+    // Keep the source complete and transfer selected transcripts separately.
+    const transcriptsDeferred = Buffer.byteLength(JSON.stringify(turns)) > 2 * 1024 * 1024;
     const sessionDetails = (this.options.sessionService?.snapshotSessions() ?? []).map(session => {
       const workspaceId = session.workspaceId ?? this.options.workspaces?.workspaceIdForExactRoot(session.cwd);
       return { ...session, ...(workspaceId ? { workspaceId } : {}) };
@@ -324,8 +328,13 @@ export class LocalApi {
       realSessions: this.options.realSessions ?? null,
       navigationCatalog: this.options.navigationCatalog?.() ?? null,
       harnessPresentations: structuredClone(this.options.harnessPresentations??{}),
-      turnsStore: typeof this.options.turnsStore === 'function' ? this.options.turnsStore() : this.options.turnsStore ?? null,
+      turnsStore: transcriptsDeferred ? null : turns,
+      transcriptsDeferred,
     };
+  }
+  private nativeTurns(): Record<string, unknown> | null {
+    const value = typeof this.options.turnsStore === 'function' ? this.options.turnsStore() : this.options.turnsStore;
+    return record(value) ? value : null;
   }
   private async route(req: IncomingMessage, res: ServerResponse): Promise<void> {
     this.boundary(req);
@@ -517,6 +526,18 @@ export class LocalApi {
       catch(error){const code=(error as Error).message;fail(code==='stale_controller_revision'||code==='draft_destination_locked'?409:code==='controller_capacity'?429:400,code.startsWith('invalid_')||['stale_controller_revision','draft_destination_locked','controller_capacity'].includes(code)?code:'invalid_controller_state');}
       // UI-only changes deliberately do not broadcast a global SSE repaint.
       return;
+    }
+    if (url.pathname === '/v1/transcript' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).some(k => !['sessionKey', 'offset', 'revision'].includes(k)) || typeof body.sessionKey !== 'string' || body.sessionKey.length > 1024 || !Number.isSafeInteger(body.offset) || Number(body.offset) < 0 || (body.revision !== undefined && (typeof body.revision !== 'string' || !/^[a-f0-9]{64}$/.test(body.revision)))) fail(400, 'invalid_transcript_request');
+      if (!this.options.journal.listSessions().some(s => s.sessionKey === body.sessionKey)) fail(404, 'transcript_unavailable');
+      const turns = this.nativeTurns();
+      const value = turns && Object.hasOwn(turns, body.sessionKey) ? turns[body.sessionKey] : [];
+      const json = JSON.stringify(Array.isArray(value) ? value : []), revision = digest(json), offset = Number(body.offset);
+      if (body.revision !== undefined && body.revision !== revision) fail(409, 'transcript_changed');
+      if (offset > json.length) fail(400, 'invalid_transcript_request');
+      const chunk = json.slice(offset, offset + 256 * 1024), next = offset + chunk.length;
+      this.send(res, 200, { sessionKey: body.sessionKey, revision, offset, chunk, nextOffset: next < json.length ? next : null }); return;
     }
     if (url.pathname === '/v1/snapshot' && req.method === 'GET') { this.send(res, 200, this.snapshot()); return; }
     if (url.pathname === '/v1/settings' && req.method === 'GET') {

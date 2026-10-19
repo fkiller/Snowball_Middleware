@@ -1,12 +1,12 @@
 import {EventEmitter} from 'node:events';
-import {DeviceSetup} from './device-setup.mjs';
+import {DeviceSetup,preparationNeedsReview} from './device-setup.mjs';
 import {ComponentSetup} from './component-setup.mjs';
 import {readPreparation} from '../../scripts/device-preparation.mjs';
 
 /** One host-owned preparation journey and one USB operation across adapters. */
 export class DeviceSetupHub extends EventEmitter {
   constructor({adapters,backupDirectory,uart=async()=>{}}){
-    super();this.setups=new Map();
+    super();this.setups=new Map();this.usbReviews=new Map();
     for(const {profile,device} of adapters){
       if(!/^[-a-z0-9]{1,64}$/.test(profile??'')||this.setups.has(profile))throw Error('invalid_preparation_profile');
       const Setup=readPreparation(device).descriptor.version===2?ComponentSetup:DeviceSetup;
@@ -27,6 +27,21 @@ export class DeviceSetupHub extends EventEmitter {
     }
   }
   get job(){return this.actionLease??[...this.setups.values()].find(s=>s.job)?.job;}
+  reviewUsbAttachments(profile,setup){
+    if(setup.code||!(setup.records instanceof Map))return; // Failed/absent enumeration cannot prove a disconnect.
+    const initial=!this.usbReviews.has(profile),seen=this.usbReviews.get(profile)??new Map();
+    const records=[...setup.records.values()].filter(r=>r.online&&r.transport==='usb'&&r.usbIdentity);
+    const present=new Set(records.map(r=>r.port));
+    for(const port of seen.keys())if(!present.has(port))seen.delete(port);
+    for(const record of records){
+      let attachment=seen.get(record.port);
+      if(attachment?.identity!==record.usbIdentity){attachment={identity:record.usbIdentity,announced:initial};seen.set(record.port,attachment);}
+      if(!attachment.announced&&preparationNeedsReview(record,setup.release)){
+        attachment.announced=true;this.emit('review',{profile,record});
+      }
+    }
+    this.usbReviews.set(profile,seen);
+  }
   observe(observation){
     const setup=this.setups.get(observation?.profile);
     if(this.closed||!(setup instanceof ComponentSetup))return;
@@ -45,7 +60,7 @@ export class DeviceSetupHub extends EventEmitter {
     this.scanPromise=Promise.resolve().then(async()=>{
       try{
         do{
-          for(const setup of this.setups.values()){if(this.closed)break;await setup.scan(this.scanForced);}
+          for(const [profile,setup] of this.setups){if(this.closed)break;await setup.scan(this.scanForced);if(!this.closed)this.reviewUsbAttachments(profile,setup);}
           if(!this.refreshPending||this.closed||this.job)break;
           this.refreshPending=false;this.scanForced=true;
         }while(true);

@@ -27,7 +27,7 @@ child.on('exit',code=>{if(!settled&&!existing){if(stopAcknowledged&&code===0)fin
 child.on('message',async message=>{
   if(message?.kind==='desktop-ready'&&message.origin===`http://127.0.0.1:${config.port}`)finish(null,`Snowball is running in the background. Use its tray icon. Web UI: ${message.origin}/`);
   else if(message?.kind==='desktop-stopped'&&args.includes('--stop'))stopAcknowledged=true;
-  else if(message?.kind==='desktop-failed')finish(Error('Snowball tray startup failed; see '+logFile));
+  else if(message?.kind==='desktop-failed')finish(Error('Snowball tray startup failed'+(/^[a-z0-9_]{1,80}$/.test(message.code??'')?' ('+message.code+')':'')+'; see '+logFile));
   else if(message?.kind==='desktop-already-running'){
     existing=true;
     const marker=path.join(directory,'desktop.v1.json'),deadline=Date.now()+20000;

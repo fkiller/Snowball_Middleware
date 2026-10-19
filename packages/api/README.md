@@ -19,6 +19,12 @@ Optional token mode: 60-second one-use bootstrap, 8-hour in-memory session, 16 o
 grants, 64 sessions/connections, 30 bootstrap attempts/minute, 600 authenticated
 requests/minute/session, 32 streams total (2/session), 256 retained invalidations,
 128 KiB request body, 5-second body timeout, 16 KiB headers, 8 MiB snapshot response.
+
+When native history exceeds 2 MiB, snapshots return `turnsStore: null` and
+`transcriptsDeferred: true`. Read the selected registered session with
+`POST /v1/transcript` (`sessionKey`, `offset`, then the returned `revision`).
+Join the JSON chunks before parsing; source changes return `409 transcript_changed`.
+This read does not truncate native history or dispatch a command.
 If an oversized/slow body causes socket teardown, clients treat it as an uncertain
 network result and inspect command history; they must not blindly retry mutations.
 

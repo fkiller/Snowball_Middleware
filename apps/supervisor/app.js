@@ -180,6 +180,24 @@ let voiceSessionKey = null;
 
 // Session Conversation Store: { [sessionKey]: Array<{ role: 'user'|'agent', text: string, time: string, status?: string }> }
 const sessionTurns = {};
+const nativeTranscripts = new Map();
+function deferredTranscript(sessionKey) {
+  const cursor=snapshot?.cursor;
+  let entry=nativeTranscripts.get(sessionKey);
+  if(entry?.cursor===cursor)return entry;
+  entry?.abort.abort();
+  entry={cursor,abort:new AbortController(),loading:true,turns:entry?.turns??[]};
+  nativeTranscripts.delete(sessionKey);nativeTranscripts.set(sessionKey,entry);
+  if(nativeTranscripts.size>4){const [key,value]=nativeTranscripts.entries().next().value;value.abort.abort();nativeTranscripts.delete(key);}
+  void client.transcript(sessionKey,entry.abort.signal).then(turns=>{
+    if(nativeTranscripts.get(sessionKey)!==entry)return;
+    entry.turns=turns;entry.loading=false;render();
+  }).catch(()=>{
+    if(nativeTranscripts.get(sessionKey)!==entry||entry.abort.signal.aborted)return;
+    entry.loading=false;entry.error=true;render();
+  });
+  return entry;
+}
 const executionBySession = new Map();
 const modelCatalogs = new Map();
 const modelCatalogRequests = new Set();
@@ -853,7 +871,13 @@ function renderWorkspace() {
     const previousScroll=messagesEl.scrollTop,previousSession=messagesEl.dataset.session;messagesEl.dataset.session=curSession.sessionKey;
     messagesEl.replaceChildren();
     const truncatedPrefix = isEn ? '[Earlier content truncated] ' : '[이전 내용 생략] ';
-    const turns = [...(snapshot?.turnsStore?.[curSession.sessionKey] ?? sessionTurns[curSession.sessionKey] ?? []), ...(snapshot?.sessionMessages?.[curSession.sessionKey] ?? []).map(m => ({ ...m, text: (m.truncated ? truncatedPrefix : '') + m.text, time: new Date(m.receivedAt).toLocaleTimeString() }))];
+    const deferred=snapshot?.transcriptsDeferred?deferredTranscript(curSession.sessionKey):null;
+    const turns = [...(deferred?.turns ?? snapshot?.turnsStore?.[curSession.sessionKey] ?? sessionTurns[curSession.sessionKey] ?? []), ...(snapshot?.sessionMessages?.[curSession.sessionKey] ?? []).map(m => ({ ...m, text: (m.truncated ? truncatedPrefix : '') + m.text, time: new Date(m.receivedAt).toLocaleTimeString() }))];
+    if(deferred?.loading)messagesEl.append(node('p',isEn?'Loading native conversation…':'네이티브 대화를 불러오는 중…'));
+    if(deferred?.error){
+      messagesEl.append(node('p',isEn?'Could not load the native conversation.':'네이티브 대화를 불러오지 못했습니다.'));
+      messagesEl.append(button(isEn?'Retry':'다시 시도',()=>{nativeTranscripts.delete(curSession.sessionKey);render();},true));
+    }
 
     if (turns.length === 0) {
       const empty = node('div');

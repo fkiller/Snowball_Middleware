@@ -16,12 +16,10 @@ export function preparationNeedsUpdate(record,release) {
   return relation!=='newer'&&(relation!=='current'||record.imageMatch===false);
 }
 export function preparationNeedsReview(record,release) {
-  if(!record.online||record.phase==='failed')return false;
-  if(record.pending===true)return true;
-  // Normal QMK HID cannot identify its installed image. Offer manual DFU
-  // preparation without claiming that a firmware update is available.
-  if(record.component==='qmk'&&record.nextStep==='enter-dfu'&&!record.currentVersion)return false;
-  return preparationNeedsUpdate(record,release);
+  if(!record.online||!['ready','complete'].includes(record.phase)||record.pending===true||record.transport!=='usb'||!record.usbIdentity)return false;
+  // CP210x presence or an unversioned HID/DFU reply alone is not an update.
+  if(record.hello?record.status!=='snowball':record.writable!==true||record.nextStep!=='ready')return false;
+  return firmwareRelation(record.hello?.firmware??record.currentVersion,release.components?.[record.component]?.version??release.version)==='older';
 }
 export const validUsbPort=value=>typeof value==='string'&&/^(?:COM[1-9][0-9]*|\/dev\/(?:tty|cu\.)[a-zA-Z0-9._-]+)$/.test(value);
 export function readBackupProgress(event,previous){
@@ -111,7 +109,7 @@ export class DeviceSetup extends EventEmitter {
         let record=this.records.get(candidate.port);
         const identity=String(candidate.usbIdentity??'').slice(0,128);
         if(!record||record.usbIdentity!==identity||!record.wasPresent||force){
-          record={port:candidate.port,label:String(candidate.label??this.descriptor.name).slice(0,128),usbIdentity:identity,online:true,wasPresent:true,phase:'checking',hello:null,status:'unknown'};
+          record={port:candidate.port,label:String(candidate.label??this.descriptor.name).slice(0,128),usbIdentity:identity,transport:'usb',online:true,wasPresent:true,phase:'checking',hello:null,status:'unknown'};
           this.records.set(record.port,record);await this.probe(record);
         }
       }

@@ -73,7 +73,11 @@ try {
     runtime.on('message',onMessage);runtime.once('exit',onExit);
   });
   const response=await fetch(origin+'/v1/snapshot',{headers:{Origin:origin},signal:AbortSignal.timeout(10000)});
-  if(!response.ok)throw Error('Owned middleware snapshot failed (HTTP '+response.status+')');
+  if(!response.ok){
+    const result=await response.json().catch(()=>null);
+    const code=/^[a-z0-9_]{1,80}$/.test(result?.error??'')?result.error:'snapshot_unavailable';
+    throw Object.assign(Error('Owned middleware snapshot failed (HTTP '+response.status+'; '+code+')'),{code});
+  }
   async function startGateway(g) {
     const serialIndex=g.args.indexOf('--serial');
     const gateway=launch(g.script,g.args,g.cwd,{SNOWBALL_USB_SUSPENDED:serialIndex>=0&&usbReservations.has('m5stack\0'+g.args[serialIndex+1])?'1':'0'});
@@ -106,4 +110,8 @@ try {
     if (process.platform === 'win32') spawn('explorer.exe', [origin + '/'], { windowsHide: true, stdio: 'ignore' }).unref();
     else if (process.platform === 'darwin') spawn('open', [origin + '/'], { stdio: 'ignore' }).unref();
   }
-} catch (error) { console.error(error.message); await stop(1); }
+} catch (error) {
+  console.error(error.message);
+  if(process.connected)process.send({kind:'suite-failed',code:/^[a-z0-9_]{1,80}$/.test(error.code??'')?error.code:'suite_start_failed'});
+  await stop(1);
+}
