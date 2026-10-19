@@ -217,10 +217,20 @@ M5Stack **0.5.6**는 머신 목록에서 식별되지 않은 “기존 등록 PC
 ## 🖥️ 비주얼 쇼케이스 (Visual Showcase)
 
 ### 웹 수퍼바이저 대시보드 (Web Supervisor)
-로컬 루프백 웹 수퍼바이저(`http://127.0.0.1:8765/`)는 외부 클라우드 의존성 없이 탐색된 작업공간, 활성 하네스(Codex, AGY, OpenCode), 그리고 실시간 하드웨어 연결 상태를 직관적으로 제공합니다:
+현재 설치본은 네이티브 프로젝트·세션 목록, 중앙 대화, 하단 입력창 중심입니다. 모델·effort와 실제 CLI 사용 가능 상태를 입력창에 두고 메타데이터는 접었습니다. 목록은 하네스 자체 순서만 따릅니다. 아래는 기존 Antigravity 인사 세션을 선택한 실제 화면이며 촬영을 위한 프롬프트는 보내지 않았습니다.
 
 <p align="center">
-  <img src="assets/screenshots/web_supervisor_dashboard_ko.png" width="100%" alt="Snowball 웹 수퍼바이저 대시보드">
+  <img src="assets/screenshots/web_supervisor_dashboard_ko.jpg" width="100%" alt="실제 설치 Web UI: Antigravity 네이티브 세션 목록, 대화, 입력창, CLI 사용 가능 상태"><br>
+  <em>2026-10-18 실제 Windows 설치본 캡처. 기존 인사 대화를 표시하며 시연용 대화를 생성하지 않았습니다.</em>
+</p>
+
+### 현재 MK20 0.2.8 화면
+
+실물 framebuffer에서 한 줄 아이콘 breadcrumb가 상단 전체 폭을 사용하고, 아래에 콘텐츠 6줄을 표시합니다. 볼륨은 변경 시 3초만 표시하도록 구현됐으며 이 캡처는 상시 볼륨 표시가 없는 기본 상태입니다. 내장 16×16 한글 폰트를 사용합니다. 원래 선택된 Codex 세션의 실제 화면이며 395 Antigravity 인수 결과는 별도입니다.
+
+<p align="center">
+  <img src="assets/screenshots/mk20_compact_breadcrumb_0_2_8.png" width="428" alt="MK20 0.2.8: one-row icon breadcrumb and six native Korean content rows"><br>
+  <em>실제 MK20 0.2.8에서 읽은 428×142 framebuffer 원본입니다.</em>
 </p>
 
 ### 물리 MK20 터미널 연동 (Hardware Terminal)
@@ -228,7 +238,7 @@ M5Stack **0.5.6**는 머신 목록에서 식별되지 않은 “기존 등록 PC
 
 <p align="center">
   <img src="assets/screenshots/mk20_navigation_demo.gif" width="480" alt="MK20 네비게이션 시연"><br>
-  <em>Snowball Middleware로 구동되는 실물 MK20 하드웨어 데스크 터미널.</em><br>
+  <em>이전 실물 MK20 시연 영상이며 현재 0.2.8 framebuffer는 위에 있습니다.</em><br>
   <a href="https://github.com/fkiller/Snowball_Control">👉 Snowball_Control 저장소 바로가기</a> &nbsp;|&nbsp; <a href="https://x.com/fkiller/status/2099345561627382015">🔗 X (Twitter) 원본 글</a>
 </p>
 
@@ -334,8 +344,8 @@ Snowball_Middleware/
 │   ├── banner.png
 │   ├── icon.png
 │   ├── screenshots/            # 웹 수퍼바이저 대시보드 및 하드웨어 캡처
-│   │   ├── web_supervisor_dashboard_ko.png
-│   │   ├── web_supervisor_dashboard_en.png
+│   │   ├── web_supervisor_dashboard_ko.jpg
+│   │   ├── web_supervisor_dashboard_en.jpg
 │   │   ├── mk20_navigation_demo.gif
 │   │   └── mk20_ui_elements_test.gif
 │   └── videos/                 # 시연 녹화 영상
