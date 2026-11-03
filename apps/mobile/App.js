@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
 import { fetch as nativeFetch } from 'expo/fetch';
-import { listSessions, validateOrigin, validateToken } from './remote.mjs';
+import { listSessions, RemoteAccessError, validateOrigin, validateToken } from './remote.mjs';
+import { createConnectionLifecycle } from './connection-lifecycle.mjs';
 
 const STORAGE_KEY = 'snowball.experimental.remote.v1';
 const storeOptions = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
@@ -13,11 +14,11 @@ export default function App() {
   const [token, setToken] = useState('');
   const [remember, setRemember] = useState(false);
   const [sessions, setSessions] = useState(null);
+  const [checkedAt, setCheckedAt] = useState(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
-  const active = useRef(null);
-  const generation = useRef(0);
+  const lifecycle = useRef(createConnectionLifecycle());
   const writes = useRef(Promise.resolve());
   const enqueueWrite = action => {
     const next = writes.current.catch(() => {}).then(action);
@@ -39,7 +40,20 @@ export default function App() {
       }
     }).catch(() => { if (mounted) setMessage('보안 저장소를 열 수 없습니다. 직접 입력해 주세요.'); })
       .finally(() => { if (mounted) setReady(true); });
-    return () => { mounted = false; generation.current++; active.current?.abort(); };
+    return () => { mounted = false; lifecycle.current.invalidate(); };
+  }, []);
+
+  useEffect(() => {
+    const listener = AppState.addEventListener('change', state => {
+      if (state !== 'active') {
+        lifecycle.current.invalidate();
+        setBusy(false);
+        setSessions(null);
+        setCheckedAt(null);
+        setMessage('앱을 벗어나 연결 상태를 지웠습니다. 돌아온 뒤 다시 확인해 주세요.');
+      }
+    });
+    return () => listener.remove();
   }, []);
 
   function confirmConnect() {
@@ -54,37 +68,45 @@ export default function App() {
 
   async function connect() {
     if (busy) return;
-    const current = ++generation.current;
-    const controller = new AbortController();
-    active.current = controller;
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    setBusy(true); setSessions(null); setMessage('');
+    const attempt = lifecycle.current.begin();
+    const timeout = setTimeout(() => attempt.abort(), 15000);
+    setBusy(true); setSessions(null); setCheckedAt(null); setMessage('');
     try {
       const canonicalOrigin = validateOrigin(origin);
       const credential = validateToken(token);
-      const items = await listSessions(canonicalOrigin, credential, nativeFetch, controller.signal);
-      if (generation.current !== current) return;
-      if (remember) {
-        await enqueueWrite(() => SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify({ origin: canonicalOrigin, token: credential }), storeOptions));
-      } else {
-        await enqueueWrite(() => SecureStore.deleteItemAsync(STORAGE_KEY, storeOptions));
-      }
-      if (generation.current !== current) return;
+      const items = await listSessions(canonicalOrigin, credential, nativeFetch, attempt.signal);
+      if (!attempt.isCurrent()) return;
+      if (attempt.signal.aborted) throw new Error('timeout');
+      clearTimeout(timeout);
+      const confirmedAt = new Date();
+      let storageFailed = false;
+      try {
+        if (remember) {
+          await enqueueWrite(() => SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify({ origin: canonicalOrigin, token: credential }), storeOptions));
+        } else {
+          await enqueueWrite(() => SecureStore.deleteItemAsync(STORAGE_KEY, storeOptions));
+        }
+      } catch { storageFailed = true; }
+      if (!attempt.isCurrent()) return;
       setSessions(items);
-      setMessage('연결되었습니다. 세션 상태와 하네스 종류만 표시합니다.');
+      setCheckedAt(confirmedAt);
+      setMessage(storageFailed ? '조회는 완료되었지만 보안 저장소를 변경하지 못했습니다. 연결 정보 저장 상태를 확인해 주세요.' : '조회가 완료되었습니다. 아래는 마지막으로 확인한 상태입니다.');
     } catch (error) {
-      if (generation.current !== current) return;
-      setMessage(controller.signal.aborted ? '연결 시간이 초과되었습니다. PC와 Tailscale 연결을 확인해 주세요.' : (error?.message || '연결하지 못했습니다. PC와 Tailscale 연결을 확인해 주세요.'));
+      if (!attempt.isCurrent()) return;
+      const message = attempt.signal.aborted ? '조회 시간이 초과되었습니다. PC와 Tailscale 연결을 확인해 주세요.'
+        : error instanceof RemoteAccessError && error.kind === 'unauthorized' ? '접근이 거부되었습니다. 자격증명과 PC 게이트웨이 설정을 확인해 주세요.'
+        : error instanceof RemoteAccessError && error.kind === 'invalid_response' ? '게이트웨이 응답을 확인할 수 없습니다. PC의 Snowball 버전과 설정을 확인해 주세요.'
+        : '조회하지 못했습니다. PC와 Tailscale 연결을 확인해 주세요.';
+      setMessage(message);
     } finally {
       clearTimeout(timeout);
-      if (generation.current === current) { setBusy(false); active.current = null; }
+      if (attempt.isCurrent()) { setBusy(false); attempt.finish(); }
     }
   }
 
   async function forget() {
-    generation.current++;
-    active.current?.abort(); active.current = null;
-    setBusy(false); setSessions(null); setOrigin(''); setToken(''); setRemember(false); setMessage('');
+    lifecycle.current.invalidate();
+    setBusy(false); setSessions(null); setCheckedAt(null); setOrigin(''); setToken(''); setRemember(false); setMessage('');
     try { await enqueueWrite(() => SecureStore.deleteItemAsync(STORAGE_KEY, storeOptions)); setMessage('이 기기의 저장된 연결 정보를 삭제했습니다. PC에서 자격증명도 철회하세요.'); }
     catch { setMessage('보안 저장소에서 삭제하지 못했습니다. 다시 시도해 주세요.'); }
   }
@@ -94,19 +116,20 @@ export default function App() {
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.kicker}>SNOWBALL · EXPERIMENTAL</Text>
       <Text style={styles.title}>내 PC에 연결</Text>
-      <Text style={styles.body}>내부 개발 실험용입니다. 현재 PC 설정 화면이나 자격증명 발급 화면은 없습니다. 개발 API로 게이트웨이를 시작하고 HTTPS 경로와 임시 자격증명을 별도 준비해야 합니다.</Text>
-      <Text style={styles.notice}>실험용 읽기 전용 연결입니다. 자동 페어링과 명령 전송은 아직 제공되지 않습니다. 유효기간이 지나거나 PC가 재시작되면 자격증명이 만료됩니다. 주소가 내 PC인지 자동 검증하지 못하므로 신뢰한 PC의 주소를 직접 확인해야 합니다.</Text>
+      <Text style={styles.body}>내부 개발 실험용입니다. PC 트레이의 실험용 원격 메뉴에서 로컬 리스너와 임시 자격증명을 관리할 수 있습니다. HTTPS 경로와 호스트 설정은 별도로 준비해야 하며 아직 실제 원격 접속 검증은 완료되지 않았습니다.</Text>
+      <Text style={styles.notice}>실험용 읽기 전용 연결입니다. 자동 페어링과 명령 전송은 아직 제공되지 않습니다. 자격증명이 만료되거나 PC에서 철회하면 다시 발급받아야 합니다. 주소가 내 PC인지 자동 검증하지 못하므로 신뢰한 PC의 주소를 직접 확인해야 합니다.</Text>
       <Text style={styles.label}>PC의 Tailscale HTTPS 주소</Text>
-      <TextInput style={styles.input} value={origin} editable={!busy && ready} onChangeText={value => { setOrigin(value); setToken(''); setSessions(null); }} placeholder="https://pc.tailnet.ts.net" autoCapitalize="none" autoCorrect={false} autoComplete="off" keyboardType="url" />
+      <TextInput style={styles.input} value={origin} editable={!busy && ready} onChangeText={value => { setOrigin(value); setToken(''); setSessions(null); setCheckedAt(null); setMessage(''); }} placeholder="https://pc.tailnet.ts.net" autoCapitalize="none" autoCorrect={false} autoComplete="off" keyboardType="url" />
       <Text style={styles.label}>게이트웨이 임시 자격증명</Text>
-      <TextInput style={styles.input} value={token} editable={!busy && ready} onChangeText={value => { setToken(value); setSessions(null); }} placeholder="43자 자격증명" secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete="off" textContentType="none" />
+      <TextInput style={styles.input} value={token} editable={!busy && ready} onChangeText={value => { setToken(value); setSessions(null); setCheckedAt(null); setMessage(''); }} placeholder="43자 자격증명" secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete="off" textContentType="none" />
       <View style={styles.row}><Text style={styles.body}>이 기기의 보안 저장소에 기억</Text><Switch value={remember} onValueChange={value => { setRemember(value); if (!value) enqueueWrite(() => SecureStore.deleteItemAsync(STORAGE_KEY, storeOptions)).catch(() => setMessage('보안 저장소에서 삭제하지 못했습니다. 다시 시도해 주세요.')); }} disabled={busy || !ready} /></View>
       <Text style={styles.small}>주소가 내 PC의 주소인지 확인하세요. 자격증명은 이 주소에 전송됩니다.</Text>
-      <TouchableOpacity style={styles.button} onPress={confirmConnect} disabled={!ready || busy} accessibilityRole="button"><Text style={styles.buttonText}>{busy ? '연결 중…' : '연결'}</Text></TouchableOpacity>
+      <TouchableOpacity style={styles.button} onPress={confirmConnect} disabled={!ready || busy} accessibilityRole="button"><Text style={styles.buttonText}>{busy ? '확인 중…' : sessions === null ? '연결 상태 확인' : '다시 확인'}</Text></TouchableOpacity>
       <TouchableOpacity style={styles.secondary} onPress={forget} disabled={!ready} accessibilityRole="button"><Text style={styles.secondaryText}>이 기기에서 연결 정보 삭제</Text></TouchableOpacity>
       {busy ? <ActivityIndicator /> : null}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
       {sessions !== null ? <View style={styles.list}>
+        <Text style={styles.small}>마지막 확인: {checkedAt?.toLocaleTimeString()} · 실시간 연결 상태가 아닙니다.</Text>
         <Text style={styles.section}>세션 · {sessions.length}</Text>
         {sessions.length === 0 ? <Text style={styles.body}>표시할 세션이 없습니다.</Text> : sessions.map((session, index) => <View style={styles.item} key={`${session.harnessPluginId}-${index}`}>
           <Text style={styles.itemTitle}>{session.harnessPluginId}</Text>

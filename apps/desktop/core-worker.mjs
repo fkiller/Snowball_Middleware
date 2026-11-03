@@ -8,6 +8,7 @@ import { appendCodexConnection, loadCodexConnections, removeCodexConnection, res
 import { defaultDiscoveryProviders } from '../../packages/core/dist/index.js';
 import { observeMk20UsbPresence } from './windows-device-presence.mjs';
 import { Mk20LanPresence } from '../supervisor/mk20-lan.mjs';
+import { handleRemoteControl } from '../supervisor/remote-manager.mjs';
 const pending = new Map(); let nextId=0, runtime, started=false, stopping=false, enrolling=false, externallyConfigured=false, dataDir, savedConnectionWarning=false;
 const send = value => process.parentPort.postMessage(value);
 function nativeRequest(action, value) {
@@ -69,6 +70,12 @@ async function resetCodex(signal) {
   } finally { enrolling=false; }
 }
 process.parentPort.on('message', async ({data}) => {
+  if(data?.kind==='remote-control') {
+    if (!runtime?.remoteControl || stopping) return;
+    const result=await handleRemoteControl(runtime.remoteControl,data);
+    if(result&&!stopping)send(result);
+    return;
+  }
   if (data?.kind==='native-result') {
     const call=pending.get(data.id);if(!call)return;pending.delete(data.id);clearTimeout(call.timer);
     if(data.ok)call.resolve(data.value);else call.reject(new Error('Native action unavailable'));return;

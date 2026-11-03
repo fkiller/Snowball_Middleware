@@ -9,6 +9,7 @@ process.parentPort.on('message',({data})=>{
     stopping=true;if(child?.connected)child.send('snowball.stop');else if(child)child.kill();else process.exit(0);return;
   }
   if(data?.kind==='native-result'){if(child?.connected)child.send(data);return;}
+  if(data?.kind==='remote-control'){if(child?.connected)child.send(data);return;}
   if(['m5-usb-control','device-usb-control'].includes(data?.kind)){if(child?.connected)child.send(data);return;}
   if(data?.kind!=='start'||started||stopping)return;started=true;
   try{
@@ -22,6 +23,7 @@ process.parentPort.on('message',({data})=>{
       if(message?.kind==='suite-ready')send({kind:'ready',origin:message.origin});
       else if(message?.kind==='suite-failed'&&/^[a-z0-9_]{1,80}$/.test(message.code??'')){failureReported=true;send({kind:'failed',code:message.code});}
       else if(message?.kind==='native')send(message);
+      else if(message?.kind==='remote-result')send(message);
       else if(message?.kind==='device-observed')send(message);
       else if(['m5-usb-result','device-usb-result'].includes(message?.kind))send(message);
     });

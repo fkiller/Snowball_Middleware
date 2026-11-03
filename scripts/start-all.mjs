@@ -45,6 +45,7 @@ import { loadSuitePlugins } from './suite-plugins.mjs';
 import {desktopBridge} from './desktop-bridge.mjs';
 import {loadSettings,saveSettings} from '../apps/supervisor/settings-store.mjs';
 import {nativeNavigation, nativeTranscriptProjection} from './native-navigation.mjs';
+import { RemoteManager, handleRemoteControl, closeRemoteAndDevice } from '../apps/supervisor/remote-manager.mjs';
 
 const profile = process.env.SNOWBALL_PROFILE ?? 'web';
 if (!['web', 'mk20', 'm5stack'].includes(profile)) throw Error('Invalid Snowball profile');
@@ -341,6 +342,24 @@ const api = new LocalApi({
 });
 
 await api.start();
+
+// This projection contains no titles, session IDs, paths or conversation text.
+// Unknown status remains unknown; native observations are never invented.
+const remoteControl = desktopSettings.enabled ? new RemoteManager({directory, sessionService:{
+  snapshotSessions() {
+    const result=[];
+    for(const [harnessPluginId, groups] of Object.entries(realSessionsData)) {
+      const seen=new Set();
+      for(const list of Object.values(groups)) for(const session of list) {
+        if(seen.has(session.id))continue;
+        seen.add(session.id);
+        result.push({harnessPluginId,status:typeof session.status==='string'?session.status:'unknown'});
+        if(result.length>=256)return result;
+      }
+    }
+    return result;
+  },
+}}) : undefined;
 
 const bootstrapFile = path.join(directory, 'live-bootstrap.json');
 function refreshCode() {
@@ -1560,6 +1579,11 @@ return async () => {
 }
 
 let closeDevice = async () => {}, closing = false, discoveryRetry;
+process.on('message',async message=>{
+  if(message?.kind!=='remote-control'||!remoteControl||closing)return;
+  const result=await handleRemoteControl(remoteControl,message);
+  if(result&&process.connected&&!closing)process.send(result);
+});
 const cleanup = async (code = 0) => {
   if (closing) return; closing = true;
   clearInterval(discoveryRetry);
@@ -1567,8 +1591,8 @@ const cleanup = async (code = 0) => {
   clearInterval(nativeObservationTimer);
   speechAbort.abort();
   for(const cached of mk20Contexts.values())for(const operation of cached.nativeDispatches.values())operation.abort();
-  await closeDevice();
-  await api.close();
+  await closeRemoteAndDevice(remoteControl, closeDevice);
+  await Promise.allSettled([api.close()]);
   await sources.close();
   await controllerPersistence.close();
   await suite?.close();

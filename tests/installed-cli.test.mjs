@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {writeInstalledCli} from '../scripts/installed-cli-setup.mjs';
+import {writeInstalledCli, registerUserCommand} from '../scripts/installed-cli-setup.mjs';
 
 const sourceScripts = fileURLToPath(new URL('../scripts/', import.meta.url));
 function run(exe, args, cwd) {
@@ -75,4 +75,60 @@ test('Windows command delegates through the install root without embedding it in
   assert.match(cmd, /%~dp0snowball-cli\.ps1/);
   assert.match(ps, /O''Brien/);
   assert.match(ps, /--root \$PSScriptRoot @args/);
+});
+
+test('direct setup refuses an experimental sibling before stopping the installed tray', t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'snowball setup guard '));
+  t.after(() => fs.rmSync(root, {recursive:true, force:true}));
+  const middleware = setupRepo(root, 'Snowball_Middleware');
+  const harness = setupRepo(root, 'Snowball_Harness_Codex');
+  const scripts = path.join(middleware, 'scripts');
+  for (const file of ['setup.mjs', 'suite-devices.mjs', 'device-preparation.mjs', 'installed-cli-setup.mjs']) fs.copyFileSync(path.join(sourceScripts, file), path.join(scripts, file));
+  const marker = path.join(root, 'tray-stopped');
+  fs.writeFileSync(path.join(scripts, 'start-installed.mjs'), `import fs from 'node:fs'; fs.writeFileSync(${JSON.stringify(marker)}, 'stopped');\n`);
+  assert.equal(run('git', ['add', '.'], middleware).status, 0);
+  assert.equal(run('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'setup fixture'], middleware).status, 0);
+  assert.equal(run('git', ['checkout', '-qb', 'feat/experiment'], harness).status, 0);
+  const state = path.join(root, '.snowball'); fs.mkdirSync(state);
+  fs.writeFileSync(path.join(state, 'suite.json'), JSON.stringify({profile:'web', deviceProfiles:[]}));
+  fs.writeFileSync(path.join(state, 'desktop.v1.json'), '{}');
+  const result = run(process.execPath, [path.join(scripts, 'setup.mjs'), '--root', root, '--npm', process.execPath, '--profile', 'web', '--update', '--no-start']);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Snowball_Harness_Codex is not on main/);
+  assert.equal(fs.existsSync(marker), false);
+});
+
+test('user command is registered only on an existing PATH and never overwrites another installation', {skip:process.platform === 'win32'}, t => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'snowball user command '));
+  t.after(() => fs.rmSync(temp, {recursive:true, force:true}));
+  const userHome = path.join(temp, 'user home');
+  const bin = path.join(userHome, '.local', 'bin');
+  const firstRoot = path.join(temp, 'first installation');
+  const secondRoot = path.join(temp, 'second installation');
+  setupRepo(firstRoot, 'Snowball_Middleware'); setupRepo(secondRoot, 'Snowball_Middleware');
+  writeInstalledCli(firstRoot, process.execPath);
+  writeInstalledCli(secondRoot, process.execPath);
+  assert.equal(registerUserCommand(firstRoot, {env:{HOME:userHome, PATH:'/usr/bin'}}), 'manual');
+  assert.equal(fs.existsSync(bin), false);
+  const env = {HOME:userHome, PATH:`${bin}:/usr/bin`};
+  assert.equal(registerUserCommand(firstRoot, {env}), 'linked');
+  assert.equal(fs.readlinkSync(path.join(bin, 'snowball')), path.join(firstRoot, 'snowball'));
+  assert.equal(registerUserCommand(firstRoot, {env}), 'linked');
+  assert.equal(registerUserCommand(secondRoot, {env}), 'conflict');
+  assert.equal(fs.readlinkSync(path.join(bin, 'snowball')), path.join(firstRoot, 'snowball'));
+  const help = run(path.join(bin, 'snowball'), ['--help']);
+  assert.equal(help.status, 0, help.stderr);
+  assert.match(help.stdout, /snowball update/);
+  fs.unlinkSync(path.join(bin, 'snowball'));
+  fs.writeFileSync(path.join(bin, 'snowball'), 'another command');
+  assert.equal(registerUserCommand(firstRoot, {env}), 'conflict');
+  assert.equal(fs.readFileSync(path.join(bin, 'snowball'), 'utf8'), 'another command');
+  const earlier = path.join(temp, 'earlier'); fs.mkdirSync(earlier);
+  fs.writeFileSync(path.join(earlier, 'snowball'), '#!/bin/sh\nexit 0\n', {mode:0o700});
+  fs.unlinkSync(path.join(bin, 'snowball'));
+  assert.equal(registerUserCommand(firstRoot, {env:{...env, PATH:`${earlier}:${env.PATH}`}}), 'conflict');
+  assert.equal(fs.existsSync(path.join(bin, 'snowball')), false);
+  assert.equal(registerUserCommand(firstRoot, {env:{...env, PATH:`relative${path.delimiter}${env.PATH}`}}), 'manual');
+  assert.equal(fs.existsSync(path.join(bin, 'snowball')), false);
+  assert.equal(registerUserCommand(firstRoot, {platform:'win32', env}), 'manual');
 });

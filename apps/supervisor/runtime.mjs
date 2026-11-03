@@ -6,6 +6,7 @@ import { LocalApi, RemoteReadGateway, loadSupervisorAssets } from '../../package
 import { ensurePrivateStateDirectory } from './private-state.mjs';
 import { chooseNativeWorkspace } from './native-picker.mjs';
 import { loadSettings, saveSettings } from './settings-store.mjs';
+import { RemoteManager } from './remote-manager.mjs';
 import { loadControllerStore } from './controller-store.mjs';
 import {harnessPresentation as codexPresentation} from '../../packages/harness-codex/dist/presentation.js';
 import {harnessPresentation as ocodePresentation} from '../../packages/harness-opencode/dist/presentation.js';
@@ -44,7 +45,7 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
   const hostId = loadHostId(directory);
   const commandDir = privateJournalDirectory(path.join(directory, 'commands'));
   const workspaceDir = privateJournalDirectory(path.join(directory, 'workspaces'));
-  let journal; let store; let metadata; let creates; let api; let remote; let sessions; let bindings = []; let deviceScanTimer; let deviceScanPromise;
+  let journal; let store; let metadata; let creates; let api; let remote; let remoteControl; let sessions; let bindings = []; let deviceScanTimer; let deviceScanPromise;
   const dispatches = new Map(); let stopping = false;
   const discovery = new HarnessDiscovery();
   const devices = devicePresence || mk20Lan ? new DeviceRegistry(Date.now, controllerPersistence.store.contexts) : undefined;
@@ -95,6 +96,7 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
     metadata = new SessionMetadataStore(privateJournalDirectory(path.join(directory, 'session-metadata')), hostId);
     creates = new SessionCreateStore(privateJournalDirectory(path.join(directory, 'session-creates')), hostId);
     sessions = new SessionService({ hostId, journal, metadata });
+    if (desktop) remoteControl = new RemoteManager({directory, sessionService:sessions});
     bindings = await createHarnessAdapters({ hostId });
     for (const { pluginId, adapter } of bindings) {
       if (sessions.getAdapter(pluginId, adapter.status?.().instanceId ?? 'default')) throw new Error('Duplicate harness instance registration');
@@ -144,6 +146,7 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
     let closed = false;
     return {
       origin: api.origin,
+      ...(remoteControl ? { remoteControl } : {}),
       ...(remote ? { remoteReadGateway: {
         origin: remote.origin,
         issueReadCredential: () => remote.issueReadCredential(),
@@ -162,10 +165,10 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
       async close() {
         if (closed) return; closed = true; stopping = true; discovery.cancel();
         clearInterval(deviceScanTimer);
-        try { try { await remote?.close(); } finally { await api.close(); } for (const { pluginId, adapter } of bindings) await sessions.removeAdapter(pluginId, adapter.status?.().instanceId ?? 'default'); await Promise.allSettled(dispatches.values()); await controllerPersistence.close(); } finally { try { store.close(); } finally { creates.close(); metadata.close(); journal.close(); } }
+        try { await Promise.allSettled([remoteControl?.close(), remote?.close(), api.close()]); for (const { pluginId, adapter } of bindings) await sessions.removeAdapter(pluginId, adapter.status?.().instanceId ?? 'default'); await Promise.allSettled(dispatches.values()); await controllerPersistence.close(); } finally { try { store.close(); } finally { creates.close(); metadata.close(); journal.close(); } }
       },
     };
   } catch (error) {
-    stopping = true; clearInterval(deviceScanTimer); discovery.cancel(); await remote?.close(); await api?.close(); for (const { adapter } of bindings) await adapter.stop?.().catch(() => {}); await Promise.allSettled(dispatches.values()); store?.close(); creates?.close(); metadata?.close(); journal?.close(); throw error;
+    stopping = true; clearInterval(deviceScanTimer); discovery.cancel(); await Promise.allSettled([remoteControl?.close(), remote?.close(), api?.close()]); for (const { adapter } of bindings) await adapter.stop?.().catch(() => {}); await Promise.allSettled(dispatches.values()); store?.close(); creates?.close(); metadata?.close(); journal?.close(); throw error;
   }
 }

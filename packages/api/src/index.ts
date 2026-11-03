@@ -8,6 +8,7 @@ import type { SupervisorAssets } from './supervisor.js';
 export { loadSupervisorAssets, type SupervisorAssets } from './supervisor.js';
 export { WorkspaceFiles, type WorkspaceSummary } from './workspaces.js';
 export { RemoteReadGateway, type RemoteReadGatewayOptions } from './remote.js';
+export { PersistentRemoteCredentials, recoverAbandonedRemoteCredentialLock, type RemoteCredentialInfo } from './remote-credentials.js';
 
 const secret = () => randomBytes(32).toString('base64url');
 const digest = (s: string) => createHash('sha256').update(s).digest('hex');

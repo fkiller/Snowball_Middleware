@@ -90,6 +90,20 @@ if ($Profile -ne 'web') {
     if (-not (Test-Path -LiteralPath $Python)) { throw 'Python 3.12 installation was not found. Supply -Python PATH.' }
 }
 $middleware = Join-Path $InstallRoot 'Snowball_Middleware'
+# Validate every existing suite checkout before changing any source repository.
+if ($Update) {
+    foreach ($repository in @('Snowball_Middleware','Snowball_Control','Snowball_Device_M5Stack','Snowball_Harness_Codex','Snowball_Harness_Antigravity','Snowball_Harness_OpenCode')) {
+        $directory = Join-Path $InstallRoot $repository
+        if (-not (Test-Path -LiteralPath $directory)) { continue }
+        $branch = (& git.exe -C $directory branch --show-current).Trim()
+        if ($LASTEXITCODE -ne 0 -or $branch -cne 'main') { throw "$repository is not on main. Experimental or detached checkouts cannot use this updater." }
+        $source = (& git.exe -C $directory remote get-url origin).Trim()
+        $allowed = @("https://github.com/fkiller/$repository", "https://github.com/fkiller/$repository.git", "git@github.com:fkiller/$repository", "git@github.com:fkiller/$repository.git")
+        if ($LASTEXITCODE -ne 0 -or $source -cnotin $allowed) { throw "Unexpected repository origin: $repository." }
+        $changes = & git.exe -C $directory status --porcelain --untracked-files=no
+        if ($LASTEXITCODE -ne 0 -or $changes) { throw "Tracked local changes in $repository; update stopped." }
+    }
+}
 if (-not (Test-Path -LiteralPath $middleware)) {
     Invoke-Checked 'git.exe' @('clone','--branch','main','https://github.com/fkiller/Snowball_Middleware.git',$middleware)
 }

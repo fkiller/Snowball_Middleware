@@ -22,10 +22,17 @@ export function checkUpdate(root) {
   const repositories = Object.keys(config.commits);
   const permitted = new Set(repositoriesFor('all'));
   if (!repositories.includes('Snowball_Middleware') || repositories.some(name => !permitted.has(name))) fail('Invalid suite repository inventory; update stopped.');
+  checkSourceCheckouts(root, repositories);
+}
+
+// Also used by direct setup updates, before stopping the tray or fetching any
+// repository. Check the whole source set before mutating any one checkout.
+export function checkSourceCheckouts(root, required = []) {
+  const permitted = new Set(repositoriesFor('all'));
   // The normal update may add adapters which were not in the old inventory.
   // Preflight any already-existing checkout it could subsequently use as well.
   const present = [...permitted].filter(name => fs.existsSync(path.join(root, name)));
-  for (const repository of new Set([...repositories, ...present])) {
+  for (const repository of new Set([...required, ...present])) {
     const directory = path.join(root, repository);
     if (git(directory, ['branch', '--show-current']) !== 'main') fail(`${repository} is not on main. Experimental or detached checkouts cannot use this updater.`);
     const origin = git(directory, ['remote', 'get-url', 'origin']);

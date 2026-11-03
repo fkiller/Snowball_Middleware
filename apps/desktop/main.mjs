@@ -30,6 +30,52 @@ const lock=app.requestSingleInstanceLock();
 if(!lock){process.send?.({kind:'desktop-already-running'});app.quit();}else{
 if(marker){fs.writeFileSync(marker+'.tmp',JSON.stringify({version:1,pid:process.pid,origin:`http://127.0.0.1:${installed.port}`,suiteConfig,status:'starting'})+'\n',{mode:0o600});fs.renameSync(marker+'.tmp',marker);}
 let tray,worker,client,state,origin,stopping=false,startupFailed=false,stopPromise,poll,notification,enrollmentBusy=false,savedConnectionWarning=false,appIcon;
+let remoteState,remoteBusy=false,remoteSequence=0;const remotePending=new Map();
+function remoteRequest(action,deviceId){
+  if(!worker||stopping)return Promise.reject(Error('Remote control unavailable'));
+  const id=++remoteSequence;
+  return new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>{remotePending.delete(id);reject(Error('Remote control timed out'));},15000);
+    remotePending.set(id,{resolve,reject,timer});
+    worker.postMessage({kind:'remote-control',id,action,...(deviceId?{deviceId}:{})});
+  });
+}
+async function remoteAction(action,deviceId){
+  if(remoteBusy||stopping)return;
+  remoteBusy=true;updateMenu();
+  const en=state?.settings?.language==='en';
+  try {
+  if(action==='enable'){
+    const choice=await dialog.showMessageBox({icon:appIcon,type:'warning',title:'Snowball · Experimental remote',
+      message:en?'Enable the experimental local gateway?':'실험용 로컬 게이트웨이를 켜시겠습니까?',
+      detail:en?'This opens a separate loopback listener only. TLS, verified pairing, host identity verification, and Tailscale setup are not provided. Previously issued unexpired credentials remain valid when re-enabled. Do not expose this gateway to the Internet.':'별도 루프백 리스너만 엽니다. TLS, 검증된 페어링, 호스트 신원 확인과 Tailscale 설정은 제공하지 않습니다. 다시 켜면 만료되지 않은 기존 자격증명이 유효합니다. 이 게이트웨이를 인터넷에 노출하지 마세요.',
+      buttons:en?['Enable','Cancel']:['켜기','취소'],defaultId:1,cancelId:1,noLink:true});
+    if(choice.response!==0)return;
+  }
+  if(action==='issue'){
+    const choice=await dialog.showMessageBox({icon:appIcon,type:'warning',title:'Snowball · Experimental remote',
+      message:en?'Issue a temporary read credential?':'임시 읽기 자격증명을 발급하시겠습니까?',
+      detail:en?'This is not verified device pairing. Anyone with the credential can read sensitive session metadata while the listener is reachable. It expires after 8 hours; revoke it if disclosed.':'검증된 기기 페어링이 아닙니다. 연결 가능한 상태에서 이 자격증명을 가진 사람은 민감한 세션 메타데이터를 읽을 수 있습니다. 8시간 후 만료되며 유출 시 철회하세요.',
+      buttons:en?['Issue','Cancel']:['발급','취소'],defaultId:1,cancelId:1,noLink:true});
+    if(choice.response!==0)return;
+  }
+  if(action==='revoke'){
+    const choice=await dialog.showMessageBox({icon:appIcon,type:'warning',title:'Snowball · Experimental remote',message:en?'Revoke this credential?':'이 자격증명을 철회하시겠습니까?',buttons:en?['Revoke','Cancel']:['철회','취소'],defaultId:1,cancelId:1,noLink:true});
+    if(choice.response!==0)return;
+  }
+    const value=await remoteRequest(action,deviceId);
+    if(action==='issue') {
+      // Native local dialog only: never write the bearer to logs, URLs, browser UI or clipboard.
+      await dialog.showMessageBox({icon:appIcon,type:'info',title:'Snowball · Experimental remote',
+        message:en?'Temporary credential — shown once':'임시 자격증명 — 한 번만 표시',
+        detail:`${value.token}\n\n${en?'Treat this as a password. Device pairing and HTTPS are not configured by Snowball.':'비밀번호처럼 보호하세요. Snowball은 기기 페어링이나 HTTPS를 설정하지 않습니다.'}`,buttons:['OK'],noLink:true});
+      remoteState=await remoteRequest('list');
+    } else remoteState=value;
+  }catch{
+    remoteState=undefined;
+    if(!stopping)await dialog.showMessageBox({icon:appIcon,type:'warning',title:'Snowball · Experimental remote',message:en?'Remote status could not be confirmed.':'원격 상태를 확인하지 못했습니다.',detail:en?'Check the local runtime and retry. The local control interface remains separate.':'로컬 런타임을 확인한 뒤 다시 시도하세요. 로컬 제어 화면은 별도로 유지됩니다.'});
+  }finally{remoteBusy=false;updateMenu();}
+}
 const iconPath=fileURLToPath(new URL('../../assets/'+(process.platform==='win32'?'icon.ico':'icon-256.png'),import.meta.url));
 let deviceSetup,setupWindow,activeSetupProfile,setupSequence=0;const setupPending=new Map();
 const setupUrl=pathToFileURL(fileURLToPath(new URL('./device-setup.html',import.meta.url))).href;
@@ -101,6 +147,17 @@ function updateMenu(){
     ...(!suiteConfig?[{label:l.connectCodex,enabled:!!client&&!smoke&&!enrollmentBusy&&!argument('--codex-control-config'),click:()=>{enrollmentBusy=true;updateMenu();worker?.postMessage({kind:'enroll-codex'});}}]:[]),
     {label:paused?l.resume:l.pause,enabled:!!client,click:async()=>{try{await client.updateSettings(state.settings.revision,{controlPaused:!paused});await refresh();}catch{await refresh();}}},
     {label:l.autostart,type:'checkbox',checked:getAutostart(),enabled:!!client&&!smoke,click:async item=>{try{await client.updateSettings(state.settings.revision,{autostart:item.checked});}catch{}await refresh();}},
+    {label:state?.settings?.language==='en'?'Experimental remote':'실험용 원격',enabled:!!client&&!smoke&&!remoteBusy,submenu:[
+      {label:remoteState?(remoteState.enabled?(state?.settings?.language==='en'?'Local listener: on':'로컬 리스너: 켜짐'):(state?.settings?.language==='en'?'Local listener: off':'로컬 리스너: 꺼짐')):(state?.settings?.language==='en'?'Status unknown':'상태 확인 안 됨'),enabled:false},
+      ...(remoteState?.enabled?[{label:`${remoteState.origin} (loopback)`,enabled:false}]:[]),
+      {label:remoteState?.enabled?(state?.settings?.language==='en'?'Disable':'끄기'):(state?.settings?.language==='en'?'Enable…':'켜기…'),enabled:!!remoteState,click:()=>void remoteAction(remoteState.enabled?'disable':'enable')},
+      {label:state?.settings?.language==='en'?'Refresh status':'상태 다시 확인',click:()=>void remoteAction('status')},
+      ...(!remoteState?[{label:state?.settings?.language==='en'?'Disable even if status is unknown':'상태를 몰라도 끄기',click:()=>void remoteAction('disable')}]:[]),
+      {label:state?.settings?.language==='en'?'Issue read credential…':'읽기 자격증명 발급…',enabled:!!remoteState?.enabled,click:()=>void remoteAction('issue')},
+      {label:state?.settings?.language==='en'?'Load credentials':'자격증명 목록 불러오기',click:()=>void remoteAction('list')},
+      ...(remoteState?.credentials??[]).map(item=>({label:`${item.label} · ${item.deviceId.slice(-8)} · ${new Date(item.expiresAt).toLocaleString()} ${state?.settings?.language==='en'?'— revoke…':'— 철회…'}`,click:()=>void remoteAction('revoke',item.deviceId)})),
+      {label:state?.settings?.language==='en'?'TLS, pairing and Tailscale setup are not provided':'TLS·페어링·Tailscale 설정 미제공',enabled:false},
+    ]},
     {type:'separator'},{label:l.settings,enabled:!!client,click:()=>void open(true)},
     {label:l.diagnostics,click:()=>void dialog.showMessageBox({icon:appIcon,type:'info',title:'Snowball',message:l.state,detail:JSON.stringify({origin:origin??null,connectedHarnesses:state?.connectedHarnesses??[],savedConnectionWarning,devices:state?.devices?.length??0,mainWindows:BrowserWindow.getAllWindows().length},null,2)})},
     {label:state?.settings?.language==='en'?'Restart middleware':'미들웨어 재시작',enabled:!stopping&&!deviceSetup?.job,click:async()=>{app.relaunch({args:process.argv.slice(1).filter(x=>!['--register-autostart','--stop'].includes(x))});await stop();}},
@@ -145,7 +202,9 @@ app.dock?.setIcon(appIcon);app.dock?.hide();tray=new Tray(drawIcon());tray.on('d
 worker=utilityProcess.fork(fileURLToPath(new URL(suiteConfig?'./suite-worker.mjs':'./core-worker.mjs',import.meta.url)),[],{serviceName:'Snowball local core',stdio:'pipe'});
 if(suiteConfig){for(const stream of [worker.stdout,worker.stderr])stream?.on('data',bytes=>process.stdout.write(bytes));}else{worker.stdout?.resume();worker.stderr?.resume();}
 worker.on('message',async message=>{
-  if(message?.kind==='device-observed'){
+  if(message?.kind==='remote-result'){
+    const call=remotePending.get(message.id);if(call){remotePending.delete(message.id);clearTimeout(call.timer);message.ok?call.resolve(message.value):call.reject(Error('Remote control unavailable'));}
+  }else if(message?.kind==='device-observed'){
     deviceSetup?.observe(message);
   }else if(message?.kind==='device-usb-result'){
     const call=setupPending.get(message.id);if(call){setupPending.delete(message.id);clearTimeout(call.timer);message.ok?call.resolve():call.reject(Error('usb_release_unconfirmed'));}
@@ -171,6 +230,7 @@ worker.on('message',async message=>{
       const url=new URL(message.origin);if(url.protocol!=='http:'||url.hostname!=='127.0.0.1'||url.origin!==message.origin)throw new Error('Invalid runtime origin');
       origin=message.origin;savedConnectionWarning=message.savedConnectionWarning===true;client=new LocalClient(origin);await refresh();poll=setInterval(()=>void refresh(),2000);
       if(!client)throw Error('Native runtime snapshot unavailable');
+      if(!smoke){try{remoteState=await remoteRequest('status');}catch{remoteState=undefined;}updateMenu();}
       if(marker){fs.writeFileSync(marker+'.tmp',JSON.stringify({version:1,pid:process.pid,origin,suiteConfig})+'\n',{mode:0o600});fs.renameSync(marker+'.tmp',marker);}
       process.send?.({kind:'desktop-ready',origin});
       startDeviceSetup();
@@ -183,7 +243,7 @@ worker.on('message',async message=>{
     }catch{console.error('Native tray/runtime verification failed');process.exitCode=1;await stop();}
   }else if(message?.kind==='failed'){console.error(message.code,smoke?message.detail??'':'');startupFailed=true;client=undefined;updateMenu();if(!origin){process.send?.({kind:'desktop-failed',code:message.code});process.exitCode=1;await stop();}}
 });
-worker.on('exit',()=>{client=undefined;startupFailed=true;enrollmentBusy=false;clearInterval(poll);updateMenu();if(!stopping){console.error('Local core exited; no commands retried');if(smoke){process.exitCode=1;void stop();}}});
+worker.on('exit',()=>{client=undefined;remoteState=undefined;for(const call of remotePending.values()){clearTimeout(call.timer);call.reject(Error('Remote control unavailable'));}remotePending.clear();startupFailed=true;enrollmentBusy=false;clearInterval(poll);updateMenu();if(!stopping){console.error('Local core exited; no commands retried');if(smoke){process.exitCode=1;void stop();}}});
 worker.postMessage({kind:'start',dataDir,suiteConfig,codexConfig:argument('--codex-control-config'),opencodeConfig:argument('--opencode-observer-config'),smoke});
 if(smoke)setTimeout(()=>{if(!stopping){console.error('Native tray smoke deadline');process.exitCode=1;void stop();}},30000).unref();
 }).catch(async error => { console.error('Native tray startup failed:',error.message);process.send?.({kind:'desktop-failed'});process.exitCode=1; await stop(); });

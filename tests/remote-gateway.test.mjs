@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { RemoteReadGateway } from '../packages/api/dist/index.js';
@@ -77,4 +78,23 @@ test('runtime leaves remote gateway off by default and closes the explicit liste
   await runtime.close();
   await assert.rejects(get(remote, '/remote/v1/sessions'));
   assert.throws(() => remote.issueReadCredential(), /not listening/);
+});
+
+test('unexpected status and plugin values cannot smuggle message text through the remote projection', async t => {
+  const gateway = await setup(t, { sessionService: { snapshotSessions: () => [{ status: 'a confidential prompt', harnessPluginId: '/private/file' }] } });
+  const credential = gateway.issueReadCredential();
+  const result = await get(gateway, '/remote/v1/sessions', { Authorization: `Bearer ${credential.token}` });
+  assert.deepEqual(result.body, { sessions: [{ status: 'unknown', harnessPluginId: 'unknown' }] });
+});
+
+test('stopping the gateway destroys incomplete client connections', async t => {
+  const gateway = await setup(t);
+  const port = Number(new URL(gateway.origin).port);
+  const socket = net.createConnection({ host: '127.0.0.1', port });
+  await new Promise((resolve, reject) => { socket.once('connect', resolve); socket.once('error', reject); });
+  socket.write('GET /remote/v1/sessions HTTP/1.1\r\n');
+  const closed = new Promise(resolve => socket.once('close', resolve));
+  await gateway.close();
+  await closed;
+  assert.equal(socket.destroyed, true);
 });

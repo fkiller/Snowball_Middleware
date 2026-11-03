@@ -65,6 +65,8 @@ try {
   if (config.dataDir) env.SNOWBALL_DATA_DIR = config.dataDir;
   const runtime=launch(path.join(middleware, 'scripts/start-all.mjs'), [], middleware, env);
   process.on('message',message=>{if(message?.kind==='native-result'&&runtime.connected)runtime.send(message);});
+  process.on('message',message=>{if(message?.kind==='remote-control'&&runtime.connected)runtime.send(message);});
+  runtime.on('message',message=>{if(message?.kind==='remote-result'&&process.connected)process.send(message);});
   await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>done(Error('Middleware startup timed out before its owned runtime reported readiness')),180000);
     const onMessage=message=>{if(message?.kind==='runtime-ready'&&message.origin===origin)done();};

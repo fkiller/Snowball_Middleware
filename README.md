@@ -60,12 +60,14 @@ curl -fsSL https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/in
 
 After installation, open the tray icon to launch the Web UI at **http://127.0.0.1:8765/** or manage Settings, Pause/Resume and login startup. Windows prepares Node/Git/Python. macOS/Linux need curl, Git and Python >=3.12 with venv/pip; Linux also needs a graphical desktop and Electron system libraries. Install and sign in to native harness applications through their vendors.
 
+**Experimental feature on the remote-expansion branch:** The tray's **Experimental remote** menu manages a separate, default-off loopback listener and eight-hour read credentials. Protect credentials like passwords and revoke any that are exposed. A PC restart turns the listener off, but unexpired credentials remain. TLS, verified device pairing, Tailscale setup and actual remote connectivity are not yet provided or verified; do not expose this listener to the Internet. A lock left by a crash has no end-user recovery interface yet. The local Web UI remains unchanged.
+
 <a id="update-snowball"></a>
 ## Update Snowball
 
 ### 1. Update PC software
 
-Installations made with this version also include a `snowball` command in the installation folder. After adding that folder to your PATH, run `snowball update`; `snowball update --no-start` updates without starting the tray. The command checks the installed source checkouts and refuses to update experimental branches or tracked local changes. It delegates to the existing source installer; it is not a signed, atomic release updater. The existing instructions below remain available for older installations.
+Installations made with this version include a `snowball` command in the installation folder. On macOS/Linux, when `~/.local/bin` is already on PATH and no existing command conflicts, setup links it there automatically; otherwise add the install folder to PATH or run its command directly. Setup never replaces another installation's command or edits shell profiles. Run `snowball update`; `snowball update --no-start` updates without starting the tray. The command and this version's direct installers check existing suite checkouts before updating and refuse experimental branches or tracked local changes. They delegate to the existing source installer; this is not a signed, atomic release updater. The instructions below also serve older installations; older installer scripts do not include this new preflight.
 
 **Use your existing installation folder.** The examples below use the default folder; change the first line if you installed elsewhere (for example, `Snowball-LAN`). Omit the device profile option.
 

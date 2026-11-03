@@ -117,6 +117,23 @@ npm_cli="$("$python_bin" -c 'import os,sys; print(os.path.realpath(sys.argv[1]))
 [ -f "$npm_cli" ] || fail 'This Node installation lacks npm. Install the official Node distribution.'
 
 middleware="$install_root/Snowball_Middleware"
+# Before any source checkout is changed, check every existing suite repository.
+# The long installer entry point must not merge main into a development branch.
+if "$update"; then
+  for repository in Snowball_Middleware Snowball_Control Snowball_Device_M5Stack Snowball_Harness_Codex Snowball_Harness_Antigravity Snowball_Harness_OpenCode; do
+    directory="$install_root/$repository"
+    [ -e "$directory" ] || continue
+    branch="$(git -C "$directory" branch --show-current)" || fail "Cannot inspect $repository."
+    [ "$branch" = main ] || fail "$repository is not on main. Experimental or detached checkouts cannot use this updater."
+    origin="$(git -C "$directory" remote get-url origin)" || fail "Cannot inspect $repository origin."
+    case "$origin" in
+      "https://github.com/fkiller/$repository"|"https://github.com/fkiller/$repository.git"|"git@github.com:fkiller/$repository"|"git@github.com:fkiller/$repository.git") ;;
+      *) fail "Unexpected repository origin: $repository." ;;
+    esac
+    changes="$(git -C "$directory" status --porcelain --untracked-files=no)" || fail "Cannot inspect $repository changes."
+    [ -z "$changes" ] || fail "Tracked local changes in $repository; update stopped."
+  done
+fi
 if [ ! -e "$middleware" ]; then
   git clone --branch main https://github.com/fkiller/Snowball_Middleware.git "$middleware"
 fi

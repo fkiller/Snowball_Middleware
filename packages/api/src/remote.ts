@@ -1,14 +1,17 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
 import type { SessionService } from '@snowball/core';
+import { PersistentRemoteCredentials, type RemoteCredentialInfo } from './remote-credentials.js';
 
-type Grant = { deviceId: string; expiresAt: number; requests: number; window: number };
+type Grant = RemoteCredentialInfo;
 export interface RemoteReadGatewayOptions {
   sessionService: SessionService;
   /** Additional exact HTTP Host authorities accepted from a trusted local proxy. */
   proxyHosts?: string[];
   port?: number;
   now?: () => number;
+  /** Constructed only after the caller validates its OS-private storage. */
+  credentialStore?: PersistentRemoteCredentials;
 }
 
 /**
@@ -19,6 +22,7 @@ export interface RemoteReadGatewayOptions {
 export class RemoteReadGateway {
   private readonly server: http.Server;
   private readonly grants = new Map<string, Grant>();
+  private readonly rates = new Map<string, { requests: number; window: number }>();
   private readonly now: () => number;
   private readonly proxyHosts: Set<string>;
   private originValue = '';
@@ -58,21 +62,33 @@ export class RemoteReadGateway {
   }
 
   /** Trusted local code only; this is not a pairing endpoint. Never log the token. */
-  issueReadCredential(): { deviceId: string; token: string; expiresAt: number } {
+  issueReadCredential(label = 'Remote device'): { deviceId: string; token: string; expiresAt: number } {
     if (!this.originValue || this.closed) throw new Error('Gateway not listening');
+    if (this.options.credentialStore) return this.options.credentialStore.issue(label);
+    if (!label || label.length > 64 || label !== label.trim() || /[\u0000-\u001f\u007f]/.test(label)) throw new Error('Invalid device label');
     const now = this.now();
     for (const [hash, grant] of this.grants) if (grant.expiresAt <= now) this.grants.delete(hash);
     if (this.grants.size >= 16) throw new Error('Credential capacity reached');
     const token = randomBytes(32).toString('base64url');
     const deviceId = `remote_${randomBytes(16).toString('hex')}`;
     const expiresAt = now + 8 * 60 * 60 * 1000;
-    this.grants.set(createHash('sha256').update(token).digest('hex'), { deviceId, expiresAt, requests: 0, window: now });
+    this.grants.set(createHash('sha256').update(token).digest('hex'), { deviceId, label, issuedAt: now, expiresAt });
     return { deviceId, token, expiresAt };
+  }
+
+  /** Trusted local code only; no bearer tokens or token hashes are returned. */
+  listReadCredentials(): RemoteCredentialInfo[] {
+    if (!this.originValue || this.closed) throw new Error('Gateway not listening');
+    if (this.options.credentialStore) return this.options.credentialStore.list();
+    const now = this.now();
+    return [...this.grants.values()].filter(grant => grant.issuedAt <= now && grant.expiresAt > now).map(grant => ({ ...grant }));
   }
 
   /** Trusted local code only. Existing connections have no streaming state. */
   revokeCredential(deviceId: string): void {
+    if (this.options.credentialStore) this.options.credentialStore.revoke(deviceId);
     for (const [hash, grant] of this.grants) if (grant.deviceId === deviceId) this.grants.delete(hash);
+    this.rates.delete(deviceId);
   }
 
   private send(res: ServerResponse, status: number, body: unknown): void {
@@ -86,7 +102,6 @@ export class RemoteReadGateway {
   private route(req: IncomingMessage, res: ServerResponse): void {
     const now = this.now();
     if (now - this.attemptWindow >= 60_000 || now < this.attemptWindow) { this.attempts = 0; this.attemptWindow = now; }
-    if (++this.attempts > 1200) { this.send(res, 429, { error: 'rate_limited' }); return; }
     const counts = new Map<string, number>();
     for (let i = 0; i < req.rawHeaders.length; i += 2) {
       const name = req.rawHeaders[i]!.toLowerCase(); counts.set(name, (counts.get(name) ?? 0) + 1);
@@ -98,19 +113,30 @@ export class RemoteReadGateway {
     if (req.method !== 'GET') { this.send(res, 405, { error: 'method_denied' }); return; }
     if (!req.url || req.url.includes('?') || req.url.includes('#') || req.headers['transfer-encoding'] !== undefined || (req.headers['content-length'] !== undefined && req.headers['content-length'] !== '0')) { this.send(res, 400, { error: 'invalid_request' }); return; }
     const auth = req.headers.authorization;
-    if (!auth || !/^Bearer [A-Za-z0-9_-]{43}$/.test(auth)) { this.send(res, 401, { error: 'unauthorized' }); return; }
-    const hash = createHash('sha256').update(auth.slice(7)).digest('hex');
-    const grant = this.grants.get(hash);
-    if (!grant || grant.expiresAt <= now) { if (grant) this.grants.delete(hash); this.send(res, 401, { error: 'unauthorized' }); return; }
-    if (now - grant.window >= 60_000 || now < grant.window) { grant.window = now; grant.requests = 0; }
-    if (++grant.requests > 120) { this.send(res, 429, { error: 'rate_limited' }); return; }
+    const hash = auth && /^Bearer [A-Za-z0-9_-]{43}$/.test(auth) ? createHash('sha256').update(auth.slice(7)).digest('hex') : '';
+    let deviceId: string | undefined;
+    try {
+      if (this.options.credentialStore) deviceId = this.options.credentialStore.authenticate(hash, now)?.deviceId;
+      else {
+        const grant = this.grants.get(hash);
+        if (grant && grant.issuedAt <= now && grant.expiresAt > now) deviceId = grant.deviceId;
+      }
+    } catch { this.send(res, 503, { error: 'unavailable' }); return; }
+    if (!deviceId) {
+      this.send(res, ++this.attempts > 1200 ? 429 : 401, { error: this.attempts > 1200 ? 'rate_limited' : 'unauthorized' }); return;
+    }
+    let rate = this.rates.get(deviceId);
+    if (!rate) { rate = { requests: 0, window: now }; this.rates.set(deviceId, rate); }
+    if (now - rate.window >= 60_000 || now < rate.window) { rate.window = now; rate.requests = 0; }
+    if (++rate.requests > 120) { this.send(res, 429, { error: 'rate_limited' }); return; }
     if (req.url !== '/remote/v1/sessions') { this.send(res, 404, { error: 'not_found' }); return; }
     try {
       // Counts and harness identifiers remain sensitive metadata. Do not export
       // titles (which may contain prompts), session identifiers, paths, message
       // text, decisions or commands through this experimental interface.
       const sessions = this.options.sessionService.snapshotSessions().slice(0, 256).map(session => ({
-        status: session.status, harnessPluginId: session.harnessPluginId,
+        status: ['idle', 'busy', 'error'].includes(session.status) ? session.status : 'unknown',
+        harnessPluginId: typeof session.harnessPluginId === 'string' && session.harnessPluginId.length <= 128 && /^[a-z][a-z0-9-]*\.[a-z][a-z0-9.-]*$/.test(session.harnessPluginId) ? session.harnessPluginId : 'unknown',
       }));
       if (Buffer.byteLength(JSON.stringify(sessions)) > 1024 * 1024) { this.send(res, 503, { error: 'capacity' }); return; }
       this.send(res, 200, { sessions });
@@ -119,8 +145,11 @@ export class RemoteReadGateway {
 
   async close(): Promise<void> {
     if (this.closed) return;
-    this.closed = true; this.grants.clear();
-    if (this.server.listening) await new Promise<void>((resolve, reject) => this.server.close(error => error ? reject(error) : resolve()));
+    this.closed = true; this.grants.clear(); this.rates.clear();
+    if (this.server.listening) await new Promise<void>((resolve, reject) => {
+      this.server.close(error => error ? reject(error) : resolve());
+      this.server.closeAllConnections();
+    });
     this.originValue = '';
   }
 }
