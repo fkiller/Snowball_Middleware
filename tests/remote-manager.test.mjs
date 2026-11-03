@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {spawnSync} from 'node:child_process';
 import {RemoteManager, handleRemoteControl, closeRemoteAndDevice} from '../apps/supervisor/remote-manager.mjs';
 import {startLocalRuntime} from '../apps/supervisor/runtime.mjs';
 
@@ -64,4 +65,37 @@ test('remote listener closes while device cleanup is still waiting', async t => 
   await new Promise(resolve=>setImmediate(resolve));
   await assert.rejects(fetch(remote.origin+'/remote/v1/sessions'));
   release(); await cleanup;
+});
+
+test('explicit local recovery preserves credentials and refuses missing, live, or guarded locks', async t => {
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-remote-recovery-'));
+  let manager=new RemoteManager({directory,sessionService:{snapshotSessions:()=>[]}});
+  t.after(async()=>{await manager.close().catch(()=>{});fs.rmSync(directory,{recursive:true,force:true});});
+  // A missing lock is not reported as a successful recovery.
+  assert.deepEqual(await handleRemoteControl(manager,{kind:'remote-control',id:1,action:'recoverLock'}),{kind:'remote-result',id:1,ok:false});
+  // A store already owned by this runtime is not eligible for recovery.
+  await manager.list();
+  assert.deepEqual(await handleRemoteControl(manager,{kind:'remote-control',id:2,action:'recoverLock'}),{kind:'remote-result',id:2,ok:false});
+  const competing=new RemoteManager({directory,sessionService:{snapshotSessions:()=>[]}});
+  assert.deepEqual(await handleRemoteControl(competing,{kind:'remote-control',id:5,action:'recoverLock'}),{kind:'remote-result',id:5,ok:false});
+  assert.equal((await manager.list()).enabled,false);
+  await competing.close();
+  await manager.close();
+  const childScript=`import {PersistentRemoteCredentials} from './packages/api/dist/index.js'; import {ensurePrivateStateDirectory} from './apps/supervisor/private-state.mjs'; const store=new PersistentRemoteCredentials({directory:process.argv[1],verifyPrivateDirectory:ensurePrivateStateDirectory}); store.issue('Test device');`;
+  const child=spawnSync(process.execPath,['--input-type=module','-e',childScript,path.join(directory,'remote')],{cwd:process.cwd(),encoding:'utf8',timeout:30000});
+  assert.equal(child.status,0,child.stderr);
+  manager=new RemoteManager({directory,sessionService:{snapshotSessions:()=>[]}});
+  const guard=path.join(directory,'remote','remote-credentials.guard');
+  fs.writeFileSync(guard,'unverified',{mode:0o600});
+  assert.deepEqual(await handleRemoteControl(manager,{kind:'remote-control',id:3,action:'recoverLock'}),{kind:'remote-result',id:3,ok:false});
+  assert.equal(fs.readFileSync(guard,'utf8'),'unverified');
+  assert.equal(fs.existsSync(path.join(directory,'remote','remote-credentials.lock')),true);
+  // Fixture cleanup simulates offline support; product code never deletes it.
+  fs.unlinkSync(guard);
+  const recovered=await handleRemoteControl(manager,{kind:'remote-control',id:4,action:'recoverLock'});
+  assert.equal(recovered.ok,true);
+  assert.equal(recovered.value.enabled,false);
+  assert.equal(recovered.value.credentials.length,1);
+  assert.equal(recovered.value.credentials[0].label,'Test device');
+  assert.equal('token' in recovered.value.credentials[0],false);
 });

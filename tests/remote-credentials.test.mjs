@@ -88,3 +88,20 @@ test('offline recovery refuses a live owner and recovers only the observed dead 
   recover(lock.token);
   const reopened = create(directory, () => Date.now()); reopened.close();
 });
+
+test('unverified guard and older lock format never get removed automatically', t => {
+  const directory=dir(); t.after(()=>fs.rmSync(path.dirname(directory),{recursive:true,force:true}));
+  const store=create(directory,()=>Date.now());
+  const lockPath=path.join(directory,'remote-credentials.lock');
+  const guardPath=path.join(directory,'remote-credentials.guard');
+  const lock=JSON.parse(fs.readFileSync(lockPath,'utf8'));
+  fs.writeFileSync(guardPath,'unverified',{mode:0o600});
+  assert.throws(()=>store.close(),/EEXIST/);
+  assert.equal(fs.readFileSync(guardPath,'utf8'),'unverified');
+  assert.equal(fs.existsSync(lockPath),true);
+  fs.unlinkSync(guardPath);store.close();
+  fs.writeFileSync(lockPath,JSON.stringify({token:lock.token,pid:lock.pid}),{mode:0o600});
+  assert.throws(()=>recoverAbandonedRemoteCredentialLock({directory,expectedToken:lock.token,verifyPrivateDirectory:ensurePrivateStateDirectory}),/unsupported version/);
+  assert.equal(fs.existsSync(lockPath),true);
+  assert.equal(fs.existsSync(guardPath),false);
+});

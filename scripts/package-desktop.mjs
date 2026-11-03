@@ -4,10 +4,12 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createHash} from 'node:crypto';
 import {packager} from '@electron/packager';
+import {verifyStagedImports} from './verify-staged-imports.mjs';
 
 const root=fileURLToPath(new URL('..',import.meta.url));
 if(!['win32','darwin','linux'].includes(process.platform))throw new Error('Build on the target Windows, macOS or Linux host');
-const requested=process.argv[2];
+const verifyOnly=process.argv[2]==='--verify-stage';
+const requested=verifyOnly?undefined:process.argv[2];
 if(requested&&(!path.isAbsolute(requested)||fs.existsSync(requested)))throw new Error('Choose a new absolute output directory');
 const output=requested??path.join(root,'artifacts','desktop',String(Date.now()));
 fs.mkdirSync(path.join(root,'.state'),{recursive:true});
@@ -22,7 +24,7 @@ function copy(relative,destination=relative){
 for(const name of ['main.mjs','core-worker.mjs','presentation.mjs','codex-connections.mjs','windows-device-presence.mjs','source-login.mjs','linux-login.mjs','device-setup.mjs','component-setup.mjs','device-setup-hub.mjs','device-setup-preload.cjs','device-setup.html','device-setup.css','device-setup.js'])copy('apps/desktop/'+name);
 for(const name of ['suite-devices.mjs','setup-profile.mjs','device-preparation.mjs','os_wifi.py'])copy('scripts/'+name);
 for(const name of ['icon.png','icon-32.png','icon-256.png','icon.ico','icon.icns','installer-small.bmp','installer-welcome.bmp'])copy('assets/'+name);
-for(const name of ['runtime.mjs','controller-store.mjs','codex-plugin.mjs','opencode-owned.mjs','settings-store.mjs','private-state.mjs','native-picker.mjs','mk20-lan.mjs','index.html','app.js','style.css'])copy('apps/supervisor/'+name);
+for(const name of ['runtime.mjs','remote-manager.mjs','controller-store.mjs','codex-plugin.mjs','opencode-owned.mjs','settings-store.mjs','private-state.mjs','native-picker.mjs','mk20-lan.mjs','index.html','app.js','style.css'])copy('apps/supervisor/'+name);
 // Reviewed Codex control and explicitly configured OpenCode observation are
 // bundled. No optional native drivers, account homes or runtime state.
 const packages=['plugin-sdk','plugin-host','core','api','client-sdk','harness-codex','harness-opencode','device-lan'];
@@ -41,10 +43,15 @@ for(const [name,files] of [
  ['dns-packet',['package.json','index.js','types.js','classes.js','opcodes.js','optioncodes.js','rcodes.js','LICENSE']],
  ['@leichtgewicht/ip-codec',['package.json','index.cjs','index.mjs','LICENSE']],
 ]) for(const file of files)copy(`node_modules/${name}/${file}`);
+// Catch missing staged static relative imports before producing an executable.
+// This does not verify computed paths, assets, bare dependencies or behavior.
+try { verifyStagedImports(staging, inventory.map(item=>item.path)); }
+catch(error) { if(verifyOnly)fs.rmSync(staging,{recursive:true,force:true}); throw error; }
+if(verifyOnly){fs.rmSync(staging,{recursive:true,force:true});console.log('Staged static relative imports verified.');process.exit(0);}
 const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
 copy('LICENSE');
 fs.writeFileSync(path.join(staging,'package.json'),JSON.stringify({name:pkg.name,version:pkg.version,author:'Snowball Middleware contributors',private:true,license:pkg.license,type:'module',main:'apps/desktop/main.mjs'},null,2));
 fs.writeFileSync(path.join(staging,'BUILD-INVENTORY.json'),JSON.stringify({version:1,platform:process.platform,arch:process.arch,license:pkg.license,signed:false,files:inventory},null,2));
-fs.writeFileSync(path.join(staging,'README.txt'),'Private unsigned development package. A per-user Windows installer can be built separately with npm run package:windows-installer. Start SnowballMiddleware to open the native tray; no front window. Supervisor stays on 127.0.0.1 without a PIN. Select Codex CLI in the native tray and review its executable, existing login home, working directory, version and SHA-256 before connecting. Explicit --codex-control-config and --opencode-observer-config absolute JSON paths are available for development. Existing tasks require explicit attachment before commands. Codex control and OpenCode read-only observer plugins are bundled. No updater, signing or physical driver support is claimed.\n');
+fs.writeFileSync(path.join(staging,'README.txt'),'Private unsigned development package. A per-user Windows installer can be built separately with npm run package:windows-installer. Start SnowballMiddleware to open the native tray; no front window. Supervisor stays on 127.0.0.1 without a PIN. Select Codex CLI in the native tray and review its executable, existing login home, working directory, version and SHA-256 before connecting. Explicit --codex-control-config and --opencode-observer-config absolute JSON paths are available for development. Existing tasks require explicit attachment before commands. Codex control and OpenCode read-only observer plugins are bundled. This standalone package does not include the source suite and does not support --suite-config; use the full source suite installation for that mode. No updater, signing or physical driver support is claimed.\n');
 const paths=await packager({dir:staging,out:output,name:'Snowball Middleware',executableName:'SnowballMiddleware',electronVersion:pkg.devDependencies.electron,platform:process.platform,arch:process.arch,asar:false,prune:false,overwrite:false,icon:path.join(root,'assets',process.platform==='win32'?'icon.ico':'icon.icns'),appBundleId:'local.snowball.middleware',appVersion:pkg.version,appCopyright:'Snowball contributors',win32metadata:{CompanyName:'Snowball',ProductName:'Snowball Middleware',FileDescription:'Snowball Middleware',InternalName:'SnowballMiddleware',OriginalFilename:'SnowballMiddleware.exe'}});
 console.log(JSON.stringify({paths,staging,signed:false,frontWindow:false,bundledPlugins:['snowball.codex','snowball.opencode'],inventoryFiles:inventory.length}));

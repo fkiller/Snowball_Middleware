@@ -1,5 +1,6 @@
 import path from 'node:path';
-import { RemoteReadGateway, PersistentRemoteCredentials } from '../../packages/api/dist/index.js';
+import fs from 'node:fs';
+import { RemoteReadGateway, PersistentRemoteCredentials, recoverAbandonedRemoteCredentialLock } from '../../packages/api/dist/index.js';
 import { ensurePrivateStateDirectory } from './private-state.mjs';
 
 // Owned by the local runtime, called only by its native parent process. No HTTP
@@ -44,6 +45,22 @@ export class RemoteManager {
     this.#openStore().revoke(deviceId);
     return this.#view();
   }); }
+  recoverLock() { return this.#run(() => {
+    // Explicit local maintenance only. Never interfere with a live gateway or
+    // this runtime's existing store, even when its integrity is unavailable.
+    if (this.#gateway || this.#store) throw Error('remote_in_use');
+    const directory = ensurePrivateStateDirectory(this.directory, ['remote-credentials.v1.json', 'remote-credentials.lock', 'remote-credentials.guard']);
+    const lockPath = path.join(directory, 'remote-credentials.lock');
+    const stat = fs.lstatSync(lockPath);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 1024) throw Error('invalid_remote_lock');
+    const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+    if (!lock || typeof lock !== 'object' || typeof lock.token !== 'string') throw Error('invalid_remote_lock');
+    // The recovery helper serializes against all writers and rechecks both the
+    // captured token and the PID before removing the abandoned lock.
+    recoverAbandonedRemoteCredentialLock({directory, expectedToken:lock.token, verifyPrivateDirectory:ensurePrivateStateDirectory});
+    this.#openStore();
+    return this.#view();
+  }); }
   close() {
     const result = this.#tail.then(async () => {
       if (this.#closed) return;
@@ -59,7 +76,7 @@ export class RemoteManager {
 // Reject malformed IPC before dispatch and never put exception messages in IPC.
 export async function handleRemoteControl(manager, message) {
   if (!message || message.kind !== 'remote-control' || !Number.isSafeInteger(message.id) || message.id < 1 ||
-      !['status','list','enable','disable','issue','revoke'].includes(message.action) ||
+      !['status','list','enable','disable','issue','revoke','recoverLock'].includes(message.action) ||
       Object.keys(message).some(k => !['kind','id','action','deviceId'].includes(k)) ||
       (message.action !== 'revoke' && message.deviceId !== undefined)) return undefined;
   try {

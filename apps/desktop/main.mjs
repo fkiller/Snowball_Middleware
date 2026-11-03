@@ -63,6 +63,13 @@ async function remoteAction(action,deviceId){
     const choice=await dialog.showMessageBox({icon:appIcon,type:'warning',title:'Snowball · Experimental remote',message:en?'Revoke this credential?':'이 자격증명을 철회하시겠습니까?',buttons:en?['Revoke','Cancel']:['철회','취소'],defaultId:1,cancelId:1,noLink:true});
     if(choice.response!==0)return;
   }
+  if(action==='recoverLock'){
+    const choice=await dialog.showMessageBox({icon:appIcon,type:'warning',title:'Snowball · Experimental remote',
+      message:en?'Recover an abandoned credential lock?':'남겨진 자격 저장소 잠금을 복구하시겠습니까?',
+      detail:en?'Only a current-version lock whose owner is confirmed stopped can be removed. Stop older Snowball processes first; older locks cannot be recovered here. The local listener must be off. Credentials are not deleted. If the owner or recovery guard cannot be verified, recovery will stop.':'현재 버전이 만든 잠금 중 소유 프로세스가 종료된 것으로 확인된 것만 제거합니다. 다른 구버전 Snowball 프로세스를 먼저 종료하세요. 구버전 잠금은 여기서 복구할 수 없습니다. 로컬 리스너는 꺼져 있어야 하며 자격증명은 삭제하지 않습니다. 소유자나 복구 가드를 확인할 수 없으면 복구를 중단합니다.',
+      buttons:en?['Recover','Cancel']:['복구','취소'],defaultId:1,cancelId:1,noLink:true});
+    if(choice.response!==0)return;
+  }
     const value=await remoteRequest(action,deviceId);
     if(action==='issue') {
       // Native local dialog only: never write the bearer to logs, URLs, browser UI or clipboard.
@@ -73,7 +80,7 @@ async function remoteAction(action,deviceId){
     } else remoteState=value;
   }catch{
     remoteState=undefined;
-    if(!stopping)await dialog.showMessageBox({icon:appIcon,type:'warning',title:'Snowball · Experimental remote',message:en?'Remote status could not be confirmed.':'원격 상태를 확인하지 못했습니다.',detail:en?'Check the local runtime and retry. The local control interface remains separate.':'로컬 런타임을 확인한 뒤 다시 시도하세요. 로컬 제어 화면은 별도로 유지됩니다.'});
+    if(!stopping)await dialog.showMessageBox({icon:appIcon,type:'warning',title:'Snowball · Experimental remote',message:action==='recoverLock'?(en?'Credential lock was not recovered.':'자격 저장소 잠금을 복구하지 못했습니다.'):(en?'Remote status could not be confirmed.':'원격 상태를 확인하지 못했습니다.'),detail:action==='recoverLock'?(en?'The lock may be in use, missing, damaged, or blocked by an unverified recovery guard. No lock is removed unless its owner is confirmed stopped.':'잠금이 사용 중이거나 없거나 손상됐거나 확인할 수 없는 복구 가드가 있을 수 있습니다. 소유자가 종료된 것을 확인하지 못하면 잠금을 제거하지 않습니다.'):(en?'Check the local runtime and retry. The local control interface remains separate.':'로컬 런타임을 확인한 뒤 다시 시도하세요. 로컬 제어 화면은 별도로 유지됩니다.')});
   }finally{remoteBusy=false;updateMenu();}
 }
 const iconPath=fileURLToPath(new URL('../../assets/'+(process.platform==='win32'?'icon.ico':'icon-256.png'),import.meta.url));
@@ -155,6 +162,7 @@ function updateMenu(){
       ...(!remoteState?[{label:state?.settings?.language==='en'?'Disable even if status is unknown':'상태를 몰라도 끄기',click:()=>void remoteAction('disable')}]:[]),
       {label:state?.settings?.language==='en'?'Issue read credential…':'읽기 자격증명 발급…',enabled:!!remoteState?.enabled,click:()=>void remoteAction('issue')},
       {label:state?.settings?.language==='en'?'Load credentials':'자격증명 목록 불러오기',click:()=>void remoteAction('list')},
+      {label:state?.settings?.language==='en'?'Recover abandoned credential lock…':'남겨진 자격 저장소 잠금 복구…',click:()=>void remoteAction('recoverLock')},
       ...(remoteState?.credentials??[]).map(item=>({label:`${item.label} · ${item.deviceId.slice(-8)} · ${new Date(item.expiresAt).toLocaleString()} ${state?.settings?.language==='en'?'— revoke…':'— 철회…'}`,click:()=>void remoteAction('revoke',item.deviceId)})),
       {label:state?.settings?.language==='en'?'TLS, pairing and Tailscale setup are not provided':'TLS·페어링·Tailscale 설정 미제공',enabled:false},
     ]},
