@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Snowball Mobile Experimental",
+    "slug": "snowball-mobile-experimental",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": { "bundleIdentifier": "dev.snowball.mobile.experimental" },
+    "android": { "package": "dev.snowball.mobile.experimental", "allowBackup": false },
+    "plugins": ["expo-secure-store"]
+  }
+}

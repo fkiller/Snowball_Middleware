@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseSetupOptions, repositoriesFor, harnessRepositories } from './setup-profile.mjs';
 import {planDevices,planDeviceConfigs} from './suite-devices.mjs';
 import {approveDevicePreparations} from './device-preparation.mjs';
+import {writeInstalledCli} from './installed-cli-setup.mjs';
 process.env.AGY_CLI_DISABLE_AUTO_UPDATE='true';
 
 const options = parseSetupOptions(process.argv.slice(2));
@@ -99,6 +100,7 @@ config.devicePreparations=approveDevicePreparations(config);
 const temporary = configFile + '.tmp';
 fs.writeFileSync(temporary, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
 fs.renameSync(temporary, configFile);
+writeInstalledCli(root, process.execPath);
 const launchScript = path.join(middleware, 'scripts/start-installed.mjs');
 if (process.platform === 'win32') {
   const quote = s => "'" + s.replaceAll("'", "''") + "'";
@@ -118,6 +120,7 @@ if (process.platform === 'win32') {
 }
 console.log(`Installed Snowball (${options.profile}) with all three verified harness plugins. Launcher: ${root}`);
 console.log(`Enabled device adapters: ${deviceProfiles.join(', ') || 'none (Web UI only)'}. Existing adapters and state are preserved.`);
+console.log(`Source updates: add the install root to PATH, then run snowball update (or run the installed command in ${root}).`);
 console.log('Native Codex / Antigravity / OpenCode applications and their sign-in remain owned by their vendors. Missing native apps are shown as unavailable.');
 if(deviceProfiles.includes('m5stack'))console.log('M5Stack LAN discovery is ready when the gateway starts. With firmware 0.4.0, choose a discovered PC on the device to pair over Wi-Fi; no USB registration script is required. For initial firmware or upgrades, connect USB and use the common Device setup window opened by the tray; it offers version review, full backup, reboot checks and Wi-Fi setup. Legacy Register-M5Stack launchers remain optional.');
 if (!options['no-start']) run(process.execPath, [launchScript, '--config', configFile,...(previouslyInstalledTray?[]:['--register-autostart'])], middleware);

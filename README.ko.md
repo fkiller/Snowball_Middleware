@@ -67,6 +67,8 @@ curl -fsSL https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/in
 
 ### 1. PC 소프트웨어 업데이트
 
+이 버전으로 설치하면 설치 폴더에 `snowball` 명령도 만들어집니다. 해당 폴더를 PATH에 추가한 뒤 `snowball update`를 실행하세요. 트레이를 시작하지 않으려면 `snowball update --no-start`를 사용합니다. 이 명령은 설치된 소스 저장소를 먼저 검사하고 실험 브랜치나 추적 중인 파일의 수정 사항이 있으면 업데이트를 중단합니다. 기존 소스 설치기를 호출하는 방식이며 서명된 원자적 릴리스 업데이트는 아닙니다. 이전 설치는 아래 방법도 사용할 수 있습니다.
+
 **기존에 설치한 폴더를 사용하세요.** 아래는 기본 경로 예시입니다. 다른 폴더(예: `Snowball-LAN`)에 설치했다면 첫 줄을 그 경로로 바꾸세요. 기기 프로필 옵션은 넣지 않습니다.
 
 <details open>

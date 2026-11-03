@@ -65,6 +65,8 @@ After installation, open the tray icon to launch the Web UI at **http://127.0.0.
 
 ### 1. Update PC software
 
+Installations made with this version also include a `snowball` command in the installation folder. After adding that folder to your PATH, run `snowball update`; `snowball update --no-start` updates without starting the tray. The command checks the installed source checkouts and refuses to update experimental branches or tracked local changes. It delegates to the existing source installer; it is not a signed, atomic release updater. The existing instructions below remain available for older installations.
+
 **Use your existing installation folder.** The examples below use the default folder; change the first line if you installed elsewhere (for example, `Snowball-LAN`). Omit the device profile option.
 
 <details open>

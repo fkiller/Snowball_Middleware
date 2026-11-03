@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CommandJournal, SessionService, SessionMetadataStore, SessionCreateStore, WorkspaceStore, HarnessDiscovery, DeviceRegistry, createHostId, parseHostId, resolveUserDataDir, recoverAbandonedJournalLock } from '../../packages/core/dist/index.js';
-import { LocalApi, loadSupervisorAssets } from '../../packages/api/dist/index.js';
+import { LocalApi, RemoteReadGateway, loadSupervisorAssets } from '../../packages/api/dist/index.js';
 import { ensurePrivateStateDirectory } from './private-state.mjs';
 import { chooseNativeWorkspace } from './native-picker.mjs';
 import { loadSettings, saveSettings } from './settings-store.mjs';
@@ -37,14 +37,14 @@ function privateJournalDirectory(directory) {
 }
 
 /** Local composition root for the CLI and native tray; no cloud control plane. */
-export async function startLocalRuntime({ dataDir = resolveUserDataDir(), repositoryRoot = fileURLToPath(new URL('../..', import.meta.url)), providers = [], enableNativePicker = false, chooseWorkspace, connectCodex, disconnectCodex, resetCodex, devicePresence, mk20Lan, noAuth = true, createHarnessAdapters = async () => [], desktop, harnessPresentations = {'snowball.codex':codexPresentation,'snowball.opencode':ocodePresentation} } = {}) {
+export async function startLocalRuntime({ dataDir = resolveUserDataDir(), repositoryRoot = fileURLToPath(new URL('../..', import.meta.url)), providers = [], enableNativePicker = false, chooseWorkspace, connectCodex, disconnectCodex, resetCodex, devicePresence, mk20Lan, noAuth = true, createHarnessAdapters = async () => [], desktop, remoteReadGateway, harnessPresentations = {'snowball.codex':codexPresentation,'snowball.opencode':ocodePresentation} } = {}) {
   // This boundary validates native privacy before any user registration is loaded.
   const directory = ensurePrivateStateDirectory(dataDir);
   const controllerPersistence = await loadControllerStore(directory);
   const hostId = loadHostId(directory);
   const commandDir = privateJournalDirectory(path.join(directory, 'commands'));
   const workspaceDir = privateJournalDirectory(path.join(directory, 'workspaces'));
-  let journal; let store; let metadata; let creates; let api; let sessions; let bindings = []; let deviceScanTimer; let deviceScanPromise;
+  let journal; let store; let metadata; let creates; let api; let remote; let sessions; let bindings = []; let deviceScanTimer; let deviceScanPromise;
   const dispatches = new Map(); let stopping = false;
   const discovery = new HarnessDiscovery();
   const devices = devicePresence || mk20Lan ? new DeviceRegistry(Date.now, controllerPersistence.store.contexts) : undefined;
@@ -133,10 +133,22 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
       mk20Lan: mk20Lan ? { describe: () => mk20Lan.describe(), configure: async value => { mk20Lan.configure(value); await rescanAfterConfiguration(); return mk20Lan.describe(); }, remove: async () => { mk20Lan.remove(); await rescanAfterConfiguration(); return mk20Lan.describe(); } } : undefined,
       supervisor: await loadSupervisorAssets(repositoryRoot) });
     await api.start();
+    // Explicit composition option only. There is no UI/CLI enablement, pairing,
+    // external listener or TLS in this development foundation.
+    if (remoteReadGateway !== undefined) {
+      if (!remoteReadGateway || typeof remoteReadGateway !== 'object' || Array.isArray(remoteReadGateway) || Object.keys(remoteReadGateway).some(key => !['port', 'proxyHosts'].includes(key))) throw new Error('Invalid remote gateway options');
+      remote = new RemoteReadGateway({ ...remoteReadGateway, sessionService: sessions });
+      await remote.start();
+    }
     if (devices) { deviceScanTimer = setInterval(() => void scanDevicePresence(), 15000); deviceScanTimer.unref(); }
     let closed = false;
     return {
       origin: api.origin,
+      ...(remote ? { remoteReadGateway: {
+        origin: remote.origin,
+        issueReadCredential: () => remote.issueReadCredential(),
+        revokeCredential: deviceId => remote.revokeCredential(deviceId),
+      } } : {}),
       issueBootstrap: () => api.issueBootstrap(),
       journal, sessions,
       async addHarnessAdapter(pluginId, adapter) {
@@ -150,10 +162,10 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
       async close() {
         if (closed) return; closed = true; stopping = true; discovery.cancel();
         clearInterval(deviceScanTimer);
-        try { await api.close(); for (const { pluginId, adapter } of bindings) await sessions.removeAdapter(pluginId, adapter.status?.().instanceId ?? 'default'); await Promise.allSettled(dispatches.values()); await controllerPersistence.close(); } finally { try { store.close(); } finally { creates.close(); metadata.close(); journal.close(); } }
+        try { try { await remote?.close(); } finally { await api.close(); } for (const { pluginId, adapter } of bindings) await sessions.removeAdapter(pluginId, adapter.status?.().instanceId ?? 'default'); await Promise.allSettled(dispatches.values()); await controllerPersistence.close(); } finally { try { store.close(); } finally { creates.close(); metadata.close(); journal.close(); } }
       },
     };
   } catch (error) {
-    stopping = true; clearInterval(deviceScanTimer); discovery.cancel(); await api?.close(); for (const { adapter } of bindings) await adapter.stop?.().catch(() => {}); await Promise.allSettled(dispatches.values()); store?.close(); creates?.close(); metadata?.close(); journal?.close(); throw error;
+    stopping = true; clearInterval(deviceScanTimer); discovery.cancel(); await remote?.close(); await api?.close(); for (const { adapter } of bindings) await adapter.stop?.().catch(() => {}); await Promise.allSettled(dispatches.values()); store?.close(); creates?.close(); metadata?.close(); journal?.close(); throw error;
   }
 }
