@@ -7,6 +7,14 @@
   "engines": {
     "node": ">=22.12"
   },
+  "bin": {
+    "snowball-install": "scripts/npm-install.mjs"
+  },
+  "files": [
+    "install.sh",
+    "install.ps1",
+    "scripts/npm-install.mjs"
+  ],
   "workspaces": [
     "packages/*"
   ],

@@ -60,6 +60,14 @@ curl -fsSL https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/in
 
 After installation, open the tray icon to launch the Web UI at **http://127.0.0.1:8765/** or manage Settings, Pause/Resume and login startup. Windows prepares Node/Git/Python. macOS/Linux need curl, Git and Python >=3.12 with venv/pip; Linux also needs a graphical desktop and Electron system libraries. Install and sign in to native harness applications through their vendors.
 
+If Node 22.12 or later and npm are already installed, the remote-expansion branch provides an **optional npm launcher** with the same one-line entry point in Windows PowerShell, macOS and Linux:
+
+```text
+npx --yes 'github:fkiller/Snowball_Middleware#feat/remote-expansion'
+```
+
+Add `--update` to update the default PC installation, or specify another installation with `--root`. This launcher runs the existing **main source installer**; it does not install the remote-expansion branch itself. The platform prerequisites above still apply. It is not an npm-published package or a signed release. Add `--help` to the command for options.
+
 **Experimental feature on the remote-expansion branch:** The tray's **Experimental remote** menu manages a separate, default-off loopback listener and eight-hour read credentials. Protect credentials like passwords and revoke any that are exposed. A PC restart turns the listener off, but unexpired credentials remain. TLS, verified device pairing, Tailscale setup and actual remote connectivity are not yet provided or verified; do not expose this listener to the Internet. After a crash, **Recover abandoned credential lock** can recover only a new-format lock whose owner is confirmed stopped; it refuses older locks and leftover recovery guards. The local Web UI remains unchanged.
 
 <a id="update-snowball"></a>
