@@ -65,10 +65,10 @@ curl -fsSL https://raw.githubusercontent.com/fkiller/Snowball_Middleware/main/in
 Node 22.12 이상과 npm이 이미 설치된 사용자는 원격 확장 브랜치의 **선택적 npm 실행기**로 Windows PowerShell·macOS·Linux에서 같은 한 줄을 사용할 수 있습니다.
 
 ```text
-npx --yes 'github:fkiller/Snowball_Middleware#feat/remote-expansion'
+npx --yes --ignore-scripts 'github:fkiller/Snowball_Middleware#feat/remote-expansion'
 ```
 
-기본 위치의 PC 소프트웨어를 업데이트할 때는 끝에 `--update`를 추가합니다. 다른 설치 위치는 `--root` 뒤에 지정합니다. 이 실행기는 기존 **main 소스 설치기**를 실행하므로 원격 확장 브랜치 자체를 설치하지 않으며, Node/npm 외에도 위의 OS별 사전 요구사항이 필요합니다. 아직 npm에 게시된 패키지나 서명된 배포물이 아닙니다. 옵션은 위 명령 뒤에 `--help`를 붙여 확인할 수 있습니다.
+기본 위치의 PC 소프트웨어를 업데이트할 때는 끝에 `--update`를 추가합니다. 다른 설치 위치는 `--root` 뒤에 지정합니다. `--ignore-scripts`는 npm이 실행기를 준비할 때 의존성의 설치 스크립트를 자동 실행하지 않도록 합니다. 첫 실행은 GitHub에서 소스와 실행기 의존성을 준비하므로 시간이 걸릴 수 있습니다. 이 실행기는 기존 **main 소스 설치기**를 실행하므로 원격 확장 브랜치 자체를 설치하지 않으며, Node/npm 외에도 위의 OS별 사전 요구사항이 필요합니다. 아직 npm에 게시된 패키지나 서명된 배포물이 아닙니다. 옵션은 위 명령 뒤에 `--help`를 붙여 확인할 수 있습니다.
 
 **원격 확장 브랜치의 실험 기능:** 트레이의 **실험용 원격** 메뉴는 기본적으로 꺼진 별도 루프백 리스너와 8시간 읽기 자격을 관리합니다. 자격은 비밀번호처럼 보호하고 유출 시 해당 메뉴에서 철회하세요. PC가 재시작되면 리스너는 다시 꺼지지만 만료 전 자격은 남습니다. 아직 TLS, 신뢰할 수 있는 기기 페어링, Tailscale 설정 및 실제 원격 접속을 제공하거나 검증하지 않았으므로 인터넷에 노출하지 마세요. 비정상 종료로 잠금이 남으면 메뉴의 **남겨진 자격 저장소 잠금 복구**로 확인할 수 있습니다. 종료가 확인된 새 형식의 잠금만 복구하며 구버전 잠금이나 복구 가드가 남은 경우에는 중단합니다. 기존 로컬 Web UI는 그대로 유지됩니다.
 

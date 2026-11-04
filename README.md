@@ -63,10 +63,10 @@ After installation, open the tray icon to launch the Web UI at **http://127.0.0.
 If Node 22.12 or later and npm are already installed, the remote-expansion branch provides an **optional npm launcher** with the same one-line entry point in Windows PowerShell, macOS and Linux:
 
 ```text
-npx --yes 'github:fkiller/Snowball_Middleware#feat/remote-expansion'
+npx --yes --ignore-scripts 'github:fkiller/Snowball_Middleware#feat/remote-expansion'
 ```
 
-Add `--update` to update the default PC installation, or specify another installation with `--root`. This launcher runs the existing **main source installer**; it does not install the remote-expansion branch itself. The platform prerequisites above still apply. It is not an npm-published package or a signed release. Add `--help` to the command for options.
+Add `--update` to update the default PC installation, or specify another installation with `--root`. `--ignore-scripts` prevents npm from automatically running dependency installation scripts while preparing the launcher. The first run can take time while GitHub source and launcher dependencies are prepared. This launcher runs the existing **main source installer**; it does not install the remote-expansion branch itself. The platform prerequisites above still apply. It is not an npm-published package or a signed release. Add `--help` to the command for options.
 
 **Experimental feature on the remote-expansion branch:** The tray's **Experimental remote** menu manages a separate, default-off loopback listener and eight-hour read credentials. Protect credentials like passwords and revoke any that are exposed. A PC restart turns the listener off, but unexpired credentials remain. TLS, verified device pairing, Tailscale setup and actual remote connectivity are not yet provided or verified; do not expose this listener to the Internet. After a crash, **Recover abandoned credential lock** can recover only a new-format lock whose owner is confirmed stopped; it refuses older locks and leftover recovery guards. The local Web UI remains unchanged.
 
