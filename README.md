@@ -294,6 +294,14 @@ For integration work across all six repositories, use a **trusted SHA manifest**
 node scripts/install-locked-development.mjs --manifest <absolute-manifest-path> --root <new-absolute-install-path>
 ```
 
+The same pinned mode is available through the optional launcher, without first cloning Middleware. Replace both paths with absolute paths; the installation folder must be new:
+
+```text
+npx --yes --ignore-scripts 'github:fkiller/Snowball_Middleware#feat/remote-expansion' --manifest '<absolute-manifest-path>' --root '<new-absolute-install-path>'
+```
+
+The manifest must come from a source you trust; it fixes the six checkout commits, not the moving GitHub launcher itself. Windows PowerShell 5 UTF-16LE redirection and UTF-8 manifest files are supported. This mode refuses `--update` and other normal-installer options.
+
 The command checks out the selected commits from the official repositories and builds the web development profile. It does not start the suite or register a shared PATH command. Node/npm and Git are required. This is not a signed end-user release; it neither overwrites an existing installation nor supports updating these detached checkouts with the normal `snowball update`. Add `--checkout-only` to verify the checkouts without installing the suite.
 
 ### 1. Setup & Build

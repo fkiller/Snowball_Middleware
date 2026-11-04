@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { diagnoseTailscale, inspectTailscaleStatus } from '../scripts/diagnose-tailscale.mjs';
+import { diagnoseTailscale, diagnoseTailscaleServe, inspectTailscaleStatus } from '../scripts/diagnose-tailscale.mjs';
 
 test('only bounded facts are returned; local addresses, users and names are never exported', () => {
   const value = { BackendState: 'Running', Self: { Online: true, DNSName: 'private.tailnet.ts.net.', HostName: 'secret-host', TailscaleIPs: ['100.64.1.2'] }, User: { LoginName: 'secret@example.test' } };
@@ -14,6 +14,27 @@ test('only bounded facts are returned; local addresses, users and names are neve
   assert.deepEqual(inspectTailscaleStatus(null), { status: 'unrecognized' });
   assert.equal(inspectTailscaleStatus({ BackendState: 'Stopped', Self: { Online: 'yes', DNSName: 'not a dns name' } }).selfOnline, null);
   assert.equal(inspectTailscaleStatus({ BackendState: 'Stopped', Self: { DNSName: 'not a dns name' } }).dnsNameReported, false);
+});
+
+test('Serve inspection runs only a bounded read-only status command and does not disclose its snapshot', () => {
+  let calls = 0;
+  const runner = (_binary, args, options) => {
+    calls++;
+    assert.deepEqual(args, ['serve', 'status', '--json']);
+    assert.equal(options.shell, false);
+    assert.equal(options.timeout, 5000);
+    assert.equal(options.maxBuffer, 256 * 1024);
+    assert.equal(options.env.SECRET, undefined);
+    return { status: 0, stdout: JSON.stringify({ TCP: { '443': { TCPForward: '127.0.0.1:24123' } }, AllowFunnel: { 'private.tail.ts.net:443': true } }) };
+  };
+  const ports = { listenPort: 443, backendPort: 24123 };
+  const result = diagnoseTailscaleServe(process.execPath, ports, { runner, environment: { SECRET: 'hidden' } });
+  assert.deepEqual(result, { status: 'observed', snapshot: 'public', connection: 'not_tested', identity: 'not_verified', backendOwnership: 'not_verified' });
+  assert.doesNotMatch(JSON.stringify(result), /private|24123|hidden/);
+  assert.deepEqual(diagnoseTailscaleServe(process.execPath, { ...ports, listenPort: 0 }, { runner }), { status: 'invalid_ports' });
+  assert.equal(calls, 1);
+  assert.deepEqual(diagnoseTailscaleServe(process.execPath, ports, { runner: () => ({ status: 0, stdout: '{"Future":true}' }) }),
+    { status: 'observed', snapshot: 'unknown', connection: 'not_tested', identity: 'not_verified', backendOwnership: 'not_verified' });
 });
 
 test('explicit CLI invocation uses fixed args, bounded output, timeout and a minimal environment', () => {

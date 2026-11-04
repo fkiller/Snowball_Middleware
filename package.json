@@ -13,7 +13,8 @@
   "files": [
     "install.sh",
     "install.ps1",
-    "scripts/npm-install.mjs"
+    "scripts/npm-install.mjs",
+    "scripts/install-locked-development.mjs"
   ],
   "workspaces": [
     "packages/*"

@@ -296,6 +296,14 @@ M5Stack **0.5.6**는 머신 목록에서 식별되지 않은 “기존 등록 PC
 node scripts/install-locked-development.mjs --manifest <manifest-절대경로> --root <새-설치폴더-절대경로>
 ```
 
+Middleware를 미리 복제하지 않고 같은 고정 설치 모드를 선택할 수도 있습니다. 두 경로를 절대 경로로 바꾸고 아직 존재하지 않는 설치 폴더를 사용하세요.
+
+```text
+npx --yes --ignore-scripts 'github:fkiller/Snowball_Middleware#feat/remote-expansion' --manifest '<manifest-절대경로>' --root '<새-설치폴더-절대경로>'
+```
+
+신뢰할 수 있는 manifest를 직접 준비해야 합니다. manifest는 여섯 저장소의 커밋을 고정하지만 변경될 수 있는 GitHub 실행기 자체를 고정하지는 않습니다. Windows PowerShell 5의 UTF-16LE 리디렉션과 UTF-8 manifest를 모두 읽습니다. 이 모드에서는 일반 설치의 `--update`와 다른 옵션을 함께 사용할 수 없습니다.
+
 공식 저장소의 지정 커밋을 검증하고 Web 개발 프로필을 빌드합니다. 자동 실행과 공용 PATH 등록은 하지 않습니다. Node/npm·Git이 필요하며, 서명된 일반 사용자 릴리스 설치가 아닙니다. 기존 설치나 기존 폴더에 덮어쓰지 않고, 일반 `snowball update`로 이 고정 체크아웃을 갱신하지 않습니다. 저장소 확인만 하려면 `--checkout-only`를 추가하세요.
 
 ### 1. 설정 및 빌드

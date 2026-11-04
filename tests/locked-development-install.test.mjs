@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { installLockedDevelopment, REPOSITORIES, validateManifest, verifyCheckouts } from '../scripts/install-locked-development.mjs';
+import { installLockedDevelopment, loadManifest, REPOSITORIES, validateManifest, verifyCheckouts } from '../scripts/install-locked-development.mjs';
 import { parseSetupOptions } from '../scripts/setup-profile.mjs';
 import { registerUserCommand } from '../scripts/installed-cli-setup.mjs';
 
@@ -27,6 +27,22 @@ function fixtureRepositories(root) {
   }
   return { version: 1, repositories: records };
 }
+
+test('manifest loading supports Windows PowerShell redirection and never exposes invalid contents', t => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'snowball-manifest-encoding-'));
+  t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  const file = path.join(temp, 'lock.json');
+  const manifest = { version: 1, repositories: [] };
+  for (const bytes of [Buffer.from(JSON.stringify(manifest)), Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(JSON.stringify(manifest))]),
+    Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(JSON.stringify(manifest), 'utf16le')])]) {
+    fs.writeFileSync(file, bytes);
+    assert.deepEqual(loadManifest(file), manifest);
+  }
+  fs.writeFileSync(file, '{"private":"do-not-print"');
+  assert.throws(() => loadManifest(file), error => error.message === 'Manifest could not be read or parsed');
+  fs.writeFileSync(file, Buffer.alloc(64 * 1024 + 1));
+  assert.throws(() => loadManifest(file), /Manifest could not be read or parsed/);
+});
 
 // Substitute local repositories only inside the explicit internal test seam;
 // production always receives the fixed official GitHub URLs.

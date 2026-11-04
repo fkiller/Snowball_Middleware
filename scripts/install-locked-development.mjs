@@ -27,6 +27,20 @@ export function validateManifest(manifest) {
   });
 }
 
+// Windows PowerShell 5 writes redirected text as UTF-16LE with a BOM; modern
+// shells normally use UTF-8. Decode both without echoing malformed input.
+export function loadManifest(file) {
+  try {
+    if (typeof file !== 'string' || !path.isAbsolute(file)) throw Error('invalid path');
+    const stat = fs.statSync(file);
+    if (!stat.isFile() || stat.size > 64 * 1024) throw Error('invalid size');
+    const bytes = fs.readFileSync(file);
+    if (bytes.length > 64 * 1024) throw Error('invalid size');
+    const encoding = bytes[0] === 0xff && bytes[1] === 0xfe ? 'utf-16le' : 'utf-8';
+    return JSON.parse(new TextDecoder(encoding, { fatal: true }).decode(bytes));
+  } catch { throw Error('Manifest could not be read or parsed'); }
+}
+
 function exec(file, args, options = {}) {
   const result = spawnSync(file, args, { encoding: 'utf8', windowsHide: true, shell: false, maxBuffer: 4 * 1024 * 1024, ...options });
   if (result.error || result.status !== 0) throw Error(`${path.basename(file)} failed; pinned development installation is incomplete`);
@@ -127,7 +141,7 @@ function parse(args) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const options = parse(process.argv.slice(2));
-    const manifest = JSON.parse(fs.readFileSync(options.manifest, 'utf8'));
+    const manifest = loadManifest(options.manifest);
     console.log('Unsigned development source installation. Only use a SHA manifest you trust.');
     const result = await installLockedDevelopment({ ...options, manifest });
     console.log(result.suiteInstalled ? `Pinned web development suite installed without starting or changing PATH: ${result.root}` : `Pinned checkouts verified; suite not installed: ${result.root}`);

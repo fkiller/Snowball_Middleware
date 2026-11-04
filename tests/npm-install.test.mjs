@@ -39,6 +39,22 @@ test('invalid options fail before an installer can run', () => {
   assert.equal(runInstaller([], { platform: 'linux', run: () => ({ status: 7 }) }), 7);
 });
 
+test('pinned development mode invokes the separate installer and cannot update an existing suite', () => {
+  const args = ['--manifest', 'A manifest path/lock.json', '--root', 'A new install path', '--checkout-only'];
+  for (const platform of ['win32', 'darwin', 'linux']) {
+    const command = installerCommand(args, platform);
+    assert.equal(command.executable, process.execPath);
+    assert.match(command.args[0], /install-locked-development\.mjs$/);
+    assert.deepEqual(command.args.slice(1), args);
+  }
+  for (const options of [
+    ['--manifest', 'lock.json'], ['--checkout-only', '--root', 'root'],
+    ['--manifest', 'lock.json', '--root', 'root', '--update'],
+    ['--manifest', 'lock.json', '--root', 'root', '--profile', 'all'],
+    ['--manifest', 'lock.json', '--root', 'root', '--root', 'other'],
+  ]) assert.throws(() => installerCommand(options, 'linux'));
+});
+
 test('a packed installer actually runs through the npm executable shim', { timeout: 60000 }, t => {
   const repository = fileURLToPath(new URL('..', import.meta.url));
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'snowball-npm-installer-'));
@@ -60,4 +76,11 @@ test('a packed installer actually runs through the npm executable shim', { timeo
   assert.equal(run.status, 0, run.stderr);
   assert.match(run.stdout, /Snowball source installer/);
   assert.match(run.stdout, /--update/);
+  assert.match(run.stdout, /--manifest/);
+  const locked = spawnSync(process.execPath, [npmCli, 'exec', '--yes', '--offline', `--package=${archive}`, '--',
+    'snowball-install', '--manifest', path.join(temp, 'absent.json'), '--root', path.join(temp, 'must-not-exist')],
+    { cwd: temp, env, encoding: 'utf8', timeout: 30000 });
+  assert.notEqual(locked.status, 0);
+  assert.match(locked.stderr, /Snowball development installer:/);
+  assert.equal(fs.existsSync(path.join(temp, 'must-not-exist')), false);
 });
