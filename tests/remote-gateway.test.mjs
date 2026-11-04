@@ -49,9 +49,9 @@ test('remote listener is opt-in, loopback only, authenticated and returns only r
 
 test('credentials are separately revocable, bounded, expiring and rate limited', async t => {
   let now = 100;
-  const gateway = await setup(t, { now: () => now, proxyHosts: ['host.example.ts.net'] });
+  const gateway = await setup(t, { now: () => now });
   const first = gateway.issueReadCredential(), second = gateway.issueReadCredential();
-  const h1 = { Host: 'host.example.ts.net', Authorization: `Bearer ${first.token}` };
+  const h1 = { Authorization: `Bearer ${first.token}` };
   const h2 = { Authorization: `Bearer ${second.token}` };
   assert.equal((await get(gateway, '/remote/v1/sessions', h1)).status, 200);
   gateway.revokeCredential(first.deviceId);
@@ -63,6 +63,7 @@ test('credentials are separately revocable, bounded, expiring and rate limited',
   now = second.expiresAt;
   assert.equal((await get(gateway, '/remote/v1/sessions', h2)).status, 401);
   assert.throws(() => new RemoteReadGateway({ sessionService: {}, proxyHosts: ['*.example'] }), /Invalid proxy Host/);
+  assert.throws(() => new RemoteReadGateway({ sessionService: {}, proxyHosts: ['host.example.ts.net'] }), /requires gateway TLS/);
 });
 
 test('runtime leaves remote gateway off by default and closes the explicit listener with the runtime', async t => {

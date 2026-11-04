@@ -1,31 +1,37 @@
 import http, { type IncomingMessage, type ServerResponse } from 'node:http';
-import { createHash, randomBytes } from 'node:crypto';
+import https from 'node:https';
+import tls from 'node:tls';
+import { createHash, createPrivateKey, randomBytes, X509Certificate } from 'node:crypto';
 import type { SessionService } from '@snowball/core';
 import { PersistentRemoteCredentials, type RemoteCredentialInfo } from './remote-credentials.js';
+import { parseTailscaleHost } from './tailscale-host.js';
 
 type Grant = RemoteCredentialInfo;
 export interface RemoteReadGatewayOptions {
   sessionService: SessionService;
-  /** Additional exact HTTP Host authorities accepted from a trusted local proxy. */
+  /** Optional exact authority; remote authorities require gateway-owned TLS. */
   proxyHosts?: string[];
   port?: number;
   now?: () => number;
   /** Constructed only after the caller validates its OS-private storage. */
   credentialStore?: PersistentRemoteCredentials;
+  /** Development-only in-memory key material; callers own secure acquisition and rotation. */
+  tls?: { host: string; cert: string | Buffer; key: string | Buffer };
 }
 
 /**
- * Development foundation only: separate loopback listener, no pairing or TLS.
+ * Development foundation only: separate loopback listener, no pairing.
  * Trusted local code must explicitly start it and issue/revoke each in-memory
  * credential. It never forwards requests to the unauthenticated Supervisor.
  */
 export class RemoteReadGateway {
-  private readonly server: http.Server;
+  private readonly server: http.Server | https.Server;
   private readonly grants = new Map<string, Grant>();
   private readonly rates = new Map<string, { requests: number; window: number }>();
   private readonly now: () => number;
   private readonly proxyHosts: Set<string>;
   private originValue = '';
+  private authority = '';
   private closed = false;
   private starting = false;
   private attempts = 0;
@@ -38,7 +44,40 @@ export class RemoteReadGateway {
       // An authority, never a URL, wildcard, credentials, path, or whitespace.
       if (!/^[a-z0-9.-]+(?::[0-9]{1,5})?$/.test(host) || host.length > 253) throw new Error('Invalid proxy Host');
     }
-    this.server = http.createServer({ maxHeaderSize: 8192, requestTimeout: 10_000, headersTimeout: 10_000, keepAliveTimeout: 5000 }, (req, res) => this.route(req, res));
+    if (!options.tls && this.proxyHosts.size) throw new Error('Remote proxy Host requires gateway TLS');
+    const serverOptions = { maxHeaderSize: 8192, requestTimeout: 10_000, headersTimeout: 10_000, keepAliveTimeout: 5000 };
+    if (options.tls) {
+      let host: string;
+      let key: ReturnType<typeof createPrivateKey>;
+      try {
+        host = parseTailscaleHost(options.tls.host);
+        const certificate = new X509Certificate(options.tls.cert);
+        key = createPrivateKey(options.tls.key);
+        const now = this.now();
+        if (!Number.isFinite(now) || !Number.isFinite(Date.parse(certificate.validFrom)) || !Number.isFinite(Date.parse(certificate.validTo)) ||
+            now < Date.parse(certificate.validFrom) || now >= Date.parse(certificate.validTo) ||
+            certificate.checkHost(host, { subject: 'never', wildcards: false }) !== host || !certificate.checkPrivateKey(key) ||
+            [...this.proxyHosts].some(proxyHost => proxyHost !== host)) throw new Error('invalid identity');
+      } catch {
+        throw new Error('Invalid remote TLS identity');
+      }
+      this.proxyHosts.add(host);
+      const context = tls.createSecureContext({ cert: options.tls.cert, key: options.tls.key, minVersion: 'TLSv1.2' });
+      this.server = https.createServer({
+        ...serverOptions, cert: options.tls.cert, key: options.tls.key, minVersion: 'TLSv1.2',
+        SNICallback: (servername, callback) => {
+          if (servername.toLowerCase() !== host) return callback(new Error('Unrecognized server name'));
+          callback(null, context);
+        },
+      }, (req, res) => this.route(req, res));
+      // The native client connects using the approved DNS name, never an IP.
+      // Reject clients that omit SNI as well as clients selecting another name.
+      this.server.on('secureConnection', socket => {
+        if (!socket.servername || socket.servername.toLowerCase() !== host) socket.destroy();
+      });
+    } else {
+      this.server = http.createServer(serverOptions, (req, res) => this.route(req, res));
+    }
     this.server.maxConnections = 32;
     this.server.on('clientError', (_, socket) => socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'));
   }
@@ -56,7 +95,8 @@ export class RemoteReadGateway {
       });
       const address = this.server.address();
       if (!address || typeof address === 'string' || address.address !== '127.0.0.1') throw new Error('Unexpected gateway listener');
-      this.originValue = `http://127.0.0.1:${address.port}`;
+      this.authority = `127.0.0.1:${address.port}`;
+      this.originValue = `${this.options.tls ? 'https' : 'http'}://${this.authority}`;
       return this.originValue;
     } finally { this.starting = false; }
   }
@@ -109,7 +149,7 @@ export class RemoteReadGateway {
     if (['host', 'authorization', 'origin', 'sec-fetch-site', 'content-length'].some(name => (counts.get(name) ?? 0) > 1)) { this.send(res, 400, { error: 'invalid_request' }); return; }
     // Native clients only. This foundation has no browser session or CORS support.
     const host = req.headers.host;
-    if (!host || (host !== this.origin.slice(7) && !this.proxyHosts.has(host)) || req.headers.origin !== undefined || req.headers['sec-fetch-site'] !== undefined) { this.send(res, 403, { error: 'boundary_denied' }); return; }
+    if (!host || (host !== this.authority && !this.proxyHosts.has(host)) || req.headers.origin !== undefined || req.headers['sec-fetch-site'] !== undefined) { this.send(res, 403, { error: 'boundary_denied' }); return; }
     if (req.method !== 'GET') { this.send(res, 405, { error: 'method_denied' }); return; }
     if (!req.url || req.url.includes('?') || req.url.includes('#') || req.headers['transfer-encoding'] !== undefined || (req.headers['content-length'] !== undefined && req.headers['content-length'] !== '0')) { this.send(res, 400, { error: 'invalid_request' }); return; }
     const auth = req.headers.authorization;

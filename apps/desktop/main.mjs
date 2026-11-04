@@ -13,6 +13,7 @@ import {sourceLogin} from './source-login.mjs';
 import {installedDevicePreparations} from '../../scripts/device-preparation.mjs';
 import {DeviceSetupHub} from './device-setup-hub.mjs';
 import {preparationNeedsReview} from './device-setup.mjs';
+import {tailscaleCandidates, inspectApprovedTailscale, describeTailscaleInspection} from './tailscale-onboarding.mjs';
 
 try {
 const args=process.argv.slice(app.isPackaged?1:2);const smoke=args.includes('--smoke-test');
@@ -31,6 +32,47 @@ if(!lock){process.send?.({kind:'desktop-already-running'});app.quit();}else{
 if(marker){fs.writeFileSync(marker+'.tmp',JSON.stringify({version:1,pid:process.pid,origin:`http://127.0.0.1:${installed.port}`,suiteConfig,status:'starting'})+'\n',{mode:0o600});fs.renameSync(marker+'.tmp',marker);}
 let tray,worker,client,state,origin,stopping=false,startupFailed=false,stopPromise,poll,notification,enrollmentBusy=false,savedConnectionWarning=false,appIcon;
 let remoteState,remoteBusy=false,remoteSequence=0;const remotePending=new Map();
+async function checkTailscale(){
+  if(remoteBusy||stopping)return;
+  remoteBusy=true;updateMenu();
+  const en=state?.settings?.language==='en';
+  try {
+    const suggestions=tailscaleCandidates();
+    let selected=suggestions[0];
+    if(selected){
+      const choice=await dialog.showMessageBox({icon:appIcon,type:'question',title:'Snowball · Tailscale',
+        message:en?'Check Tailscale on this PC?':'이 PC의 Tailscale 상태를 확인할까요?',
+        detail:en?`The selected local program will run with your account permissions:\n${selected}\n\nRun it only if you trust this Tailscale installation. This will not change Tailscale settings or enable a remote connection.`:`아래 로컬 프로그램이 현재 계정의 권한으로 실행됩니다.\n${selected}\n\n신뢰하는 Tailscale 설치본인 경우에만 실행하세요. 이 검사는 설정을 바꾸거나 원격 연결을 활성화하지 않습니다.`,
+        buttons:en?['Check','Choose another…','Cancel']:['확인','다른 파일 선택…','취소'],defaultId:2,cancelId:2,noLink:true});
+      if(choice.response===2)return;
+      if(choice.response===1)selected=undefined;
+    }
+    if(!selected){
+      if(!suggestions.length){
+        const choice=await dialog.showMessageBox({icon:appIcon,type:'info',title:'Snowball · Tailscale',
+          message:en?'Tailscale was not found in the usual locations.':'일반적인 위치에서 Tailscale을 찾지 못했습니다.',
+          detail:en?'Install Tailscale on this PC, or select its command-line executable if it is already installed. No settings will be changed.':'이 PC에 Tailscale을 설치하거나 이미 설치했다면 명령줄 실행 파일을 선택하세요. 설정은 변경되지 않습니다.',
+          buttons:en?['Choose file…','Cancel']:['파일 선택…','취소'],defaultId:1,cancelId:1,noLink:true});
+        if(choice.response!==0)return;
+      }
+      const file=await dialog.showOpenDialog({title:en?'Choose Tailscale command-line executable':'Tailscale 명령줄 실행 파일 선택',properties:['openFile']});
+      if(file.canceled||!file.filePaths[0])return;
+      selected=file.filePaths[0];
+      const choice=await dialog.showMessageBox({icon:appIcon,type:'warning',title:'Snowball · Tailscale',
+        message:en?'Run the selected program?':'선택한 프로그램을 실행할까요?',
+        detail:en?`${selected}\n\nThis program runs with your account permissions. Continue only if this is your trusted Tailscale installation.`:`${selected}\n\n이 프로그램은 현재 계정의 권한으로 실행됩니다. 신뢰하는 Tailscale 설치본인 경우에만 계속하세요.`,
+        buttons:en?['Run','Cancel']:['실행','취소'],defaultId:1,cancelId:1,noLink:true});
+      if(choice.response!==0)return;
+    }
+    const result=await inspectApprovedTailscale(selected);
+    const text=describeTailscaleInspection(result,en?'en':'ko');
+    if(!stopping)await dialog.showMessageBox({icon:appIcon,type:result.kind==='ready'?'info':'warning',title:'Snowball · Tailscale',...text});
+  } catch {
+    if(!stopping)await dialog.showMessageBox({icon:appIcon,type:'warning',title:'Snowball · Tailscale',
+      message:en?'Could not check Tailscale.':'Tailscale을 확인하지 못했습니다.',
+      detail:en?'Open Tailscale on this PC and try again. Existing local control remains available.':'이 PC에서 Tailscale을 확인하고 다시 시도하세요. 기존 로컬 제어는 계속 사용할 수 있습니다.'});
+  } finally {remoteBusy=false;updateMenu();}
+}
 function remoteRequest(action,deviceId){
   if(!worker||stopping)return Promise.reject(Error('Remote control unavailable'));
   const id=++remoteSequence;
@@ -155,6 +197,7 @@ function updateMenu(){
     {label:paused?l.resume:l.pause,enabled:!!client,click:async()=>{try{await client.updateSettings(state.settings.revision,{controlPaused:!paused});await refresh();}catch{await refresh();}}},
     {label:l.autostart,type:'checkbox',checked:getAutostart(),enabled:!!client&&!smoke,click:async item=>{try{await client.updateSettings(state.settings.revision,{autostart:item.checked});}catch{}await refresh();}},
     {label:state?.settings?.language==='en'?'Experimental remote':'실험용 원격',enabled:!!client&&!smoke&&!remoteBusy,submenu:[
+      {label:state?.settings?.language==='en'?'Check Tailscale on this PC…':'이 PC의 Tailscale 확인…',click:()=>void checkTailscale()},
       {label:remoteState?(remoteState.enabled?(state?.settings?.language==='en'?'Local listener: on':'로컬 리스너: 켜짐'):(state?.settings?.language==='en'?'Local listener: off':'로컬 리스너: 꺼짐')):(state?.settings?.language==='en'?'Status unknown':'상태 확인 안 됨'),enabled:false},
       ...(remoteState?.enabled?[{label:`${remoteState.origin} (loopback)`,enabled:false}]:[]),
       {label:remoteState?.enabled?(state?.settings?.language==='en'?'Disable':'끄기'):(state?.settings?.language==='en'?'Enable…':'켜기…'),enabled:!!remoteState,click:()=>void remoteAction(remoteState.enabled?'disable':'enable')},

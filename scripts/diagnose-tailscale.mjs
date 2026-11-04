@@ -33,6 +33,7 @@ export function diagnoseTailscale(executable, { runner = spawnSync, environment 
   for (const name of ['HOME', 'USERPROFILE', 'XDG_RUNTIME_DIR', 'SYSTEMROOT', 'SystemRoot', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR']) {
     if (typeof environment[name] === 'string') env[name] = environment[name];
   }
+  env.TAILSCALE_BE_CLI = '1';
   let child;
   try {
     child = runner(binary, ['status', '--json', '--peers=false'], {

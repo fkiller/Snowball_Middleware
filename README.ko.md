@@ -280,6 +280,16 @@ M5Stack **0.5.6**는 머신 목록에서 식별되지 않은 “기존 등록 PC
 - **Node.js**: `>= 22.12.0`
 - **현재 검증 환경**: Windows 11 리뷰 호스트. 코어 자동화 테스트는 Ubuntu에서도 통과합니다.
 
+### 여러 저장소의 고정 커밋으로 개발 환경 설치
+
+원격 확장 작업처럼 여섯 저장소를 함께 검증하려면 Control의 `scripts/workspace-revisions.mjs lock`으로 만든 **신뢰하는 SHA manifest**를 사용합니다. Middleware에서 아래 명령을 실행할 때 두 경로를 각 PC의 절대 경로로 바꾸세요. 설치 폴더는 아직 존재하지 않아야 합니다.
+
+```text
+node scripts/install-locked-development.mjs --manifest <manifest-절대경로> --root <새-설치폴더-절대경로>
+```
+
+공식 저장소의 지정 커밋을 검증하고 Web 개발 프로필을 빌드합니다. 자동 실행과 공용 PATH 등록은 하지 않습니다. Node/npm·Git이 필요하며, 서명된 일반 사용자 릴리스 설치가 아닙니다. 기존 설치나 기존 폴더에 덮어쓰지 않고, 일반 `snowball update`로 이 고정 체크아웃을 갱신하지 않습니다. 저장소 확인만 하려면 `--checkout-only`를 추가하세요.
+
 ### 1. 설정 및 빌드
 ```bash
 # 저장소 복제

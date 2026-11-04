@@ -278,6 +278,16 @@ Current component ownership, transport paths, security boundaries and implementa
 - **Node.js**: `>= 22.12.0`
 - **Current validation**: Windows review host. Automated core tests also run on Ubuntu; Linux Supervisor currently has no default harness survey or native tray package target.
 
+### Install a pinned multi-repository development suite
+
+For integration work across all six repositories, use a **trusted SHA manifest** produced by Control's `scripts/workspace-revisions.mjs lock`. From Middleware, replace both placeholders below with absolute paths. The installation directory must not already exist.
+
+```text
+node scripts/install-locked-development.mjs --manifest <absolute-manifest-path> --root <new-absolute-install-path>
+```
+
+The command checks out the selected commits from the official repositories and builds the web development profile. It does not start the suite or register a shared PATH command. Node/npm and Git are required. This is not a signed end-user release; it neither overwrites an existing installation nor supports updating these detached checkouts with the normal `snowball update`. Add `--checkout-only` to verify the checkouts without installing the suite.
+
 ### 1. Setup & Build
 ```bash
 # Clone the repository

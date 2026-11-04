@@ -76,7 +76,7 @@ export async function listSessions(origin, token, transport, signal) {
       credentials: 'omit', redirect: 'error', cache: 'no-store', signal: request.signal,
     });
     if (request.signal.aborted) throw new Error('Request aborted');
-    if (!response.ok) throw new RemoteAccessError(response.status === 401 || response.status === 403 ? 'unauthorized' : 'unavailable');
+    if (!response.ok) throw new RemoteAccessError(response.status === 401 ? 'unauthorized' : response.status === 403 ? 'forbidden' : 'unavailable');
     const contentType = response.headers.get('content-type') || '';
     if (!/^application\/json(?:\s*;|\s*$)/i.test(contentType)) throw new RemoteAccessError('invalid_response');
     const result = await readBoundedJson(response);

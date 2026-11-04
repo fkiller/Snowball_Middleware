@@ -25,7 +25,7 @@ test('explicit CLI invocation uses fixed args, bounded output, timeout and a min
     assert.equal(options.shell, false);
     assert.equal(options.timeout, 5000);
     assert.equal(options.maxBuffer, 256 * 1024);
-    assert.deepEqual(options.env, { HOME: '/chosen' });
+    assert.deepEqual(options.env, { HOME: '/chosen', TAILSCALE_BE_CLI: '1' });
     return { status: 0, stdout: JSON.stringify({ BackendState: 'Running' }), stderr: 'private stderr' };
   }});
   assert.equal(invoked, true);

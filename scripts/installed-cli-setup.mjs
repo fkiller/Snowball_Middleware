@@ -16,8 +16,8 @@ export function writeInstalledCli(root, nodeExecutable, platform = process.platf
 
 // Respect the user's existing PATH and existing commands. Do not edit shell
 // profiles or replace a link belonging to another Snowball installation.
-export function registerUserCommand(root, { platform = process.platform, env = process.env } = {}) {
-  if (platform === 'win32') return 'manual';
+export function registerUserCommand(root, { platform = process.platform, env = process.env, disabled = false } = {}) {
+  if (disabled || platform === 'win32') return 'manual';
   if (!env.HOME || !path.isAbsolute(env.HOME)) return 'manual';
   const bin = path.join(env.HOME, '.local', 'bin');
   const entries = (env.PATH ?? '').split(path.delimiter).map(entry => path.isAbsolute(entry) ? path.resolve(entry) : null);

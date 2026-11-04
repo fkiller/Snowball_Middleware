@@ -103,7 +103,9 @@ const temporary = configFile + '.tmp';
 fs.writeFileSync(temporary, JSON.stringify(config, null, 2) + '\n', { mode: 0o600 });
 fs.renameSync(temporary, configFile);
 writeInstalledCli(root, process.execPath);
-const commandRegistration = registerUserCommand(root);
+// snowball-isolated-setup-v1: do not register a shared PATH command for a
+// pinned, separately installed development suite.
+const commandRegistration = registerUserCommand(root, { disabled: options['no-command-link'] });
 const launchScript = path.join(middleware, 'scripts/start-installed.mjs');
 if (process.platform === 'win32') {
   const quote = s => "'" + s.replaceAll("'", "''") + "'";
@@ -123,7 +125,8 @@ if (process.platform === 'win32') {
 }
 console.log(`Installed Snowball (${options.profile}) with all three verified harness plugins. Launcher: ${root}`);
 console.log(`Enabled device adapters: ${deviceProfiles.join(', ') || 'none (Web UI only)'}. Existing adapters and state are preserved.`);
-if (commandRegistration === 'linked') console.log('Source updates: run snowball update in a new terminal.');
+if (options['no-command-link']) console.log('Isolated development installation: shared PATH was not changed. Use a new trusted SHA manifest for the next installation.');
+else if (commandRegistration === 'linked') console.log('Source updates: run snowball update in a new terminal.');
 else if (commandRegistration === 'conflict') console.log(`A snowball command already exists; it was not replaced. Run the installed command in ${root}, or select this install root on PATH.`);
 else console.log(`Source updates: add the install root to PATH, then run snowball update (or run the installed command in ${root}).`);
 console.log('Native Codex / Antigravity / OpenCode applications and their sign-in remain owned by their vendors. Missing native apps are shown as unavailable.');
