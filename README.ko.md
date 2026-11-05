@@ -74,6 +74,8 @@ npx --yes --ignore-scripts 'github:fkiller/Snowball_Middleware#feat/remote-expan
 
 실험 소스에는 별도의 읽기 전용 브라우저 상호 TLS PoC도 있습니다. `scripts/start-browser-poc.mjs`는 `--host`, `--server-ca`, `--server-cert`, `--server-key`, `--client-ca`, `--device-cert`와 새 절대경로 `--state`를 모두 명시해야 합니다. 서버 키는 OS 비공개 폴더에 있어야 합니다. 루프백만 열고 Tailscale 설정이나 인증서 설치를 수행하지 않으며, 격리 실행기는 기존 세션에 연결하지 않습니다. 신뢰된 같은 프로세스의 연동에서는 실제 런타임 세션 서비스를 `RemoteBrowserGateway`에 전달할 수 있습니다. 이 개발 실험은 검증된 기기 등록이나 운영용 원격 접속이 아닙니다. 파일 기반 기기 인증서는 복제할 수 있고 iPhone의 사용자 루트 신뢰는 시스템 전체 TLS에 영향을 줍니다. 일반 무인증 Supervisor를 원격 백엔드로 노출하지 마세요.
 
+실험용 Expo 앱에는 별도의 **iOS 18+ 네이티브 Debug** 연결 검사가 있습니다. `apps/mobile`에서 Node 22.13+로 고정 의존성을 설치하고 Xcode/CocoaPods 환경에서 `npm run ios`로 로컬 모듈을 포함해 빌드합니다. Expo Go·Android·Release에서는 이 전송을 사용할 수 없습니다. 신뢰하는 로컬 개발자가 먼저 `RemoteManager.enableTls`와 사설 raw TCP 전달을 준비해야 합니다. 신뢰하는 PC와 정확한 origin·전용 인증서 SHA-256 전체 지문을 대조한 뒤 임시 읽기 bearer를 입력합니다. 시스템 루트를 설치하지 않으며 제한된 세션 메타데이터만 조회합니다. `npm test`는 모바일 JS를, macOS의 `npm run test:ios-transport`는 임시 루프백 서버와 실제 Apple TLS를 검사합니다. 검토된 등록·기기에 묶인 키나 실제 iPhone 인수 완료는 아닙니다. [현재 아키텍처와 제한](https://github.com/fkiller/Snowball_Control/blob/feat/remote-expansion/docs/ARCHITECTURE.ko.md#ios-네이티브-인증서-고정-읽기-실험)
+
 <a id="update-snowball"></a>
 ## Snowball 업데이트
 

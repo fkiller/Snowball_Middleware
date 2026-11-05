@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import https from 'node:https';
 import tls from 'node:tls';
-import { createHash } from 'node:crypto';
+import { createHash, X509Certificate } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { prepareGatewayIdentity } from '../apps/supervisor/gateway-identity.mjs';
 import { RemoteReadGateway } from '../packages/api/dist/index.js';
@@ -21,6 +21,10 @@ test('a private dedicated gateway identity is stable and fails closed on damage,
   const first = prepareGatewayIdentity({ directory, host, openssl });
   assert.match(first.fingerprint, /^[a-f0-9]{64}$/);
   assert.equal(first.host, host);
+  // LibreSSL otherwise emits explicit EC parameters that Apple's TLS stack
+  // rejects before the URLSession trust callback. Require the P-256 curve OID.
+  const publicKey = new X509Certificate(first.certificate).publicKey.export({ format: 'der', type: 'spki' });
+  assert.ok(publicKey.includes(Buffer.from('06082a8648ce3d030107', 'hex')));
   assert.doesNotMatch(JSON.stringify(first), /PRIVATE KEY/);
   const reopened = prepareGatewayIdentity({ directory, host });
   assert.equal(reopened.fingerprint, first.fingerprint);

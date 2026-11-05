@@ -68,7 +68,8 @@ export function prepareGatewayIdentity({ directory, host, openssl, now }) {
       for (const name of ['SystemRoot', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR', 'PATH']) {
         if (typeof process.env[name] === 'string') env[name] = process.env[name];
       }
-      const result = spawnSync(executable, ['req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1',
+      const result = spawnSync(executable, ['req', '-x509', '-sha256', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1',
+        '-pkeyopt', 'ec_param_enc:named_curve',
         '-nodes', '-keyout', keyFile, '-out', certFile, '-days', '30', '-subj', `/CN=${canonicalHost}`,
         '-addext', `subjectAltName=DNS:${canonicalHost}`, '-addext', 'basicConstraints=critical,CA:FALSE',
         '-addext', 'keyUsage=critical,digitalSignature', '-addext', 'extendedKeyUsage=serverAuth'],

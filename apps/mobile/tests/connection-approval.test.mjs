@@ -9,12 +9,14 @@ test('credential transmission stays disabled until the gateway itself can be ver
 
 test('only the exact address and credential confirmed for the current foreground draft remain approved', () => {
   const token = 'a'.repeat(43);
-  const draft = { origin: 'https://pc.tailnet.ts.net', token, revision: 7, active: true };
-  const approval = prepareConnection(draft.origin, draft.token, draft.revision);
+  const draft = { origin: 'https://pc.tailnet.ts.net', token, fingerprint: 'a'.repeat(64), revision: 7, active: true };
+  const approval = prepareConnection(draft.origin, draft.token, draft.revision, draft.fingerprint);
   assert.equal(Object.isFrozen(approval), true);
   assert.equal(isConnectionApprovalCurrent(approval, draft), true);
   assert.equal(isConnectionApprovalCurrent(approval, { ...draft, origin: 'https://other.tailnet.ts.net' }), false);
   assert.equal(isConnectionApprovalCurrent(approval, { ...draft, token: 'b'.repeat(43) }), false);
+  assert.equal(isConnectionApprovalCurrent(approval, { ...draft, fingerprint: 'b'.repeat(64) }), false);
+  assert.equal(isConnectionApprovalCurrent(approval, { ...draft, fingerprint: undefined }), false);
   assert.equal(isConnectionApprovalCurrent(approval, { ...draft, revision: 8 }), false);
   assert.equal(isConnectionApprovalCurrent(approval, { ...draft, active: false }), false);
   assert.throws(() => prepareConnection('http://pc.tailnet.ts.net', token, 7));

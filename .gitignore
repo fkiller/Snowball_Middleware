@@ -14,3 +14,7 @@ __pycache__/
 *.pyc
 
 artifacts/
+
+# Native test build products.
+.build/
+.swiftpm/

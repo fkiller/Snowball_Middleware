@@ -1,5 +1,6 @@
 // This experimental transport permits only explicit Tailscale HTTPS origins.
-// A public CA validates the server certificate using the platform TLS stack.
+// The legacy entry point below stays closed; the separate iOS Debug reader
+// pins the dedicated gateway certificate on the request's TLS connection.
 export class RemoteAccessError extends Error {
   constructor(kind) { super(kind); this.name = 'RemoteAccessError'; this.kind = kind; }
 }
@@ -10,7 +11,8 @@ export function validateOrigin(input) {
   try { url = new URL(input); } catch { throw new Error('Enter a valid HTTPS address.'); }
   const host = url.hostname;
   const labels = host.split('.');
-  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname !== '/' || url.port ||
+  if ((input !== url.origin && input !== url.origin + '/') || host.length > 253 ||
+      url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname !== '/' || url.port ||
       !host.endsWith('.ts.net') || labels.length < 4 || labels.some(label => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) {
     throw new Error('Use the exact HTTPS Tailscale address, with no path or port.');
   }
@@ -18,7 +20,7 @@ export function validateOrigin(input) {
 }
 
 export function validateToken(value) {
-  if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(value)) throw new Error('Enter the 43-character gateway credential.');
+  if (typeof value !== 'string' || value.length !== 43 || !/^[A-Za-z0-9_-]{43}$/.test(value)) throw new Error('Enter the 43-character gateway credential.');
   return value;
 }
 
