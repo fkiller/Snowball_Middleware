@@ -11,13 +11,10 @@ assert.ok(sessionsByHarness['snowball.codex'], 'Codex sessions present');
 assert.ok(sessionsByHarness['snowball.antigravity'], 'Antigravity sessions present');
 assert.ok(sessionsByHarness['snowball.opencode'], 'OpenCode sessions present');
 
-const agSnowball = sessionsByHarness['snowball.antigravity']['Snowball_Control'];
-assert.ok(agSnowball && agSnowball.length > 0, 'Antigravity Snowball_Control sessions found');
-console.log(`  ✓ Antigravity Snowball_Control sessions: ${agSnowball.length}`);
-
-const ocSnowball = sessionsByHarness['snowball.opencode']['Snowball_Control'];
-assert.ok(ocSnowball && ocSnowball.length > 0, 'OpenCode Snowball_Control sessions found');
-console.log(`  ✓ OpenCode Snowball_Control sessions: ${ocSnowball.length}`);
+for (const [harness, projects] of Object.entries(sessionsByHarness)) {
+  assert.ok(Object.values(projects).some(sessions => sessions.length), `${harness}: real native sessions required`);
+  console.log(`  ✓ ${harness}: ${Object.values(projects).flat().length} real sessions`);
+}
 
 import { scanAllHarnessCatalogs } from './harness-catalog-scanner.mjs';
 
@@ -34,14 +31,9 @@ for (const h of context.harnesses) {
   const harnessData = sessionsByHarness[h.id] || {};
   const scopeKey = `dev-pc/${h.id}`;
   const projs = [];
-  const projEntries = Object.entries(harnessData);
-  projEntries.sort(([a], [b]) => {
-    if (a === 'Snowball_Control') return -1;
-    if (b === 'Snowball_Control') return 1;
-    return a.localeCompare(b);
-  });
+  const projEntries = Object.entries(harnessData).filter(([, sessions]) => sessions.length);
   for (const [projName, sessList] of projEntries) {
-    projs.push({ id: projName, name: projName, path: process.cwd() });
+    projs.push({ id: projName, name: projName, path: sessList[0].cwd });
     context.sessionsByScope[`${scopeKey}/${projName}`] = sessList.map(s => ({
       id: s.id,
       sessionKey: s.sessionKey,
@@ -73,11 +65,10 @@ k14 = state.keys.find(k => k.keyId === 14);
 k10 = state.keys.find(k => k.keyId === 10);
 const expectedAgModel = (context.getCurrentSession().model || 'Default').slice(0, 15);
 assert.equal(k18.labelMain, expectedAgModel, `Antigravity session model matches ${expectedAgModel}`);
-const curAgModelObj = catalogs['snowball.antigravity'].find(m => m.model === agSnowball[0].model);
 const expectedAgEffort = context.efforts[context.selectedEffortIdx] || 'Default';
 assert.equal(k14.labelMain, expectedAgEffort, `Antigravity session effort matches ${expectedAgEffort}`);
 assert.equal(k10.labelMain, 'on-request', 'Antigravity default access is on-request');
-console.log(`  ✓ Antigrav active session 0 (${agSnowball[0].title}): model=${k18.labelMain}, effort=${k14.labelMain}, access=${k10.labelMain}`);
+console.log(`  ✓ Antigrav active: model=${k18.labelMain}, effort=${k14.labelMain}, access=${k10.labelMain}`);
 
 // 2. Cycle to OpenCode
 context.cycleHarness();
@@ -87,12 +78,15 @@ k18 = state.keys.find(k => k.keyId === 18);
 k14 = state.keys.find(k => k.keyId === 14);
 k10 = state.keys.find(k => k.keyId === 10);
 const ocCatalog = catalogs['snowball.opencode'];
-const ocModelObj = ocCatalog?.find(m => m.model === ocSnowball[0].model || (m.model.includes('/') && ocSnowball[0].model.includes('/') && m.model.split('/')[1] === ocSnowball[0].model.split('/')[1]));
-const expectedOcModel = (ocCatalog.length ? (ocModelObj?.displayName || context.models[context.selectedModelIdx]) : 'Default').slice(0, 15);
+const ocSession = context.getCurrentSession();
+const ocModelObj = ocCatalog?.find(m => m.model === ocSession.model || (m.model.includes('/') && ocSession.model?.includes('/') && m.model.split('/')[1] === ocSession.model.split('/')[1]));
+const expectedOcChoice = ocModelObj || ocCatalog.find(m => m.isDefault) || ocCatalog[0];
+assert.equal(context.models[context.selectedModelIdx], expectedOcChoice?.model, 'Native session model or discovered default is selected');
+const expectedOcModel = (expectedOcChoice ? (expectedOcChoice.model.includes('/') ? expectedOcChoice.displayName || expectedOcChoice.model : expectedOcChoice.model) : 'Default').slice(0, 15);
 assert.equal(k18.labelMain.trim(), expectedOcModel.trim(), `OpenCode session model matches ${expectedOcModel}`);
 assert.equal(k14.labelMain, context.efforts[context.selectedEffortIdx] || 'Default', 'Only discovered OpenCode variants are displayed');
 assert.equal(k10.labelMain, 'on-request', 'OpenCode default access is on-request');
-console.log(`  ✓ OpenCode active session 0 (${ocSnowball[0].title}): model=${k18.labelMain}, effort=${k14.labelMain}, access=${k10.labelMain}`);
+console.log(`  ✓ OpenCode active: model=${k18.labelMain}, effort=${k14.labelMain}, access=${k10.labelMain}`);
 
 // 3. Test Model editor in OpenCode
 context.openEditor('model');

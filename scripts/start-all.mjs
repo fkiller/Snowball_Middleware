@@ -46,6 +46,7 @@ import {desktopBridge} from './desktop-bridge.mjs';
 import {loadSettings,saveSettings} from '../apps/supervisor/settings-store.mjs';
 import {nativeNavigation, nativeTranscriptProjection} from './native-navigation.mjs';
 import { RemoteManager, handleRemoteControl, closeRemoteAndDevice } from '../apps/supervisor/remote-manager.mjs';
+import { readDevelopmentRemoteConfig, startDevelopmentRemote } from '../apps/supervisor/development-remote.mjs';
 
 const profile = process.env.SNOWBALL_PROFILE ?? 'web';
 if (!['web', 'mk20', 'm5stack'].includes(profile)) throw Error('Invalid Snowball profile');
@@ -345,7 +346,8 @@ await api.start();
 
 // This projection contains no titles, session IDs, paths or conversation text.
 // Unknown status remains unknown; native observations are never invented.
-const remoteControl = desktopSettings.enabled ? new RemoteManager({directory, sessionService:{
+const developmentRemoteFile = process.env.SNOWBALL_REMOTE_DEVELOPMENT_CONFIG;
+const remoteControl = desktopSettings.enabled || developmentRemoteFile ? new RemoteManager({directory, sessionService:{
   snapshotSessions() {
     const result=[];
     for(const [harnessPluginId, groups] of Object.entries(realSessionsData)) {
@@ -360,6 +362,13 @@ const remoteControl = desktopSettings.enabled ? new RemoteManager({directory, se
     return result;
   },
 }}) : undefined;
+let developmentRemote;
+if (developmentRemoteFile) {
+  try {
+    developmentRemote = await startDevelopmentRemote(remoteControl, readDevelopmentRemoteConfig(developmentRemoteFile));
+    console.log('Development pinned TLS gateway is ready; mobile binding is in the private local configuration directory.');
+  } catch { console.error('Development remote gateway unavailable. Local control remains available.'); }
+}
 
 const bootstrapFile = path.join(directory, 'live-bootstrap.json');
 function refreshCode() {
@@ -1591,6 +1600,7 @@ const cleanup = async (code = 0) => {
   clearInterval(nativeObservationTimer);
   speechAbort.abort();
   for(const cached of mk20Contexts.values())for(const operation of cached.nativeDispatches.values())operation.abort();
+  if(developmentRemote)await developmentRemote.close().catch(()=>{});
   await closeRemoteAndDevice(remoteControl, closeDevice);
   await Promise.allSettled([api.close()]);
   await sources.close();

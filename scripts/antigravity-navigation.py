@@ -3,6 +3,7 @@ import json
 import os
 import re
 import sqlite3
+from native_database import open_native_database
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -102,7 +103,7 @@ def scan_antigravity(home=None, appdata=None, read_turns=True):
     sessions, turns_store = {}, {}
     if not db.exists():
         return sessions, turns_store, projects
-    connection = sqlite3.connect(db.as_uri() + '?mode=ro', uri=True)
+    connection = open_native_database(db)
     connection.row_factory = sqlite3.Row
     try:
         columns = {row[1] for row in connection.execute('PRAGMA table_info(conversation_summaries)')}

@@ -1,5 +1,6 @@
 import sqlite3, json, sys, os
 from pathlib import Path
+from native_database import open_native_database
 
 sys.stdout.reconfigure(encoding='utf-8')
 projects_only = '--projects-only' in sys.argv[1:]
@@ -22,6 +23,7 @@ except Exception as e:
     sys.stderr.write(f'Antigravity scan error: {e}\n')
 
 # 2. OPENCODE
+con = None
 try:
     oc_db = os.path.expanduser(r'~/.local/share/opencode/opencode.db')
     oc_cache_path = os.path.expanduser(r'~/.cache/opencode/models.json')
@@ -33,7 +35,7 @@ try:
         except: pass
 
     if os.path.exists(oc_db):
-        con = sqlite3.connect(Path(oc_db).as_uri() + '?mode=ro', uri=True)
+        con = open_native_database(oc_db)
         cur = con.cursor()
         cur.execute('SELECT s.id, s.title, s.directory, s.model, s.time_updated FROM session s ORDER BY s.time_updated DESC;')
         
@@ -104,5 +106,8 @@ try:
             result['turns'][sid] = turns
 except Exception as e:
     sys.stderr.write(f'OpenCode scan error: {e}\n')
+finally:
+    if con:
+        con.close()
 
 print(json.dumps(result, ensure_ascii=False))

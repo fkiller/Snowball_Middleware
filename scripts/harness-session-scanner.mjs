@@ -3,6 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import cp from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { nativePython, nativePythonEnvironment } from './native-python.mjs';
 import {readCodexNavigation, codexSessionProject, orderCodexSessions} from './codex-navigation.mjs';
 
 /**
@@ -145,9 +146,9 @@ export function scanAllHarnessSessions() {
   // 2. ANTIGRAVITY & OPENCODE SESSIONS VIA NATIVE DB SCANNER
   try {
     const pyScript = path.join(path.dirname(fileURLToPath(import.meta.url)), 'harness-db-scanner.py');
-    const pyOut = cp.execFileSync('python', [pyScript], {
+    const pyOut = cp.execFileSync(nativePython(), [pyScript], {
       encoding: 'utf8',
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      env: nativePythonEnvironment(),
       maxBuffer: 20 * 1024 * 1024
     });
     const parsed = JSON.parse(pyOut);
