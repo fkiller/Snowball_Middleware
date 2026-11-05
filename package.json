@@ -14,7 +14,9 @@
     "install.sh",
     "install.ps1",
     "scripts/npm-install.mjs",
-    "scripts/install-locked-development.mjs"
+    "scripts/install-locked-development.mjs",
+    "scripts/tailscale-install.mjs",
+    "scripts/tailscale-install-windows.ps1"
   ],
   "workspaces": [
     "packages/*"

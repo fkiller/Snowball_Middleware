@@ -55,6 +55,58 @@ test('pinned development mode invokes the separate installer and cannot update a
   ]) assert.throws(() => installerCommand(options, 'linux'));
 });
 
+test('explicit Tailscale modes select only the verified prerequisite helper', () => {
+  const install = installerCommand(['--tailscale'], 'win32');
+  assert.equal(install.executable, process.execPath);
+  assert.match(install.args[0], /tailscale-install\.mjs$/);
+  assert.deepEqual(install.args.slice(1), ['--install']);
+  const msi = "C:\\Installers with spaces & apostrophe's\\tailscale.msi";
+  const offline = installerCommand(['--tailscale', '--msi', msi], 'win32');
+  assert.deepEqual(offline.args.slice(1), ['--install', '--msi', msi]);
+  assert.deepEqual(installerCommand(['--tailscale-status'], 'win32').args.slice(1), ['--inspect']);
+  let invocations = 0;
+  assert.equal(runInstaller(['--tailscale', '--msi', msi], { platform: 'win32', run(file, args, options) {
+    invocations++;
+    assert.equal(file, process.execPath);
+    assert.deepEqual(args.slice(1), ['--install', '--msi', msi]);
+    assert.equal(options.shell, false);
+    return { status: 17 };
+  } }), 17);
+  assert.equal(invocations, 1);
+});
+
+test('Tailscale automation refuses implicit or mixed installation and unsupported platforms', () => {
+  for (const args of [
+    ['--tailscale', '--update'], ['--tailscale', '--root', 'C:\\Snowball'],
+    ['--manifest', 'lock.json', '--root', 'new', '--tailscale'],
+    ['--tailscale', '--profile', 'web'], ['--tailscale', '--tailscale'],
+    ['--tailscale', '--help'], ['--tailscale-status', '--tailscale'],
+    ['--tailscale-status', '--msi', 'C:\\verified.msi'], ['--tailscale', '--msi'],
+    ['--tailscale', '--msi', 'relative.msi'], ['--tailscale', '--msi', '/rooted.msi'],
+    ['--tailscale', '--msi', '\\\\server\\share\\install.msi'],
+    ['--tailscale', '--msi', 'C:\\installer.exe'],
+    ['--tailscale', '--msi', 'C:\\bad\"path.msi'],
+    ['--tailscale', '--msi', 'C:\\bad\npath.msi'],
+    ['--tailscale', '--msi', 'C:\\bad\0path.msi'],
+    ['--msi', 'C:\\verified.msi'],
+  ]) {
+    assert.throws(() => runInstaller(args, { platform: 'win32', run() { assert.fail('must not launch'); } }));
+  }
+  for (const platform of ['darwin', 'linux']) {
+    assert.throws(() => installerCommand(['--tailscale'], platform), /https:\/\/tailscale.com\/docs\/install/);
+    assert.throws(() => installerCommand(['--tailscale-status'], platform), /available on Windows/);
+  }
+});
+
+test('rejected option strings and spawn errors cannot disclose arbitrary input', () => {
+  const privateValue = 'sentinel-private-command-value';
+  for (const args of [[privateValue], ['--tailscale', privateValue], ['--manifest', 'lock.json', privateValue]]) {
+    assert.throws(() => installerCommand(args, 'win32'), error => !error.message.includes(privateValue));
+  }
+  assert.throws(() => runInstaller(['--tailscale'], { platform: 'win32', run: () => ({ error: Error(privateValue) }) }),
+    error => error.message === 'Installer process could not be started.');
+});
+
 test('a packed installer actually runs through the npm executable shim', { timeout: 60000 }, t => {
   const repository = fileURLToPath(new URL('..', import.meta.url));
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'snowball-npm-installer-'));
@@ -70,6 +122,10 @@ test('a packed installer actually runs through the npm executable shim', { timeo
   assert.equal(pack.status, 0, pack.stderr);
   const [metadata] = JSON.parse(pack.stdout);
   assert.ok(metadata.size < 100000, 'the bootstrap should not bundle the entire source tree');
+  const packedFiles = metadata.files.map(file => file.path);
+  assert.ok(packedFiles.includes('scripts/tailscale-install.mjs'));
+  assert.ok(packedFiles.includes('scripts/tailscale-install-windows.ps1'));
+  assert.equal(packedFiles.some(name => /\.msi$|(?:^|\/)\.state\//i.test(name)), false);
   const archive = path.join(temp, metadata.filename);
   const run = spawnSync(process.execPath, [npmCli, 'exec', '--yes', '--offline', `--package=${archive}`, '--', 'snowball-install', '--help'],
     { cwd: temp, env, encoding: 'utf8', timeout: 30000 });
@@ -77,6 +133,7 @@ test('a packed installer actually runs through the npm executable shim', { timeo
   assert.match(run.stdout, /Snowball source installer/);
   assert.match(run.stdout, /--update/);
   assert.match(run.stdout, /--manifest/);
+  assert.match(run.stdout, /--tailscale/);
   const locked = spawnSync(process.execPath, [npmCli, 'exec', '--yes', '--offline', `--package=${archive}`, '--',
     'snowball-install', '--manifest', path.join(temp, 'absent.json'), '--root', path.join(temp, 'must-not-exist')],
     { cwd: temp, env, encoding: 'utf8', timeout: 30000 });

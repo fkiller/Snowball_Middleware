@@ -26,6 +26,7 @@ if (!fs.existsSync(compiler)) throw new Error('Inno Setup 6 ISCC.exe is required
 const outputDir = path.join(root, 'artifacts', 'installers', String(Date.now()));
 fs.mkdirSync(outputDir, { recursive: true });
 const args = ['/Q', '/DSourceDir=' + absolutePackage, '/DOutputDir=' + outputDir, '/DAppVersion=' + version,
+  ...(inventory.privateTailscaleBundle === true ? ['/DPrivateTailscaleBundle=1'] : []),
   path.join(root, 'scripts', 'windows-installer.iss')];
 await new Promise((resolve, reject) => {
   const child = spawn(compiler, args, { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });

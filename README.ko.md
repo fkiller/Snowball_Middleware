@@ -337,9 +337,11 @@ npm run start:tray
 # 대상 Windows 또는 macOS 호스트에서 빌드
 npm run package:desktop
 
-# (Windows) NSIS 사용자별 설치 파일(.exe) 빌드
-npm run package:windows-installer
+# (Windows) 출력된 데스크톱 폴더로 Inno Setup 사용자별 설치 파일 빌드
+npm run package:windows-installer -- "<데스크톱-폴더-절대경로>"
 ```
+
+Windows에서 별도의 `npx --yes --ignore-scripts 'github:fkiller/Snowball_Middleware#feat/remote-expansion' --tailscale` 명령은 공식 Tailscale MSI를 받아 검증하고 기존 설치를 확인한 후 관리자 승인을 요청합니다. `--tailscale-status`는 설치하지 않고 상태만 확인합니다. 로그인은 Tailscale에서 직접 하세요. 이 명령은 Snowball 원격 접속, Serve 또는 Funnel을 켜지 않습니다. 개인 개발용 `npm run package:desktop -- --with-tailscale`은 검증된 MSI를 내장하며 Inno 설치기에 기본 해제된 선택 항목을 추가합니다. 배포 전에 Tailscale 재배포 약관을 확인하세요. 개발 패키지에는 서명이 없습니다.
 
 ---
 
