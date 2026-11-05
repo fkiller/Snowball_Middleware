@@ -2,6 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { RemoteReadGateway, PersistentRemoteCredentials, recoverAbandonedRemoteCredentialLock } from '../../packages/api/dist/index.js';
 import { ensurePrivateStateDirectory } from './private-state.mjs';
+import { prepareGatewayIdentity } from './gateway-identity.mjs';
 
 // Owned by the local runtime, called only by its native parent process. No HTTP
 // route exposes these methods. The gateway stays off after every process restart.
@@ -30,6 +31,17 @@ export class RemoteManager {
     try { await gateway.start(); this.#gateway = gateway; }
     catch(error) { await gateway.close(); throw error; }
     return this.#view();
+  }); }
+  // Trusted local development callers only. This remains loopback-only and is
+  // intentionally not in the IPC dispatch allowlist: pairing, approval and a
+  // safe mobile transport are required before a UI can expose this operation.
+  enableTls({ host, openssl } = {}) { return this.#run(async () => {
+    if (this.#gateway) throw Error('remote_already_enabled');
+    const identity = prepareGatewayIdentity({directory:path.join(this.directory,'tls-identity'),host,openssl});
+    const gateway = new RemoteReadGateway({sessionService:this.sessionService,credentialStore:this.#openStore(),tls:identity.tlsOptions()});
+    try { await gateway.start(); this.#gateway = gateway; }
+    catch(error) { await gateway.close(); throw error; }
+    return { ...this.#view(), host:identity.host, fingerprint:identity.fingerprint };
   }); }
   disable() { return this.#run(async () => {
     const gateway = this.#gateway; this.#gateway = undefined;

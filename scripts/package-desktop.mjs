@@ -30,7 +30,7 @@ function copy(relative,destination=relative){
 for(const name of ['main.mjs','core-worker.mjs','presentation.mjs','codex-connections.mjs','windows-device-presence.mjs','source-login.mjs','linux-login.mjs','device-setup.mjs','component-setup.mjs','device-setup-hub.mjs','device-setup-preload.cjs','device-setup.html','device-setup.css','device-setup.js','tailscale-onboarding.mjs'])copy('apps/desktop/'+name);
 for(const name of ['suite-devices.mjs','setup-profile.mjs','device-preparation.mjs','os_wifi.py','tailscale-install.mjs','tailscale-install-windows.ps1'])copy('scripts/'+name);
 for(const name of ['icon.png','icon-32.png','icon-256.png','icon.ico','icon.icns','installer-small.bmp','installer-welcome.bmp'])copy('assets/'+name);
-for(const name of ['runtime.mjs','remote-manager.mjs','controller-store.mjs','codex-plugin.mjs','opencode-owned.mjs','settings-store.mjs','private-state.mjs','native-picker.mjs','mk20-lan.mjs','index.html','app.js','style.css'])copy('apps/supervisor/'+name);
+for(const name of ['runtime.mjs','remote-manager.mjs','gateway-identity.mjs','controller-store.mjs','codex-plugin.mjs','opencode-owned.mjs','settings-store.mjs','private-state.mjs','native-picker.mjs','mk20-lan.mjs','index.html','app.js','style.css'])copy('apps/supervisor/'+name);
 // Reviewed Codex control and explicitly configured OpenCode observation are
 // bundled. No optional native drivers, account homes or runtime state.
 const packages=['plugin-sdk','plugin-host','core','api','client-sdk','harness-codex','harness-opencode','device-lan'];

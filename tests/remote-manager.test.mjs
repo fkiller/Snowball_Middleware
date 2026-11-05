@@ -4,8 +4,37 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
+import tls from 'node:tls';
+import {createHash} from 'node:crypto';
 import {RemoteManager, handleRemoteControl, closeRemoteAndDevice} from '../apps/supervisor/remote-manager.mjs';
 import {startLocalRuntime} from '../apps/supervisor/runtime.mjs';
+
+test('trusted local TLS listener uses its persistent identity and stays off IPC', {timeout:60000}, async t => {
+  const lookup=spawnSync(process.platform==='win32'?'where.exe':'which',['openssl'],{encoding:'utf8',timeout:5000});
+  const openssl=lookup.status===0?lookup.stdout.split(/\r?\n/).find(line=>path.isAbsolute(line)&&fs.existsSync(line)):undefined;
+  if(!openssl){t.skip('OpenSSL unavailable');return;}
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-manager-tls-'));
+  const manager=new RemoteManager({directory,sessionService:{snapshotSessions:()=>[]}});
+  t.after(async()=>{await manager.close().catch(()=>{});fs.rmSync(directory,{recursive:true,force:true});});
+  assert.equal(await handleRemoteControl(manager,{kind:'remote-control',id:1,action:'enableTls'}),undefined);
+  const host='node.example.ts.net';
+  const first=await manager.enableTls({host,openssl});
+  assert.match(first.origin,/^https:\/\/127\.0\.0\.1:\d+$/);
+  assert.match(first.fingerprint,/^[a-f0-9]{64}$/);
+  const cert=JSON.parse(fs.readFileSync(path.join(directory,'remote','tls-identity','gateway-tls-identity.v1.json'),'utf8')).cert;
+  await new Promise((resolve,reject)=>{
+    const socket=tls.connect({host:'127.0.0.1',port:Number(new URL(first.origin).port),servername:host,ca:cert,
+      checkServerIdentity:(name,peer)=>tls.checkServerIdentity(name,peer)||(createHash('sha256').update(peer.raw).digest('hex')===first.fingerprint?undefined:Error('pin mismatch'))});
+    socket.once('secureConnect',()=>{socket.end();resolve();});socket.once('error',reject);
+  });
+  await assert.rejects(manager.enableTls({host,openssl}),/remote_already_enabled/);
+  await manager.disable();
+  const second=await manager.enableTls({host});
+  assert.equal(second.fingerprint,first.fingerprint);
+  await manager.disable();
+  await assert.rejects(manager.enableTls({host:'other.example.ts.net',openssl}),/not replaced/);
+  assert.equal((await manager.status()).enabled,false);
+});
 
 test('local manager is opt-in, closes the listener, retains expiring credentials and revokes them', async t => {
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'snowball-remote-control-'));
