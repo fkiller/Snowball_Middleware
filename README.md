@@ -70,6 +70,8 @@ Add `--update` to update the default PC installation, or specify another install
 
 **Experimental feature on the remote-expansion branch:** The tray's **Experimental remote** menu manages a separate, default-off loopback listener and eight-hour read credentials. Protect credentials like passwords and revoke any that are exposed. A PC restart turns the listener off, but unexpired credentials remain. TLS, verified device pairing, Tailscale setup and actual remote connectivity are not yet provided or verified; do not expose this listener to the Internet. After a crash, **Recover abandoned credential lock** can recover only a new-format lock whose owner is confirmed stopped; it refuses older locks and leftover recovery guards. The local Web UI remains unchanged.
 
+The experimental source tree also contains a separate read-only browser mTLS PoC. `scripts/start-browser-poc.mjs` requires explicit `--host`, `--server-ca`, `--server-cert`, `--server-key`, `--client-ca`, `--device-cert`, and a new absolute `--state` directory. The server key must be in an OS-private directory. It binds loopback, does not configure Tailscale or install certificates, and its isolated runtime does not attach existing sessions. A trusted integrator may pass a live runtime's session service directly to `RemoteBrowserGateway`. This development experiment is not verified device enrollment or production remote access: client identity files can be copied, and installing a private root on iPhone affects system-wide TLS trust. Do not use the ordinary unauthenticated Supervisor as a remote backend.
+
 <a id="update-snowball"></a>
 ## Update Snowball
 
