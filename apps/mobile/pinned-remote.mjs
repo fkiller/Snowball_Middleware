@@ -21,7 +21,7 @@ export function parseSessionResponse(json) {
 
 let sequence = 0;
 const errorKinds = new Set(['invalid_input', 'gateway_identity_unverified', 'redirect_denied', 'invalid_response',
-  'unauthorized', 'forbidden', 'rate_limited', 'unavailable', 'cancelled', 'timeout', 'connection_failed']);
+  'unauthorized', 'forbidden', 'rate_limited', 'unavailable', 'cancelled', 'timeout', 'host_unresolved', 'host_unreachable', 'connection_failed']);
 
 // Only the bundled iOS Debug module can perform this experiment. No fetch,
 // caller-provided TLS flag, Expo Go, Android or Release fallback exists.

@@ -63,6 +63,8 @@ test('cancellation reaches the native request and suppresses a late result witho
 test('native errors expose only bounded error kinds', async () => {
   for (const [error, expected] of [[{ code: 'unauthorized', message: token }, 'unauthorized'],
     [{ code: 'gateway_identity_unverified' }, 'gateway_identity_unverified'],
+    [{ code: 'host_unresolved', message: origin }, 'host_unresolved'],
+    [{ code: 'host_unreachable', message: origin }, 'host_unreachable'],
     [new Error(token), 'connection_failed']]) {
     const reader = createPinnedSessionReader({ ...native, listSessions: async () => { throw error; } }, options);
     await assert.rejects(reader.listSessions(origin, token, pin), { kind: expected, message: expected });

@@ -125,11 +125,11 @@ export default function App() {
     if (!connectionAvailable) { setMessage('PC의 Snowball 신원 확인이 준비되면 연결할 수 있습니다. 지금은 따로 설정할 필요가 없습니다.'); return; }
     if (storageStateRef.current !== 'ready') { setMessage('저장된 연결 정보를 먼저 삭제해 주세요.'); return; }
     try { validateOrigin(draft.current.origin); }
-    catch { setMessage('PC에서 표시한 Tailscale HTTPS 주소를 그대로 입력해 주세요. 경로나 포트는 넣지 않습니다.'); return; }
+    catch { Alert.alert('PC 주소 확인', 'PC에서 표시한 origin의 Tailscale HTTPS 주소를 앞뒤 공백 없이 그대로 입력해 주세요. 기기 ID나 token은 주소가 아닙니다. 경로나 포트는 넣지 않습니다.'); return; }
     try { validateToken(draft.current.token); }
-    catch { setMessage('PC에서 발급한 43자의 읽기 자격증명을 입력해 주세요.'); return; }
+    catch { Alert.alert('자격증명 확인', 'PC에서 발급한 token의 43자 읽기 자격증명을 입력해 주세요.'); return; }
     try { validateFingerprint(draft.current.fingerprint); }
-    catch { setMessage('신뢰하는 PC에서 확인한 전용 인증서의 SHA-256 지문 64자를 입력해 주세요.'); return; }
+    catch { Alert.alert('PC 인증서 지문 확인', '신뢰하는 PC에서 확인한 fingerprint의 SHA-256 지문 64자 전체를 입력해 주세요.'); return; }
     const approval = prepareConnection(draft.current.origin, draft.current.token, draft.current.revision, draft.current.fingerprint);
     Alert.alert('PC 주소와 인증서 확인', `신뢰하는 PC에서 직접 확인한 주소와 전용 인증서 SHA-256 지문이 아래와 모두 같은지 비교하세요. 네트워크에서 받은 지문을 그대로 신뢰하지 마세요.\n\n${approval.origin}\n\n${approval.fingerprint}`, [
       { text: '취소', style: 'cancel' },
@@ -191,6 +191,8 @@ export default function App() {
         : error instanceof RemoteAccessError && error.kind === 'redirect_denied' ? 'PC가 다른 주소로 이동을 요청해 중단했습니다. 이동 대상에는 자격증명을 보내지 않았습니다.'
         : error instanceof RemoteAccessError && error.kind === 'rate_limited' ? '조회 횟수 제한에 도달했습니다. 잠시 후 직접 다시 확인해 주세요.'
         : error instanceof RemoteAccessError && error.kind === 'cancelled' ? '조회가 취소되었습니다. 다시 확인해 주세요.'
+        : error instanceof RemoteAccessError && error.kind === 'host_unresolved' ? 'PC 주소를 찾지 못했습니다. iPhone의 Tailscale VPN과 MagicDNS가 켜져 있는지 확인해 주세요.'
+        : error instanceof RemoteAccessError && error.kind === 'host_unreachable' ? 'PC 게이트웨이에 연결하지 못했습니다. iPhone의 Tailscale VPN 활성 상태와 PC의 Serve 전달을 확인해 주세요.'
         : '조회하지 못했습니다. PC와 Tailscale 연결을 확인해 주세요.';
       setMessage(message);
     } finally {
@@ -241,11 +243,11 @@ export default function App() {
       <View style={styles.row}><Text style={styles.body}>이 기기의 보안 저장소에 기억</Text><Switch value={remember} onValueChange={value => { rememberRef.current = value; setRemember(value); setStorageNotice(value ? '조회에 성공하면 연결 정보를 저장하고 다시 읽어 확인합니다.' : ''); if (!value) void clearStoredBinding().catch(() => {}); }} disabled={busy || !ready} /></View>
       {storageNotice ? <Text accessibilityLiveRegion="polite" style={styles.small}>{storageNotice}</Text> : null}
       <Text style={styles.small}>주소가 내 PC의 주소인지 확인하세요. 자격증명은 이 주소에 전송됩니다.</Text>
+      {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
       <TouchableOpacity style={styles.button} onPress={confirmConnect} disabled={!ready || busy || storageState !== 'ready'} accessibilityRole="button"><Text style={styles.buttonText}>{busy ? '확인 중…' : storageState === 'clearing' ? '이전 연결 정보 삭제 중…' : sessions === null ? '연결 상태 확인' : '다시 확인'}</Text></TouchableOpacity>
       <TouchableOpacity style={styles.secondary} onPress={forget} disabled={!ready} accessibilityRole="button"><Text style={styles.secondaryText}>이 기기에서 연결 정보 삭제</Text></TouchableOpacity>
       <TouchableOpacity style={styles.secondary} onPress={returnToGuide} disabled={!ready} accessibilityRole="button"><Text style={styles.secondaryText}>안내로 돌아가기</Text></TouchableOpacity>
       {busy ? <ActivityIndicator /> : null}
-      {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
       {sessions !== null ? <View style={styles.list}>
         <Text style={styles.small}>마지막 확인: {checkedAt?.toLocaleTimeString()} · 실시간 연결 상태가 아닙니다.</Text>
         <Text style={styles.section}>세션 · {sessions.length}</Text>
