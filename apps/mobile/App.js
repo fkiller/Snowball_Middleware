@@ -219,6 +219,38 @@ export default function App() {
     setDevelopmentMode(false);
   }
 
+  function toggleRemember(value) {
+    rememberRef.current = value;
+    setRemember(value);
+    if (!value) {
+      setStorageNotice('');
+      void clearStoredBinding().catch(() => {});
+      return;
+    }
+    if (sessions !== null && storageStateRef.current === 'ready') {
+      try {
+        const canonicalOrigin = validateOrigin(draft.current.origin);
+        const credential = validateToken(draft.current.token);
+        const pin = validateFingerprint(draft.current.fingerprint);
+        const revision = draft.current.revision;
+        storedMayExist.current = true;
+        setStorageNotice('보안 저장소에 저장 중…');
+        void storage.current.save(JSON.stringify({ origin: canonicalOrigin, token: credential, fingerprint: pin })).then(saved => {
+          if (draft.current.revision !== revision || !rememberRef.current) return;
+          if (!saved) throw new Error('Connection storage save was cancelled');
+          setStorageNotice('보안 저장소에 저장하고 다시 읽어 확인했습니다.');
+        }).catch(() => {
+          if (draft.current.revision !== revision) return;
+          storedMayExist.current = true;
+          updateStorageState('error');
+          setStorageNotice('보안 저장소에 저장되었는지 확인하지 못했습니다. 연결 정보를 삭제하고 다시 시도해 주세요.');
+        });
+        return;
+      } catch { /* Fall back to saving on the next confirmed check. */ }
+    }
+    setStorageNotice('조회에 성공하면 연결 정보를 저장하고 다시 읽어 확인합니다.');
+  }
+
   return <SafeAreaView style={styles.root}>
     <StatusBar style="auto" />
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -240,7 +272,7 @@ export default function App() {
       <TextInput style={styles.input} value={fingerprint} editable={!busy && ready} onChangeText={value => { draft.current = { ...draft.current, fingerprint: value, token: '', revision: draft.current.revision + 1 }; invalidateStoredBinding(); setFingerprint(value); setToken(''); setSessions(null); setCheckedAt(null); setMessage(''); }} placeholder="PC에서 확인한 64자리 16진수" autoCapitalize="none" autoCorrect={false} autoComplete="off" maxLength={64} accessibilityLabel="PC 전용 인증서 SHA-256 지문" />
       <Text style={styles.label}>게이트웨이 임시 자격증명</Text>
       <TextInput style={styles.input} value={token} editable={!busy && ready} onChangeText={value => { draft.current = { ...draft.current, token: value, revision: draft.current.revision + 1 }; invalidateStoredBinding(); setToken(value); setSessions(null); setCheckedAt(null); setMessage(''); }} placeholder="43자 자격증명" secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete="off" textContentType="none" />
-      <View style={styles.row}><Text style={styles.body}>이 기기의 보안 저장소에 기억</Text><Switch value={remember} onValueChange={value => { rememberRef.current = value; setRemember(value); setStorageNotice(value ? '조회에 성공하면 연결 정보를 저장하고 다시 읽어 확인합니다.' : ''); if (!value) void clearStoredBinding().catch(() => {}); }} disabled={busy || !ready} /></View>
+      <View style={styles.row}><Text style={styles.body}>이 기기의 보안 저장소에 기억</Text><Switch value={remember} onValueChange={toggleRemember} disabled={busy || !ready} /></View>
       {storageNotice ? <Text accessibilityLiveRegion="polite" style={styles.small}>{storageNotice}</Text> : null}
       <Text style={styles.small}>주소가 내 PC의 주소인지 확인하세요. 자격증명은 이 주소에 전송됩니다.</Text>
       {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
