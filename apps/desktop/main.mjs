@@ -8,7 +8,7 @@ import { resolveUserDataDir } from '../../packages/core/dist/index.js';
 import { ensurePrivateStateDirectory } from '../supervisor/private-state.mjs';
 import { inspectCodexSelection } from './codex-connections.mjs';
 
-import { labels, AttentionNotifications } from './presentation.mjs';
+import { labels, AttentionNotifications, desktopJourneyGuide } from './presentation.mjs';
 import {sourceLogin} from './source-login.mjs';
 import {installedDevicePreparations} from '../../scripts/device-preparation.mjs';
 import {DeviceSetupHub} from './device-setup-hub.mjs';
@@ -192,6 +192,7 @@ function updateMenu(){
   tray.setContextMenu(Menu.buildFromTemplate([
     {label:'Snowball · '+status,enabled:false},{type:'separator'},
     {label:l.open,enabled:!!client,click:()=>void open()},
+    {label:l.guide,click:()=>void dialog.showMessageBox({icon:appIcon,type:'info',title:'Snowball',...desktopJourneyGuide(state?.settings?.language,!!deviceSetup)})},
     ...(suiteConfig?[{label:state?.settings?.language==='en'?'Device setup…':'기기 설정…',enabled:!!deviceSetup,click:()=>void openDeviceSetup()}]:[]),
     ...(!suiteConfig?[{label:l.connectCodex,enabled:!!client&&!smoke&&!enrollmentBusy&&!argument('--codex-control-config'),click:()=>{enrollmentBusy=true;updateMenu();worker?.postMessage({kind:'enroll-codex'});}}]:[]),
     {label:paused?l.resume:l.pause,enabled:!!client,click:async()=>{try{await client.updateSettings(state.settings.revision,{controlPaused:!paused});await refresh();}catch{await refresh();}}},

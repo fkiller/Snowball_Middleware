@@ -8,11 +8,15 @@ import { createConnectionLifecycle } from './connection-lifecycle.mjs';
 import { prepareConnection, isConnectionApprovalCurrent } from './connection-approval.mjs';
 import { createConnectionStorage } from './connection-storage.mjs';
 import { VERIFIED_GATEWAY_CONNECTION_AVAILABLE } from './connection-policy.mjs';
+import { remoteJourneyGuide } from './journey-guide.mjs';
 
 const STORAGE_KEY = 'snowball.experimental.remote.v1';
 const storeOptions = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
 
 export default function App() {
+  let locale = 'ko';
+  try { locale = Intl.DateTimeFormat().resolvedOptions().locale; } catch { /* Keep the Korean default. */ }
+  const journey = remoteJourneyGuide(locale);
   const [origin, setOrigin] = useState('');
   const [token, setToken] = useState('');
   const [remember, setRemember] = useState(false);
@@ -54,7 +58,7 @@ export default function App() {
       if (sequence !== clearSequence.current) return;
       storedMayExist.current = true;
       updateStorageState('error');
-      setMessage('저장된 연결 정보를 지우지 못했습니다. 아래의 연결 정보 삭제를 다시 눌러 주세요.');
+      setMessage(journey.forgetFailed);
     }).finally(() => { if (clearing.current === operation) clearing.current = null; });
     return operation;
   }
@@ -76,9 +80,9 @@ export default function App() {
         setToken(savedToken);
         setRemember(true);
       } catch {
-        setMessage('저장된 연결 정보를 읽을 수 없습니다. 다시 입력해 주세요.');
+        setMessage(journey.loadFailed);
       }
-    }).catch(() => { if (mounted) setMessage('보안 저장소를 열 수 없습니다. 직접 입력해 주세요.'); })
+    }).catch(() => { if (mounted) setMessage(journey.storageFailed); })
       .finally(() => { if (mounted) setReady(true); });
     return () => { mounted = false; lifecycle.current.invalidate(); };
   }, []);
@@ -92,7 +96,7 @@ export default function App() {
         setBusy(false);
         setSessions(null);
         setCheckedAt(null);
-        setMessage('앱을 벗어나 연결 상태를 지웠습니다. 돌아온 뒤 다시 확인해 주세요.');
+        setMessage(VERIFIED_GATEWAY_CONNECTION_AVAILABLE ? '앱을 벗어나 연결 상태를 지웠습니다. 돌아온 뒤 다시 확인해 주세요.' : '');
       } else draft.current = { ...draft.current, active: true };
     });
     return () => listener.remove();
@@ -164,19 +168,20 @@ export default function App() {
     draft.current = { ...draft.current, origin: '', token: '', revision: draft.current.revision + 1 };
     busyRef.current = false;
     setBusy(false); setSessions(null); setCheckedAt(null); setOrigin(''); setToken(''); setRemember(false); setMessage('');
-    try { await clearStoredBinding(); setMessage('이 기기의 저장된 연결 정보를 삭제했습니다. PC에서 자격증명도 철회하세요.'); }
-    catch { setMessage('보안 저장소에서 삭제하지 못했습니다. 다시 시도해 주세요.'); }
+    try { await clearStoredBinding(); setMessage(journey.forgetDone); }
+    catch { setMessage(journey.forgetFailed); }
   }
 
   return <SafeAreaView style={styles.root}>
     <StatusBar style="auto" />
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.kicker}>SNOWBALL · EXPERIMENTAL</Text>
-      <Text style={styles.title}>내 PC에 연결</Text>
+      <Text style={styles.title}>{VERIFIED_GATEWAY_CONNECTION_AVAILABLE ? '내 PC에 연결' : journey.title}</Text>
       {!VERIFIED_GATEWAY_CONNECTION_AVAILABLE ? <>
-        <Text style={styles.body}>PC에 있는 Snowball을 휴대폰에서 안전하게 사용할 수 있도록 연결 기능을 준비하고 있습니다.</Text>
-        <Text style={styles.notice}>아직 PC의 Snowball에 직접 연결했는지 안전하게 확인할 수 없어 자격증명을 전송하지 않습니다. 지금 PC나 휴대폰에서 별도로 설정할 필요는 없습니다.</Text>
-        <TouchableOpacity style={styles.secondary} onPress={forget} disabled={!ready} accessibilityRole="button"><Text style={styles.secondaryText}>이전에 저장한 연결 정보 삭제</Text></TouchableOpacity>
+        <Text style={styles.body}>{journey.intro}</Text>
+        {journey.steps.map(step => <Text key={step} style={styles.body}>{step}</Text>)}
+        <Text style={styles.notice}>{journey.notice}</Text>
+        <TouchableOpacity style={styles.secondary} onPress={forget} disabled={!ready} accessibilityRole="button"><Text style={styles.secondaryText}>{journey.forget}</Text></TouchableOpacity>
         {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
       </> : <>
       <Text style={styles.body}>1. PC와 휴대폰에 Tailscale을 설치하고 같은 사설망에 연결합니다.{'\n'}2. PC 트레이의 실험용 원격 메뉴에서 표시하는 PC 주소와 읽기 자격증명을 확인합니다.{'\n'}3. 아래에 두 정보를 입력하고 PC 화면의 주소와 비교합니다.</Text>
