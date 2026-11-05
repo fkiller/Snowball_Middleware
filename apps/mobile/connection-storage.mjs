@@ -16,6 +16,13 @@ export function createConnectionStorage({ get, set, remove }) {
         if (expected !== generation) return false;
         await set(value);
         if (expected !== generation) { await remove(); return false; }
+        const stored = await get();
+        if (expected !== generation) { await remove(); return false; }
+        if (stored !== value) {
+          // A resolved write alone is not evidence that the credential survived.
+          await remove();
+          throw new Error('Secure storage write could not be verified');
+        }
         return true;
       });
     },

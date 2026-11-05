@@ -7,6 +7,6 @@
     "userInterfaceStyle": "automatic",
     "ios": { "bundleIdentifier": "dev.snowball.mobile.experimental" },
     "android": { "package": "dev.snowball.mobile.experimental", "allowBackup": false },
-    "plugins": ["expo-secure-store"]
+    "plugins": ["expo-secure-store", "./plugins/with-embedded-debug.cjs"]
   }
 }

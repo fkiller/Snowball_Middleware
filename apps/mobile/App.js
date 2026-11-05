@@ -24,6 +24,8 @@ export default function App() {
   const [developmentMode, setDevelopmentMode] = useState(false);
   const connectionAvailable = VERIFIED_GATEWAY_CONNECTION_AVAILABLE || (developmentMode && developmentReader.available);
   const [remember, setRemember] = useState(false);
+  const rememberRef = useRef(false);
+  const [storageNotice, setStorageNotice] = useState('');
   const [sessions, setSessions] = useState(null);
   const [checkedAt, setCheckedAt] = useState(null);
   const [message, setMessage] = useState('');
@@ -57,6 +59,7 @@ export default function App() {
     operation.then(() => {
       if (sequence !== clearSequence.current) return;
       storedMayExist.current = false;
+      setStorageNotice('이 기기에 저장된 연결 정보가 없습니다.');
       updateStorageState('ready');
     }, () => {
       if (sequence !== clearSequence.current) return;
@@ -74,7 +77,8 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
     storage.current.load().then(raw => {
-      if (!mounted || !raw) return;
+      if (!mounted) return;
+      if (!raw) { setStorageNotice('이 기기에 저장된 연결 정보가 없습니다.'); return; }
       storedMayExist.current = true;
       try {
         const saved = JSON.parse(raw);
@@ -83,11 +87,21 @@ export default function App() {
         setOrigin(savedOrigin);
         setToken(savedToken);
         setFingerprint(savedFingerprint);
+        rememberRef.current = true;
         setRemember(true);
+        setStorageNotice('보안 저장소에서 연결 정보를 복원했습니다.');
       } catch {
+        updateStorageState('error');
+        setStorageNotice(journey.loadFailed);
         setMessage(journey.loadFailed);
       }
-    }).catch(() => { if (mounted) setMessage(journey.storageFailed); })
+    }).catch(() => {
+      if (!mounted) return;
+      storedMayExist.current = true;
+      updateStorageState('error');
+      setStorageNotice(journey.storageFailed);
+      setMessage(journey.storageFailed);
+    })
       .finally(() => { if (mounted) setReady(true); });
     return () => { mounted = false; lifecycle.current.invalidate(); };
   }, []);
@@ -145,16 +159,24 @@ export default function App() {
       clearTimeout(timeout);
       const confirmedAt = new Date();
       let storageFailed = false;
+      let saved = false;
       try {
-        if (remember) {
+        if (rememberRef.current) {
           storedMayExist.current = true;
-          await storage.current.save(JSON.stringify({ origin: canonicalOrigin, token: credential, fingerprint: approval.fingerprint }));
+          saved = await storage.current.save(JSON.stringify({ origin: canonicalOrigin, token: credential, fingerprint: approval.fingerprint }));
+          if (!saved) throw new Error('Connection storage save was cancelled');
         } else {
           await storage.current.clear();
           storedMayExist.current = false;
         }
-      } catch { storageFailed = true; storedMayExist.current = true; updateStorageState('error'); }
+      } catch {
+        storageFailed = true;
+        storedMayExist.current = true;
+        updateStorageState('error');
+      }
       if (!attempt.isCurrent()) return;
+      setStorageNotice(storageFailed ? '보안 저장소에 저장되었는지 확인하지 못했습니다. 연결 정보를 삭제하고 다시 시도해 주세요.'
+        : saved ? '보안 저장소에 저장하고 다시 읽어 확인했습니다.' : '연결 정보를 저장하지 않았습니다. 재시작하면 다시 입력해야 합니다.');
       setSessions(items);
       setCheckedAt(confirmedAt);
       setMessage(storageFailed ? '조회는 완료되었지만 보안 저장소를 변경하지 못했습니다. 연결 정보 저장 상태를 확인해 주세요.' : '조회가 완료되었습니다. 아래는 마지막으로 확인한 상태입니다.');
@@ -181,9 +203,18 @@ export default function App() {
     lifecycle.current.invalidate();
     draft.current = { ...draft.current, origin: '', token: '', fingerprint: '', revision: draft.current.revision + 1 };
     busyRef.current = false;
+    rememberRef.current = false;
     setBusy(false); setSessions(null); setCheckedAt(null); setOrigin(''); setToken(''); setFingerprint(''); setRemember(false); setMessage('');
     try { await clearStoredBinding(); setMessage(journey.forgetDone); }
     catch { setMessage(journey.forgetFailed); }
+  }
+
+  function returnToGuide() {
+    lifecycle.current.invalidate();
+    draft.current = { ...draft.current, revision: draft.current.revision + 1 };
+    busyRef.current = false;
+    setBusy(false); setSessions(null); setCheckedAt(null); setMessage('');
+    setDevelopmentMode(false);
   }
 
   return <SafeAreaView style={styles.root}>
@@ -207,11 +238,12 @@ export default function App() {
       <TextInput style={styles.input} value={fingerprint} editable={!busy && ready} onChangeText={value => { draft.current = { ...draft.current, fingerprint: value, token: '', revision: draft.current.revision + 1 }; invalidateStoredBinding(); setFingerprint(value); setToken(''); setSessions(null); setCheckedAt(null); setMessage(''); }} placeholder="PC에서 확인한 64자리 16진수" autoCapitalize="none" autoCorrect={false} autoComplete="off" maxLength={64} accessibilityLabel="PC 전용 인증서 SHA-256 지문" />
       <Text style={styles.label}>게이트웨이 임시 자격증명</Text>
       <TextInput style={styles.input} value={token} editable={!busy && ready} onChangeText={value => { draft.current = { ...draft.current, token: value, revision: draft.current.revision + 1 }; invalidateStoredBinding(); setToken(value); setSessions(null); setCheckedAt(null); setMessage(''); }} placeholder="43자 자격증명" secureTextEntry autoCapitalize="none" autoCorrect={false} autoComplete="off" textContentType="none" />
-      <View style={styles.row}><Text style={styles.body}>이 기기의 보안 저장소에 기억</Text><Switch value={remember} onValueChange={value => { setRemember(value); if (!value) void clearStoredBinding().catch(() => {}); }} disabled={busy || !ready} /></View>
+      <View style={styles.row}><Text style={styles.body}>이 기기의 보안 저장소에 기억</Text><Switch value={remember} onValueChange={value => { rememberRef.current = value; setRemember(value); setStorageNotice(value ? '조회에 성공하면 연결 정보를 저장하고 다시 읽어 확인합니다.' : ''); if (!value) void clearStoredBinding().catch(() => {}); }} disabled={busy || !ready} /></View>
+      {storageNotice ? <Text accessibilityLiveRegion="polite" style={styles.small}>{storageNotice}</Text> : null}
       <Text style={styles.small}>주소가 내 PC의 주소인지 확인하세요. 자격증명은 이 주소에 전송됩니다.</Text>
       <TouchableOpacity style={styles.button} onPress={confirmConnect} disabled={!ready || busy || storageState !== 'ready'} accessibilityRole="button"><Text style={styles.buttonText}>{busy ? '확인 중…' : storageState === 'clearing' ? '이전 연결 정보 삭제 중…' : sessions === null ? '연결 상태 확인' : '다시 확인'}</Text></TouchableOpacity>
       <TouchableOpacity style={styles.secondary} onPress={forget} disabled={!ready} accessibilityRole="button"><Text style={styles.secondaryText}>이 기기에서 연결 정보 삭제</Text></TouchableOpacity>
-      <TouchableOpacity style={styles.secondary} onPress={() => { void forget(); setDevelopmentMode(false); }} disabled={!ready} accessibilityRole="button"><Text style={styles.secondaryText}>개발 연결 정보 삭제 · 안내로 돌아가기</Text></TouchableOpacity>
+      <TouchableOpacity style={styles.secondary} onPress={returnToGuide} disabled={!ready} accessibilityRole="button"><Text style={styles.secondaryText}>안내로 돌아가기</Text></TouchableOpacity>
       {busy ? <ActivityIndicator /> : null}
       {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
       {sessions !== null ? <View style={styles.list}>

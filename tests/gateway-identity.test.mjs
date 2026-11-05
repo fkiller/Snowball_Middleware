@@ -54,16 +54,20 @@ test('a pinned dedicated certificate rejects another valid same-host TLS endpoin
   const attacker = https.createServer(other.tlsOptions(), (_req, res) => { attackerReceived = true; res.end(); });
   await new Promise((resolve, reject) => { attacker.once('error', reject); attacker.listen(0, '127.0.0.1', resolve); });
   t.after(() => new Promise(resolve => attacker.close(resolve)));
-  const request = port => new Promise((resolve, reject) => {
+  // These self-signed fixtures have the same subject. OpenSSL can choose the
+  // wrong same-subject anchor from a combined CA array before reaching the pin
+  // check. Trust each peer individually so the negative case really exercises
+  // a PKI-valid, same-host endpoint with the wrong dedicated fingerprint.
+  const request = (port, certificate) => new Promise((resolve, reject) => {
     const req = https.request({ host: '127.0.0.1', port, servername: host, path: '/remote/v1/sessions',
-      ca: [first.certificate, other.certificate], headers: { Host: host, Authorization: `Bearer ${grant.token}` },
+      ca: certificate, agent: false, headers: { Host: host, Authorization: `Bearer ${grant.token}` },
       checkServerIdentity: (name, peer) => tls.checkServerIdentity(name, peer) ||
         (createHash('sha256').update(peer.raw).digest('hex') === first.fingerprint ? undefined : Error('gateway_identity_mismatch')),
     }, res => { res.resume(); res.on('end', () => resolve(res.statusCode)); });
     req.on('error', reject); req.end();
   });
-  assert.equal(await request(Number(new URL(gateway.origin).port)), 200);
-  await assert.rejects(request(attacker.address().port), /gateway_identity_mismatch/);
+  assert.equal(await request(Number(new URL(gateway.origin).port), first.certificate), 200);
+  await assert.rejects(request(attacker.address().port, other.certificate), /gateway_identity_mismatch/);
   assert.equal(attackerReceived, false);
 });
 
