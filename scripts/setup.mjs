@@ -14,7 +14,7 @@ const options = parseSetupOptions(process.argv.slice(2));
 if (!['win32', 'darwin', 'linux'].includes(process.platform)) throw Error('Suite installation supports Windows, macOS and desktop Linux');
 const middleware = fileURLToPath(new URL('..', import.meta.url));
 const root = path.resolve(options.root ?? path.dirname(middleware));
-if (path.join(root, 'Snowball_Middleware') !== path.resolve(middleware)) throw Error('Install root must contain this Snowball_Middleware checkout');
+if (fs.realpathSync(path.join(root, 'Snowball_Middleware')) !== fs.realpathSync(path.resolve(middleware))) throw Error('Install root must contain this Snowball_Middleware checkout');
 const [major, minor] = process.versions.node.split('.').map(Number);
 if (major < 22 || major === 22 && minor < 12) throw Error('Node >=22.12 is required');
 const npm = options.npm ?? process.env.npm_execpath ?? path.join(path.dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');

@@ -23,6 +23,7 @@
           <span class="lang-divider">/</span>
           <button id="lang-btn-ko" class="lang-btn" type="button" title="한국어">KO</button>
         </div>
+        <button id="btn-mobile-pair" class="secondary icon-btn" type="button" title="Pair Mobile Device" data-i18n-title="mobile_pair_title">📱 <span id="mobile-pair-btn-label" data-i18n="mobile_pair_btn">Mobile</span></button>
         <button id="btn-settings" class="secondary icon-btn" type="button" title="Settings" data-i18n-title="settings_title">⚙️ <span data-i18n="settings_btn">Settings</span></button>
       </div>
     </header>
@@ -126,6 +127,17 @@
             </div>
           </section>
         </div>
+      </div>
+    </div>
+
+    <!-- 5. Mobile Pairing Modal -->
+    <div id="mobile-pair-modal" class="modal-backdrop" hidden>
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h2>📱 <span id="mobile-pair-modal-title">휴대폰 연결</span></h2>
+          <button id="btn-close-mobile-pair" class="close-btn" type="button">✕</button>
+        </div>
+        <div class="modal-body" id="mobile-pair-body"></div>
       </div>
     </div>
 

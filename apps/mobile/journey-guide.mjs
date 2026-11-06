@@ -32,3 +32,34 @@ export function remoteJourneyGuide(locale) {
     storageFailed: '보안 저장소를 열 수 없습니다.',
   };
 }
+
+export function pairingJourneyGuide(locale) {
+  const english = typeof locale === 'string' && locale.toLowerCase().startsWith('en');
+  return english ? {
+    title: 'Connect to your PC',
+    intro: 'Connect directly to Snowball running on your Windows PC or Mac with a quick QR scan.',
+    steps: [
+      '1. On your PC, open Snowball and click [📱 Pair Mobile] at the top.',
+      '2. Tap [Scan QR Code] below to scan your PC screen, or tap [Connect with Copied Code].',
+      '3. Verify the 6-digit confirmation number matches both screens and click [Approve] on your PC.',
+    ],
+    notice: 'Your phone generates a hardware-backed P-256 signing key in the iOS Keychain and pins the PC certificate automatically.',
+    scanButton: '📷 Scan QR Code to Connect',
+    pasteButton: '📋 Connect with Copied Pairing Code',
+    disconnectButton: 'Disconnect this PC',
+    disconnectDone: 'Disconnected from this PC.',
+  } : {
+    title: '내 PC와 연결하기',
+    intro: '내 Windows PC 또는 Mac에서 실행 중인 Snowball과 QR 스캔 한 번으로 바로 연결합니다.',
+    steps: [
+      '1. PC의 Snowball 화면 상단에서 [📱 휴대폰 연결]을 누릅니다.',
+      '2. 아래 [QR 코드 스캔하여 연결]로 PC 화면을 비추거나, [복사한 연결 코드로 연결]을 누릅니다.',
+      '3. 두 화면에 표시된 6자리 확인 번호가 같은지 확인하고 PC에서 [승인]을 누르면 완료됩니다.',
+    ],
+    notice: '휴대폰 내부 보안 영역(iOS Keychain)에서 생성된 P-256 기기 서명 키와 인증서 자동 고정(Pinning)으로 안전하게 통신합니다.',
+    scanButton: '📷 QR 코드 스캔하여 연결',
+    pasteButton: '📋 복사한 연결 코드로 연결',
+    disconnectButton: '이 PC 연결 해제',
+    disconnectDone: '이 기기에서 PC 연결 정보를 삭제했습니다.',
+  };
+}

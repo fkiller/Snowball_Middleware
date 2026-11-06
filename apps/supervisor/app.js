@@ -1147,10 +1147,160 @@ function renderDeviceStatus() {
   }
 }
 
+function buildQrSvgElement(svgString) {
+  const match = typeof svgString === 'string'
+    ? /^<svg [^>]*viewBox="0 0 (\d+) \1"[^>]*><rect [^>]*\/><path d="([M0-9,h1vz-]+)" fill="#000000"\/><\/svg>$/.exec(svgString)
+    : null;
+  if (!match) return null;
+  const total = match[1];
+  const pathData = match[2];
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${total} ${total}`);
+  svg.setAttribute('width', '220');
+  svg.setAttribute('height', '220');
+  svg.setAttribute('shape-rendering', 'crispEdges');
+  const rect = document.createElementNS(svgNS, 'rect');
+  rect.setAttribute('width', total);
+  rect.setAttribute('height', total);
+  rect.setAttribute('fill', '#ffffff');
+  const path = document.createElementNS(svgNS, 'path');
+  path.setAttribute('d', pathData);
+  path.setAttribute('fill', '#000000');
+  svg.append(rect, path);
+  return svg;
+}
+
+let lastAutoOpenedPairingId = null;
+function renderMobilePairingModal() {
+  const isEn = typeof currentLanguage !== 'undefined' && currentLanguage === 'en';
+  const mobile = snapshot?.mobileRemote ?? null;
+  const pending = mobile?.pendingRequests ?? [];
+  const paired = mobile?.pairedDevices ?? [];
+  const invitation = mobile?.activeInvitation ?? null;
+
+  const btnLabel = $('mobile-pair-btn-label');
+  if (btnLabel) {
+    if (pending.length > 0) {
+      btnLabel.textContent = isEn ? `Approve (${pending.length})` : `승인 대기 (${pending.length})`;
+    } else if (paired.length > 0) {
+      btnLabel.textContent = isEn ? `Mobile (${paired.length})` : `휴대폰 (${paired.length})`;
+    } else {
+      btnLabel.textContent = isEn ? 'Pair Mobile' : '휴대폰 연결';
+    }
+  }
+  const modalTitle = $('mobile-pair-modal-title');
+  if (modalTitle) modalTitle.textContent = isEn ? 'Mobile Device Pairing' : '휴대폰 원격 연결';
+
+  const modal = $('mobile-pair-modal');
+  if (pending.length > 0 && modal && modal.hidden && pending[0].pairingId !== lastAutoOpenedPairingId) {
+    lastAutoOpenedPairingId = pending[0].pairingId;
+    modal.hidden = false;
+  }
+
+  const body = $('mobile-pair-body');
+  if (!body) return;
+  body.replaceChildren();
+
+  // 1. Pending Approval Requests
+  if (pending.length > 0) {
+    const pendingSection = node('section');
+    pendingSection.className = 'settings-section';
+    pendingSection.append(node('h3', isEn ? 'Pending Device Approval' : '연결 승인 대기 중인 휴대폰'));
+    for (const req of pending) {
+      const card = node('div');
+      card.className = 'card pending-pair-card';
+      const formattedCode = `${req.verificationCode.slice(0, 3)} - ${req.verificationCode.slice(3)}`;
+      const codeBadge = node('div', formattedCode, 'sas-code-badge');
+      const actions = node('div');
+      actions.className = 'settings-actions';
+      actions.append(
+        button(isEn ? 'Approve Device' : '승인 (연결 허용)', () => void run(async signal => (await client.approveRemotePairing(req.pairingId, signal)).snapshot)),
+        button(isEn ? 'Reject' : '거절', () => void run(async signal => (await client.rejectRemotePairing(req.pairingId, signal)).snapshot), true)
+      );
+      card.append(
+        node('strong', `${req.deviceLabel} (${req.deviceId})`),
+        node('p', isEn
+          ? 'Verify that your phone displays this exact 6-digit confirmation code before approving:'
+          : '휴대폰 화면에 아래 6자리 확인 번호가 똑같이 표시되는지 확인한 뒤 [승인]을 누르세요.'),
+        codeBadge,
+        actions
+      );
+      pendingSection.append(card);
+    }
+    body.append(pendingSection);
+  }
+
+  // 2. QR Code & One-Click Pairing Code
+  const qrSection = node('section');
+  qrSection.className = 'settings-section';
+  qrSection.append(node('h3', isEn ? 'Connect a New Phone (QR or Code)' : '새 휴대폰 연결 (QR 스캔 또는 연결 코드)'));
+  qrSection.append(node('p', isEn
+    ? '1. Open the Snowball app on your phone (same Wi-Fi works directly; no third-party VPN app required). 2. Scan the QR code below or copy the pairing code. 3. Confirm the 6-digit code here.'
+    : '1. 휴대폰에서 Snowball 앱을 엽니다 (같은 Wi-Fi에서 별도 앱 설치 없이 바로 연결됩니다). 2. 아래 QR 코드를 스캔하거나 연결 코드를 복사해 붙여넣습니다. 3. 6자리 확인 번호를 대조하고 승인합니다.'));
+
+  if (invitation) {
+    const svgEl = buildQrSvgElement(invitation.qrSvg);
+    if (svgEl) {
+      const frame = node('div', '', 'qr-frame');
+      frame.append(svgEl);
+      qrSection.append(frame);
+    }
+    const copyStatus = node('p', '');
+    const actions = node('div');
+    actions.className = 'settings-actions';
+    actions.append(
+      button(isEn ? '📋 Copy Pairing Code' : '📋 연결 코드 복사', () => {
+        void navigator.clipboard?.writeText(invitation.pairingCode).then(() => {
+          copyStatus.textContent = isEn ? 'Pairing code copied to clipboard.' : '일회용 연결 코드가 클립보드에 복사되었습니다. 휴대폰 앱에서 [복사한 연결 코드로 연결]을 누르세요.';
+        }).catch(() => {
+          copyStatus.textContent = invitation.pairingCode;
+        });
+      }),
+      button(isEn ? '🔄 New QR Code' : '🔄 새 QR 코드 발급', () => void run(async signal => (await client.startRemotePairing(signal)).snapshot), true)
+    );
+    qrSection.append(actions, copyStatus);
+  } else {
+    const actions = node('div');
+    actions.className = 'settings-actions';
+    actions.append(
+      button(isEn ? 'Show QR Code & Pairing Code' : 'QR 코드 및 일회용 연결 코드 표시', () => void run(async signal => (await client.startRemotePairing(signal)).snapshot))
+    );
+    qrSection.append(actions);
+  }
+  body.append(qrSection);
+
+  // 3. Paired Mobile Devices List
+  const devicesSection = node('section');
+  devicesSection.className = 'settings-section';
+  devicesSection.append(node('h3', isEn ? 'Connected Mobile Devices' : '연결된 휴대폰 목록'));
+  if (!paired.length) {
+    devicesSection.append(node('p', isEn ? 'No mobile devices paired yet.' : '아직 등록된 휴대폰이 없습니다.'));
+  } else {
+    for (const dev of paired) {
+      const row = node('div');
+      row.className = 'card paired-device-row';
+      const info = node('div');
+      const lastSeen = new Date(dev.lastSeenAt).toLocaleString();
+      info.append(
+        node('strong', dev.label),
+        node('p', isEn ? `${dev.deviceId} · Last active: ${lastSeen}` : `${dev.deviceId} · 최근 확인: ${lastSeen}`)
+      );
+      const revokeBtn = button(isEn ? 'Disconnect' : '연결 해제', () => void run(async signal => (await client.revokeRemoteDevice(dev.deviceId, signal)).snapshot), true);
+      row.append(info, revokeBtn);
+      devicesSection.append(row);
+    }
+  }
+  body.append(devicesSection);
+}
+
 function initSettingsModal() {
   const modal = $('settings-modal');
   const btnOpen = $('btn-settings');
   const btnClose = $('btn-close-settings');
+  const mobileModal = $('mobile-pair-modal');
+  const btnMobileOpen = $('btn-mobile-pair');
+  const btnMobileClose = $('btn-close-mobile-pair');
   const btnRerun = $('btn-rerun-wizard');
   const btnRescan = $('btn-settings-rescan');
   const chkAutostart = $('setting-autostart');
@@ -1160,6 +1310,26 @@ function initSettingsModal() {
 
   if (btnLangEn) btnLangEn.onclick = () => setLanguage('en');
   if (btnLangKo) btnLangKo.onclick = () => setLanguage('ko');
+
+  if (btnMobileOpen) {
+    btnMobileOpen.onclick = () => {
+      if (mobileModal) mobileModal.hidden = false;
+      renderMobilePairingModal();
+      if (!snapshot?.mobileRemote?.activeInvitation) {
+        void run(async signal => (await client.startRemotePairing(signal)).snapshot);
+      }
+    };
+  }
+  if (btnMobileClose) {
+    btnMobileClose.onclick = () => {
+      if (mobileModal) mobileModal.hidden = true;
+    };
+  }
+  if (mobileModal) {
+    mobileModal.onclick = e => {
+      if (e.target === mobileModal) mobileModal.hidden = true;
+    };
+  }
 
   if (mk20Save) mk20Save.onclick=()=>void run(async signal=>{
     await client.configureMk20Lan($('mk20-lan-address').value.trim(),$('mk20-lan-interface').value,signal);
@@ -1411,6 +1581,7 @@ function render() {
       : (isEn ? 'This Computer · Local Control' : '이 컴퓨터 · 로컬 제어');
   }
   renderDeviceStatus();
+  renderMobilePairingModal();
   const wsContainer = $('workspace-container');
   const wizContainer = $('wizard-container');
   const breadcrumbs = $('breadcrumb-bar');

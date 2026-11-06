@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {remoteJourneyGuide} from '../journey-guide.mjs';
+import {remoteJourneyGuide, pairingJourneyGuide} from '../journey-guide.mjs';
 import {VERIFIED_GATEWAY_CONNECTION_AVAILABLE} from '../connection-policy.mjs';
 import fs from 'node:fs';
 
@@ -16,6 +16,17 @@ test('mobile-first guide explains the computer prerequisite without claiming pai
     assert.equal(guide.steps.length,3);
     assert.doesNotMatch(JSON.stringify(guide),/https?:\/\//);
   }
+});
+
+test('Track B pairing journey guide never requires Tailscale or manual fingerprint entry', () => {
+  const ko = pairingJourneyGuide('ko-KR');
+  const en = pairingJourneyGuide('en-US');
+  assert.equal(ko.steps.length, 3);
+  assert.equal(en.steps.length, 3);
+  assert.match(ko.steps.join(' '), /QR 코드/);
+  assert.match(ko.steps.join(' '), /6자리 확인 번호/);
+  assert.doesNotMatch(JSON.stringify(ko), /Tailscale|Tailgate|fingerprint|64자리/i);
+  assert.doesNotMatch(JSON.stringify(en), /Tailscale|Tailgate|fingerprint|64-char/i);
 });
 
 test('preview naming retains the experimental app identities and Android backup protection', () => {

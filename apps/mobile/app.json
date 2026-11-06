@@ -5,7 +5,12 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "ios": { "bundleIdentifier": "dev.snowball.mobile.experimental" },
+    "ios": {
+      "bundleIdentifier": "dev.snowball.mobile.experimental",
+      "infoPlist": {
+        "NSCameraUsageDescription": "PC 화면의 Snowball 연결 QR 코드를 스캔하기 위해 카메라를 사용합니다."
+      }
+    },
     "android": { "package": "dev.snowball.mobile.experimental", "allowBackup": false },
     "plugins": ["expo-secure-store", "./plugins/with-embedded-debug.cjs"]
   }

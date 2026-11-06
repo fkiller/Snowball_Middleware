@@ -307,7 +307,27 @@ const harness = {
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
 const supervisor = await loadSupervisorAssets(repositoryRoot);
 
-const api = new LocalApi({
+// This projection contains no titles, session IDs, paths or conversation text.
+// Unknown status remains unknown; native observations are never invented.
+const developmentRemoteFile = process.env.SNOWBALL_REMOTE_DEVELOPMENT_CONFIG;
+let api;
+const remoteControl = new RemoteManager({directory, hostId, hostname: os.hostname(), onStateChange: () => api?.notifyNativeObservations(), sessionService:{
+  snapshotSessions() {
+    const result=[];
+    for(const [harnessPluginId, groups] of Object.entries(realSessionsData)) {
+      const seen=new Set();
+      for(const list of Object.values(groups)) for(const session of list) {
+        if(seen.has(session.id))continue;
+        seen.add(session.id);
+        result.push({harnessPluginId,status:typeof session.status==='string'?session.status:'unknown'});
+        if(result.length>=256)return result;
+      }
+    }
+    return result;
+  },
+}});
+
+api = new LocalApi({
   journal,
   workspaceStore: store,
   devices,
@@ -340,34 +360,22 @@ const api = new LocalApi({
   listAccess: listNativeAccess,
   createSession: handleCreateSession,
   onCommandQueued: handleCommandQueued,
+  mobileRemote: remoteControl,
 });
 
 await api.start();
 
-// This projection contains no titles, session IDs, paths or conversation text.
-// Unknown status remains unknown; native observations are never invented.
-const developmentRemoteFile = process.env.SNOWBALL_REMOTE_DEVELOPMENT_CONFIG;
-const remoteControl = desktopSettings.enabled || developmentRemoteFile ? new RemoteManager({directory, sessionService:{
-  snapshotSessions() {
-    const result=[];
-    for(const [harnessPluginId, groups] of Object.entries(realSessionsData)) {
-      const seen=new Set();
-      for(const list of Object.values(groups)) for(const session of list) {
-        if(seen.has(session.id))continue;
-        seen.add(session.id);
-        result.push({harnessPluginId,status:typeof session.status==='string'?session.status:'unknown'});
-        if(result.length>=256)return result;
-      }
-    }
-    return result;
-  },
-}}) : undefined;
 let developmentRemote;
 if (developmentRemoteFile) {
   try {
     developmentRemote = await startDevelopmentRemote(remoteControl, readDevelopmentRemoteConfig(developmentRemoteFile));
     console.log('Development pinned TLS gateway is ready; mobile binding is in the private local configuration directory.');
   } catch { console.error('Development remote gateway unavailable. Local control remains available.'); }
+} else if (remoteControl.describe().pairedDevices?.length > 0) {
+  try {
+    await remoteControl.startPairing();
+    console.log('Mobile remote TLS gateway resumed for paired devices.');
+  } catch { console.error('Mobile remote TLS gateway could not resume automatically.'); }
 }
 
 const bootstrapFile = path.join(directory, 'live-bootstrap.json');

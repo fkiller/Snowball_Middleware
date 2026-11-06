@@ -36,6 +36,16 @@ export interface Snapshot {
   deviceSources: ReturnType<DeviceRegistry['sourceStates']>;
   deviceCandidates: DeviceCandidate[];
   mk20Lan?: { selected: { version: number; targetAddress: string; interfaceName: string } | null; interfaces: { name: string; address: string }[]; error?: string } | null;
+  mobileRemote?: {
+    enabled: boolean;
+    origin: string | null;
+    host: string | null;
+    fingerprint: string | null;
+    endpoints: string[];
+    activeInvitation: { invitationId: string; pairingCode: string; qrSvg: string; expiresAt: number; endpoints: string[]; pcName: string } | null;
+    pendingRequests: { pairingId: string; deviceId: string; deviceLabel: string; verificationCode: string; createdAt: number; expiresAt: number }[];
+    pairedDevices: { deviceId: string; label: string; publicKeySpki: string; pairedAt: number; lastSeenAt: number }[];
+  } | null;
   /** Reviewed candidate survey, or null when the runtime supplies no surveyor. Never control evidence. */
   harness: DiscoverySnapshot | null;
   settings?: LocalSettings;
@@ -95,6 +105,11 @@ export class LocalClient {
   resetCodex(signal?: AbortSignal): Promise<{ snapshot: Snapshot }> { return this.request('/v1/harness/reset-codex', {}, signal); }
   configureMk20Lan(targetAddress: string, interfaceName: string, signal?: AbortSignal): Promise<{ snapshot: Snapshot }> { return this.request('/v1/devices/mk20-lan/configure', { targetAddress, interfaceName }, signal); }
   removeMk20Lan(signal?: AbortSignal): Promise<{ snapshot: Snapshot }> { return this.request('/v1/devices/mk20-lan/remove', {}, signal); }
+  startRemotePairing(signal?: AbortSignal): Promise<{ pairing: unknown; snapshot: Snapshot }> { return this.request('/v1/remote/pair/start', {}, signal); }
+  approveRemotePairing(pairingId: string, signal?: AbortSignal): Promise<{ snapshot: Snapshot }> { return this.request('/v1/remote/pair/approve', { pairingId }, signal); }
+  rejectRemotePairing(pairingId: string, signal?: AbortSignal): Promise<{ snapshot: Snapshot }> { return this.request('/v1/remote/pair/reject', { pairingId }, signal); }
+  revokeRemoteDevice(deviceId: string, signal?: AbortSignal): Promise<{ snapshot: Snapshot }> { return this.request('/v1/remote/devices/revoke', { deviceId }, signal); }
+  disableRemote(signal?: AbortSignal): Promise<{ snapshot: Snapshot }> { return this.request('/v1/remote/disable', {}, signal); }
   recheckWorkspace(workspaceId: string, signal?: AbortSignal): Promise<WorkspaceSummary> { return this.request(`/v1/workspaces/${encodeURIComponent(workspaceId)}/recheck`, {}, signal); }
   selectWorkspace(signal?: AbortSignal): Promise<{ selected: false } | { selected: true; workspaceId: string }> { return this.request('/v1/workspaces/select', {}, signal); }
   settings(signal?: AbortSignal): Promise<{ settings: LocalSettings }> { return this.request('/v1/settings', undefined, signal); }

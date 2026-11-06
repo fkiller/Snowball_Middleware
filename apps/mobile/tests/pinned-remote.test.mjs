@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createPinnedSessionReader, parseSessionResponse, validateFingerprint } from '../pinned-remote.mjs';
+import { createPinnedSessionReader, parseSessionResponse, validateFingerprint, validatePairingCode } from '../pinned-remote.mjs';
 
 const origin = 'https://pc.tailnet.ts.net', token = 'a'.repeat(43), pin = 'a1'.repeat(32);
 const response = JSON.stringify({ sessions: [{ status: 'idle', harnessPluginId: 'snowball.codex' }] });
@@ -69,4 +69,53 @@ test('native errors expose only bounded error kinds', async () => {
     const reader = createPinnedSessionReader({ ...native, listSessions: async () => { throw error; } }, options);
     await assert.rejects(reader.listSessions(origin, token, pin), { kind: expected, message: expected });
   }
+});
+
+test('Track B pairing code validation and signed device methods bridge through the native module', async () => {
+  const validCode = 'SBP1.' + 'A'.repeat(64);
+  assert.equal(validatePairingCode('  ' + validCode + '\n'), validCode);
+  for (const invalid of ['', 'SBP2.' + 'A'.repeat(64), 'SBP1.short', 'https://example.com']) {
+    assert.throws(() => validatePairingCode(invalid));
+  }
+
+  const endpoints = ['https://192.168.1.10:54321', 'https://pc.tailnet.ts.net'];
+  const reader = createPinnedSessionReader({
+    ...native,
+    requestPairing: async (id, code, label) => {
+      assert.equal(code, validCode);
+      assert.equal(label, 'My iPhone');
+      return JSON.stringify({
+        pairingId: 'pair_123',
+        deviceId: 'dev_abc',
+        verificationCode: '123456',
+        pcLabel: 'Test Mac',
+        tlsServerName: 'pc.tailnet.ts.net',
+        fingerprint: pin,
+        endpoints,
+        activeEndpoint: endpoints[0],
+      });
+    },
+    checkPairingStatus: async (id, eps, sni, fp) => {
+      assert.deepEqual(eps, endpoints);
+      assert.equal(sni, 'pc.tailnet.ts.net');
+      assert.equal(fp, pin);
+      return JSON.stringify({ status: 'approved', deviceId: 'dev_abc' });
+    },
+    listSignedSessions: async (id, eps, sni, fp) => {
+      assert.deepEqual(eps, endpoints);
+      assert.equal(sni, 'pc.tailnet.ts.net');
+      assert.equal(fp, pin);
+      return response;
+    },
+  }, options);
+
+  const pairRes = await reader.requestPairing(' ' + validCode + ' ', 'My iPhone');
+  assert.equal(pairRes.verificationCode, '123456');
+  assert.equal(pairRes.activeEndpoint, endpoints[0]);
+
+  const statusRes = await reader.checkPairingStatus(endpoints, 'pc.tailnet.ts.net', pin.toUpperCase());
+  assert.equal(statusRes.status, 'approved');
+
+  const sessions = await reader.listSignedSessions(endpoints, 'pc.tailnet.ts.net', pin.toUpperCase());
+  assert.deepEqual(sessions, JSON.parse(response).sessions);
 });

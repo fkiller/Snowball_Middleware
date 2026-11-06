@@ -96,7 +96,7 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
     metadata = new SessionMetadataStore(privateJournalDirectory(path.join(directory, 'session-metadata')), hostId);
     creates = new SessionCreateStore(privateJournalDirectory(path.join(directory, 'session-creates')), hostId);
     sessions = new SessionService({ hostId, journal, metadata });
-    if (desktop) remoteControl = new RemoteManager({directory, sessionService:sessions});
+    if (desktop) remoteControl = new RemoteManager({directory, sessionService:sessions, hostId, onStateChange: () => api?.notifyNativeObservations()});
     bindings = await createHarnessAdapters({ hostId });
     for (const { pluginId, adapter } of bindings) {
       if (sessions.getAdapter(pluginId, adapter.status?.().instanceId ?? 'default')) throw new Error('Duplicate harness instance registration');
@@ -133,6 +133,7 @@ export async function startLocalRuntime({ dataDir = resolveUserDataDir(), reposi
       },
       chooseWorkspace: chooseWorkspace ?? (enableNativePicker && ['win32', 'darwin'].includes(process.platform) ? chooseNativeWorkspace : undefined), connectCodex, disconnectCodex, resetCodex,
       mk20Lan: mk20Lan ? { describe: () => mk20Lan.describe(), configure: async value => { mk20Lan.configure(value); await rescanAfterConfiguration(); return mk20Lan.describe(); }, remove: async () => { mk20Lan.remove(); await rescanAfterConfiguration(); return mk20Lan.describe(); } } : undefined,
+      mobileRemote: remoteControl,
       supervisor: await loadSupervisorAssets(repositoryRoot) });
     await api.start();
     // Explicit composition option only. There is no UI/CLI enablement, pairing,

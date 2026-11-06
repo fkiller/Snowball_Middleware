@@ -8,6 +8,8 @@ import type { SupervisorAssets } from './supervisor.js';
 export { loadSupervisorAssets, type SupervisorAssets } from './supervisor.js';
 export { WorkspaceFiles, type WorkspaceSummary } from './workspaces.js';
 export { RemoteReadGateway, type RemoteReadGatewayOptions } from './remote.js';
+export { RemotePairingCoordinator, computeSasVerificationCode, type PairedMobileDeviceInfo, type PendingPairingRequestInfo, type ActiveInvitationInfo } from './remote-pairing.js';
+export { renderQrSvg, encodeQrMatrix } from './qr-svg.js';
 export { parseTailscaleHost, extractTailscaleSelfHost } from './tailscale-host.js';
 export { PersistentRemoteCredentials, recoverAbandonedRemoteCredentialLock, type RemoteCredentialInfo } from './remote-credentials.js';
 
@@ -86,6 +88,14 @@ export interface LocalApiOptions {
     describe(): { selected: { version: number; targetAddress: string; interfaceName: string } | null; interfaces: { name: string; address: string }[]; error?: string };
     configure(value: { targetAddress: string; interfaceName: string }): Promise<unknown>;
     remove(): Promise<unknown>;
+  };
+  mobileRemote?: {
+    describe(): unknown;
+    startPairing(): Promise<unknown>;
+    approvePairing(pairingId: string): Promise<unknown>;
+    rejectPairing(pairingId: string): Promise<unknown>;
+    revokeDevice(deviceId: string): Promise<unknown>;
+    disable(): Promise<unknown>;
   };
 }
 /**
@@ -326,6 +336,7 @@ export class LocalApi {
       deviceSources: this.options.devices?.sourceStates() ?? [],
       deviceCandidates: this.options.devices?.listCandidates() ?? [],
       mk20Lan: this.options.mk20Lan?.describe() ?? null,
+      ...(this.options.mobileRemote ? { mobileRemote: this.options.mobileRemote.describe() } : {}),
       harness: this.options.harness?.describe() ?? null,
       hostname: this.options.hostname || os.hostname(),
       realSessions: this.options.realSessions ?? null,
@@ -517,6 +528,52 @@ export class LocalApi {
       try { await this.options.mk20Lan.remove(); }
       catch { fail(503, 'device_config_failed'); }
       finally { this.mk20LanBusy = false; }
+      this.send(res, 200, { snapshot: this.snapshot() }); return;
+    }
+    if (url.pathname === '/v1/remote/pair/start' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).length) fail(400, 'invalid_request');
+      if (!this.options.mobileRemote) fail(404, 'remote_pairing_unavailable');
+      let pairing: unknown;
+      try { pairing = await this.options.mobileRemote.startPairing(); }
+      catch { fail(503, 'remote_pairing_failed'); }
+      this.changed();
+      this.send(res, 200, { pairing, snapshot: this.snapshot() }); return;
+    }
+    if (url.pathname === '/v1/remote/pair/approve' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).length !== 1 || typeof body.pairingId !== 'string' || !/^pair_[a-f0-9]{16}$/.test(body.pairingId)) fail(400, 'invalid_request');
+      if (!this.options.mobileRemote) fail(404, 'remote_pairing_unavailable');
+      try { await this.options.mobileRemote.approvePairing(body.pairingId); }
+      catch { fail(409, 'pairing_not_found'); }
+      this.changed();
+      this.send(res, 200, { snapshot: this.snapshot() }); return;
+    }
+    if (url.pathname === '/v1/remote/pair/reject' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).length !== 1 || typeof body.pairingId !== 'string' || !/^pair_[a-f0-9]{16}$/.test(body.pairingId)) fail(400, 'invalid_request');
+      if (!this.options.mobileRemote) fail(404, 'remote_pairing_unavailable');
+      try { await this.options.mobileRemote.rejectPairing(body.pairingId); }
+      catch { fail(409, 'pairing_not_found'); }
+      this.changed();
+      this.send(res, 200, { snapshot: this.snapshot() }); return;
+    }
+    if (url.pathname === '/v1/remote/devices/revoke' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).length !== 1 || typeof body.deviceId !== 'string' || !/^(?:dev|remote)_[a-f0-9]{16,32}$/.test(body.deviceId)) fail(400, 'invalid_request');
+      if (!this.options.mobileRemote) fail(404, 'remote_pairing_unavailable');
+      try { await this.options.mobileRemote.revokeDevice(body.deviceId); }
+      catch { fail(503, 'remote_revoke_failed'); }
+      this.changed();
+      this.send(res, 200, { snapshot: this.snapshot() }); return;
+    }
+    if (url.pathname === '/v1/remote/disable' && req.method === 'POST') {
+      const body = await this.body(req); this.stillAuthorized(req, session);
+      if (Object.keys(body).length) fail(400, 'invalid_request');
+      if (!this.options.mobileRemote) fail(404, 'remote_pairing_unavailable');
+      try { await this.options.mobileRemote.disable(); }
+      catch { fail(503, 'remote_disable_failed'); }
+      this.changed();
       this.send(res, 200, { snapshot: this.snapshot() }); return;
     }
     if (url.pathname === '/v1/controller' && req.method === 'GET') {

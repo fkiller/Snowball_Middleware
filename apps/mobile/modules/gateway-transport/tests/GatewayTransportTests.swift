@@ -84,6 +84,44 @@ final class GatewayTransportTests: XCTestCase {
     request.start { result in XCTAssertEqual(result.failure, .cancelled); completed.fulfill() }
     wait(for: [completed], timeout: 2)
   }
+
+  func testTrackBPairingInvitationAndDeviceSigningIdentity() throws {
+    let fpBytes = Data(repeating: 0xab, count: 32)
+    let fpHex = String(repeating: "ab", count: 32)
+    let payload: [String: Any] = [
+      "v": 1,
+      "n": "Test Mac",
+      "s": "pc.tailnet.ts.net",
+      "f": fpBytes.base64UrlEncodedString(),
+      "u": ["https://192.168.1.20:54321", "https://pc.tailnet.ts.net"],
+      "i": "inv_0123456789abcdef0123456789abcdef",
+      "k": String(repeating: "b", count: 43)
+    ]
+    let jsonData = try JSONSerialization.data(withJSONObject: payload)
+    let parsed = try ParsedPairingInvitation(pairingCode: "SBP1.\(jsonData.base64UrlEncodedString())")
+    XCTAssertEqual(parsed.invitationId, "inv_0123456789abcdef0123456789abcdef")
+    XCTAssertEqual(parsed.fingerprint, fpHex)
+    XCTAssertEqual(parsed.tlsServerName, "pc.tailnet.ts.net")
+    XCTAssertEqual(parsed.endpoints.count, 2)
+
+    let identity = DeviceSigningIdentity()
+    XCTAssertTrue(identity.deviceId.hasPrefix("dev_"))
+    let (bodyData, sasCode) = try identity.buildPairRequestPayload(
+      invitationId: parsed.invitationId,
+      invitationSecret: parsed.invitationSecret,
+      fingerprint: parsed.fingerprint,
+      deviceLabel: "My iPhone"
+    )
+    XCTAssertEqual(sasCode.count, 6)
+    XCTAssertNotNil(Int(sasCode))
+    let bodyObj = try XCTUnwrap(JSONSerialization.jsonObject(with: bodyData) as? [String: Any])
+    XCTAssertEqual(bodyObj["invitationId"] as? String, parsed.invitationId)
+    XCTAssertEqual(bodyObj["publicKeySpki"] as? String, identity.publicKeySpki)
+
+    let headers = try identity.buildSignedRequestHeaders(method: "GET", path: "/remote/v1/sessions", fingerprint: parsed.fingerprint)
+    XCTAssertEqual(headers["X-Snowball-Device-Id"], identity.deviceId)
+    XCTAssertNotNil(headers["X-Snowball-Signature"])
+  }
 }
 
 private extension Result where Failure == GatewayTransportError {
