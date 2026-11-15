@@ -1,3 +1,5 @@
+MK20: If Settings remains visible after returning from Machines, update this PC installation and use **K4 Close**. **K17** opens Machines. Saved drafts and selections are retained.
+
 <p align="center">
   <img src="assets/banner.png" alt="Snowball Banner" width="100%">
 </p>

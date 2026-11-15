@@ -486,3 +486,17 @@ test('MK20 UX Parity: Model, Effort, and Access selections reflect active sessio
   assert.equal(context.getCurrentSession().access, 'auto-approve', 'Committed access must persist on current session object');
 });
 
+
+
+test('MK20 Settings has a reachable exit while firmware owns Machines K17', () => {
+  const context = new ContextManager();
+  context.voiceDraftText = 'preserved draft';
+  context.viewMode = 'settings';
+  context.updateReaderForCurrentSession();
+  const keys = context.getDeviceState().keys;
+  assert.equal(keys.find(k => k.keyId === 4).labelMain, 'Close');
+  assert.equal(keys.find(k => k.keyId === 4).isDisabled, false);
+  assert.equal(keys.find(k => k.keyId === 17).labelMain, 'Change PC');
+  assert.ok(context.readerLines.some(line => line.includes('K4: Close')));
+  assert.equal(context.voiceDraftText, 'preserved draft');
+});

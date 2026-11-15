@@ -1,3 +1,5 @@
+MK20: Machines에서 돌아와도 Settings만 표시되면 이 PC 설치본을 업데이트한 뒤 **K4 Close**로 닫습니다. **K17**은 Machines를 엽니다. 저장한 초안과 선택은 보존합니다.
+
 <p align="center">
   <img src="assets/banner.png" alt="Snowball Banner" width="100%">
 </p>

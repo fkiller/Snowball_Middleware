@@ -856,7 +856,7 @@ export class ContextManager {
       currentModeKey = 'settings';
       this.readerTitle = 'Settings';
       this.readerSubtitle = 'Snowball Control | Middleware';
-      this.readerLines = ['Local Control Online', 'K17: Close settings'];
+      this.readerLines = ['Local Control Online', 'K4: Close settings | K17: Machines'];
     } else if (this.activeEditor !== 'none') {
       let title = '', subtitle = '', items = [];
       switch (this.activeEditor) {
@@ -1153,12 +1153,12 @@ export class ContextManager {
       for (let kid = 1; kid <= 20; kid++) {
         keys.push({
           keyId: kid,
-          labelTop: kid === 17 ? 'SETTINGS' : '',
-          labelMain: kid === 17 ? 'Close' : '',
-          isFilled: kid === 17,
+          labelTop: kid === 17 ? 'MACHINES' : kid === 4 ? 'SETTINGS' : '',
+          labelMain: kid === 17 ? 'Change PC' : kid === 4 ? 'Close' : '',
+          isFilled: kid === 4 || kid === 17,
           isEditing: false,
           isFocused: false,
-          isDisabled: kid !== 17
+          isDisabled: kid !== 17 && kid !== 4
         });
       }
     } else if (this.viewMode === 'workspace') {

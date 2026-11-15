@@ -1109,7 +1109,7 @@ async function handleMk20Input(input) {
 
     // ViewMode = settings
     if (context.viewMode === 'settings') {
-      if (kid === 17) {
+      if (kid === 4 || kid === 17) {
         context.viewMode = 'session';
         context.updateReaderForCurrentSession();
       }
