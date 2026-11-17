@@ -1,3 +1,4 @@
+import { syncSkinSettings, handleSkinSettingsInput } from './mk20-settings.mjs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import fs from 'node:fs';
@@ -940,6 +941,8 @@ async function paintMk20() {
     const selection={harnessPluginId:context.getCurrentHarness().id,harnessInstanceId:'default',...(session.sessionKey?{sessionKey:session.sessionKey}:{})};
     const previous=controllerStates.get(mk20ControllerId);
     if(JSON.stringify(previous.selection)!==JSON.stringify(selection)||JSON.stringify(previous.preferences)!==JSON.stringify(preferences))controllerStates.update(mk20ControllerId,previous.revision,{selection,preferences});
+    syncSkinSettings(context, mk20);
+    if (context.viewMode === 'settings') context.updateReaderForCurrentSession();
     const payload = context.toPreviewPayload();
     await mk20.preview(payload);
   } catch (err) {
@@ -969,6 +972,8 @@ async function handleMk20Input(input) {
     console.log('[MK20 INPUT RECEIVED]:', input);
   }
   try {
+
+  if (handleSkinSettingsInput(context, mk20, input)) { await paintMk20(); return; }
 
   if (input.kind === 'knob-turn') {
     if (input.knob === 'left') {
@@ -1107,16 +1112,6 @@ async function handleMk20Input(input) {
       return;
     }
 
-    // ViewMode = settings
-    if (context.viewMode === 'settings') {
-      if (kid === 4 || kid === 17) {
-        context.viewMode = 'session';
-        context.updateReaderForCurrentSession();
-      }
-      void paintMk20();
-      return;
-    }
-
     // ViewMode = session
     if (kid === 17) {
       if (context.isRecordingVoice) {
@@ -1191,6 +1186,7 @@ async function handleMk20Input(input) {
       await context.readWorkspaceFiles(context.getCurrentWorkspacePath());
     } else if (kid === 2) {
       context.activeEditor = 'none';
+      context.settingsSkinFocus = undefined;
       context.viewMode = 'settings';
       context.updateReaderForCurrentSession();
     } else if ([19, 15, 11, 7, 3].includes(kid)) {

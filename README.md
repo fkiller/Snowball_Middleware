@@ -1,3 +1,5 @@
+MK20 Settings exposes the device plugin’s registered skins. Use the left knob to browse and click to apply, tap a displayed skin, K18 Next, or K10 First. K4 closes Settings; K17 opens Machines. The chosen skin is retained per controller.
+
 MK20: If Settings remains visible after returning from Machines, update this PC installation and use **K4 Close**. **K17** opens Machines. Saved drafts and selections are retained.
 
 <p align="center">

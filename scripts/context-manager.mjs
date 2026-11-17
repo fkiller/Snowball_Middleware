@@ -1,3 +1,4 @@
+import { skinSettingsView } from './mk20-settings.mjs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
@@ -854,9 +855,10 @@ export class ContextManager {
 
     if (this.viewMode === 'settings') {
       currentModeKey = 'settings';
-      this.readerTitle = 'Settings';
-      this.readerSubtitle = 'Snowball Control | Middleware';
-      this.readerLines = ['Local Control Online', 'K4: Close settings | K17: Machines'];
+      const settings = skinSettingsView(this);
+      this.readerTitle = settings.title;
+      this.readerSubtitle = settings.subtitle;
+      this.readerLines = settings.lines;
     } else if (this.activeEditor !== 'none') {
       let title = '', subtitle = '', items = [];
       switch (this.activeEditor) {
@@ -1150,17 +1152,7 @@ export class ContextManager {
       keys.push({ keyId: 8, labelTop: 'DISMISS', labelMain: 'Later', isFilled: false, isEditing: false, isFocused: false });
       keys.push({ keyId: 4, labelTop: 'ABORT', labelMain: 'Stop', isFilled: false, isEditing: false, isFocused: false });
     } else if (this.viewMode === 'settings') {
-      for (let kid = 1; kid <= 20; kid++) {
-        keys.push({
-          keyId: kid,
-          labelTop: kid === 17 ? 'MACHINES' : kid === 4 ? 'SETTINGS' : '',
-          labelMain: kid === 17 ? 'Change PC' : kid === 4 ? 'Close' : '',
-          isFilled: kid === 4 || kid === 17,
-          isEditing: false,
-          isFocused: false,
-          isDisabled: kid !== 17 && kid !== 4
-        });
-      }
+      keys.push(...skinSettingsView(this).keys);
     } else if (this.viewMode === 'workspace') {
       if (!this.isWorkspaceViewerActive) {
         // Mode 1: 4x4 Full File Browser Mode

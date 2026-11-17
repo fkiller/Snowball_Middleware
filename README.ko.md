@@ -1,3 +1,5 @@
+MK20 Settings에서 기기 플러그인에 등록된 스킨을 선택합니다. 왼쪽 노브로 탐색하고 클릭해 적용하거나, 표시된 스킨·K18 Next·K10 First를 누릅니다. K4는 닫기, K17은 Machines이며 선택한 스킨은 컨트롤러별로 보존합니다.
+
 MK20: Machines에서 돌아와도 Settings만 표시되면 이 PC 설치본을 업데이트한 뒤 **K4 Close**로 닫습니다. **K17**은 Machines를 엽니다. 저장한 초안과 선택은 보존합니다.
 
 <p align="center">
