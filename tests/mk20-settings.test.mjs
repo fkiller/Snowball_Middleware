@@ -49,3 +49,12 @@ test('K4 closes without losing drafts, session selection or the selected plugin 
   assert.equal(context.viewMode,'session');assert.equal(context.voiceDraftText,'보존할 초안');
   assert.equal(context.getCurrentSession().id,session);assert.equal(transport.getActiveSkin().id,skin);
 });
+
+test('Scoped Settings metadata fits the real wire encoder capacity', {skip:!native}, () => {
+  const {context,transport}=setup();
+  context.harnessPresentations={'codex':{}};
+  const payload=context.toPreviewPayload();
+  const encoded=native.encodeLegacyPreview({...payload,skinId:transport.getActiveSkin().id,controllerId:'ctl_0123456789abcdef',runId:'0123456789abcdef0123456789abcdef',leaseToken:'0123456789abcdef0123456789abcdef'},1);
+  assert.ok(encoded.length>1400);assert.ok(encoded.length<=4096);
+  const parsed=JSON.parse(encoded);assert.equal(parsed.keys.filter(k=>k.top?.startsWith('SKIN')||k.top==='ACTIVE').length,8);
+});
